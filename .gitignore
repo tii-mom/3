@@ -142,3 +142,6 @@ docs/*
 frontend/coverage/
 aicodex
 output/
+.wrangler/
+.agents/
+skills-lock.json
