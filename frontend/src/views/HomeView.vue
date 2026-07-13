@@ -42,7 +42,7 @@
         <!-- Logo -->
         <div class="flex items-center">
           <div class="h-10 w-10 overflow-hidden rounded-xl shadow-md">
-            <img :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-contain" />
+            <img :src="siteLogo || '/logo.svg'" alt="Logo" class="h-full w-full object-contain" />
           </div>
         </div>
 
@@ -220,7 +220,7 @@
                   >
                     <div class="flex items-center gap-3">
                       <div class="h-9 w-9 rounded-lg bg-gradient-to-br from-primary-500/10 to-orange-600/10 border border-primary-500/20 flex items-center justify-center p-1.5">
-                        <img src="/logo.png" alt="3API Logo" class="h-full w-full object-contain" />
+                        <img src="/logo.svg" alt="3API Logo" class="h-full w-full object-contain" />
                       </div>
                       <div class="flex flex-col gap-0.5">
                         <div class="flex items-center gap-1.5">
