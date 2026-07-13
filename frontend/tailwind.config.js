@@ -19,33 +19,33 @@ export default {
           900: '#7c2d12',
           950: '#431407'
         },
-        // 辅助色 - 深灰/暖灰 (Zinc)
+        // 辅助色 - 深灰/暖灰 (Zinc 变更为 Midnight Navy)
         accent: {
-          50: '#fafafa',
-          100: '#f4f4f5',
-          200: '#e4e4e7',
-          300: '#d4d4d8',
-          400: '#a1a1aa',
-          500: '#71717a',
-          600: '#52525b',
-          700: '#3f3f46',
-          800: '#27272a',
-          900: '#18181b',
-          950: '#09090b'
+          50: '#f0f2f8',
+          100: '#e1e5f0',
+          200: '#c2cbdf',
+          300: '#97a6ca',
+          400: '#677bb0',
+          500: '#485c94',
+          600: '#364778',
+          700: '#28355c',
+          800: '#181c2c',
+          900: '#0f121d',
+          950: '#080a10'
         },
-        // 深色模式背景 (Zinc)
+        // 深色模式背景 (Midnight Navy)
         dark: {
-          50: '#fafafa',
-          100: '#f4f4f5',
-          200: '#e4e4e7',
-          300: '#d4d4d8',
-          400: '#a1a1aa',
-          500: '#71717a',
-          600: '#52525b',
-          700: '#3f3f46',
-          800: '#27272a',
-          900: '#18181b',
-          950: '#09090b'
+          50: '#f0f2f8',
+          100: '#e1e5f0',
+          200: '#c2cbdf',
+          300: '#97a6ca',
+          400: '#677bb0',
+          500: '#485c94',
+          600: '#364778',
+          700: '#28355c',
+          800: '#181c2c',
+          900: '#0f121d',
+          950: '#080a10'
         }
       },
       fontFamily: {
@@ -77,11 +77,11 @@ export default {
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
         'gradient-primary': 'linear-gradient(135deg, #ff7d24 0%, #ea580c 100%)',
-        'gradient-dark': 'linear-gradient(135deg, #27272a 0%, #18181b 100%)',
+        'gradient-dark': 'linear-gradient(135deg, #181c2c 0%, #080a10 100%)',
         'gradient-glass':
           'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
         'mesh-gradient':
-          'radial-gradient(at 40% 20%, rgba(255, 125, 36, 0.12) 0px, transparent 50%), radial-gradient(at 80% 0%, rgba(245, 158, 11, 0.08) 0px, transparent 50%), radial-gradient(at 0% 50%, rgba(255, 125, 36, 0.08) 0px, transparent 50%)'
+          'radial-gradient(at 40% 20%, rgba(255, 125, 36, 0.12) 0px, transparent 50%), radial-gradient(at 80% 0%, rgba(0, 132, 255, 0.1) 0px, transparent 50%), radial-gradient(at 0% 50%, rgba(255, 125, 36, 0.08) 0px, transparent 50%)'
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',

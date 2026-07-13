@@ -554,6 +554,7 @@
     @apply transition-all duration-200;
     @apply hover:bg-gray-100 dark:hover:bg-dark-800;
     @apply hover:text-gray-900 dark:hover:text-white;
+    @apply active:scale-[0.98];
     padding-left: 1.0625rem;
     padding-right: 0.875rem;
   }

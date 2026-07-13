@@ -995,8 +995,8 @@ onUnmounted(() => {
   animation: pulse-dot-kv 2s ease-in-out infinite;
 }
 
-/* Tabular nums */
 .tabular-nums {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
 }

@@ -20,7 +20,57 @@ export default {
     tags: {
       subscriptionToApi: 'Subscription to API',
       stickySession: 'Session Persistence',
-      realtimeBilling: 'Pay As You Go'
+      realtimeBilling: 'Pay As You Go',
+      officialNative: 'Official Native・Pure Performance',
+      officialNativeDesc: 'Provide official channel native API interfaces without any castration or debasing. Support the latest models to ensure native speed and output quality.'
+    },
+    ccswitch: {
+      title: 'One-click CcSwitch Import',
+      desc: 'Zero configuration access. Make your client gain full-blood AI capabilities in a second. No tedious settings, direct import of API keys and routing configs.',
+      btn: 'Download CCS',
+      hint: '* Ensure CcSwitch client is installed and 3API account is logged in',
+      consoleTitle: '3API Console (Keys Management)',
+      clientTitle: 'CC Switch Client',
+      importBtn: 'Import to CCS',
+      keyName: 'Name',
+      keyVal: 'API Key',
+      keyUsage: 'Usage',
+      keyOps: 'Actions'
+    },
+    steps: {
+      title: 'Get Started in Three Steps',
+      subtitle: 'An intuitive integration workflow that gets you running in seconds',
+      step1Title: '1. Create API Key',
+      step1Desc: 'Generate your dedicated API key token inside the 3API dashboard key table.',
+      step2Title: '2. Import to CCS',
+      step2Desc: 'Click the "Import to CCS" button inside your console to sync keys dynamically.',
+      step3Title: '3. Enable in CCS',
+      step3Desc: 'Open your CC Switch client, select the 3API node, and toggle enable to activate.'
+    },
+    codex: {
+      title: 'Powering Advanced AI Coding Agents',
+      subtitle: '3API native full-power models feed your coding assistant with ultra-fast, uncensored contextual logic',
+      newtask: 'New Task',
+      scheduled: 'Scheduled',
+      plugins: 'Plugins',
+      projects: 'Projects',
+      notasks: 'no tasks',
+      tasks: 'Tasks',
+      identifyModel: 'Identify Current Model',
+      startPreview: 'Start Local Preview',
+      settings: 'Settings',
+      userPrompt: 'Hello, what model are you?',
+      inputPlaceholder: 'Request follow-up changes',
+      fullAccess: 'Full Access',
+      tokenRate: '5.6 Sol Light',
+      outputTitle: 'Output',
+      outputDesc: 'Create files or site',
+      sourcesTitle: 'Sources',
+      sourcesDesc: 'Attach files or connect apps'
+    },
+    testimonials: {
+      title: 'Trusted by Developers and Teams',
+      subtitle: 'Thousands of software engineers and machine learning teams use 3API for their everyday agent pipelines'
     },
     // Pain points section
     painPoints: {

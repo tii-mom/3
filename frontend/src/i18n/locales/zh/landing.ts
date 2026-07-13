@@ -20,7 +20,57 @@ export default {
     tags: {
       subscriptionToApi: '订阅转 API',
       stickySession: '会话保持',
-      realtimeBilling: '按量计费'
+      realtimeBilling: '按量计费',
+      officialNative: '官方账号・原生满血',
+      officialNativeDesc: '提供官方渠道原生 API 接口，无任何阉割与降智。支持最新模型特性，确保企业级极速响应与原生输出质量。'
+    },
+    ccswitch: {
+      title: '一键导入 CcSwitch',
+      desc: '零配置接入，让您的客户端瞬间具备满血 AI 能力。无需繁琐设置，直接导入 API 密钥及路由配置。',
+      btn: '下载 CCS',
+      hint: '* 导入前请确保已安装 CcSwitch 客户端并已登录 3API 账号',
+      consoleTitle: '3API 控制台 (密钥管理)',
+      clientTitle: 'CC Switch 客户端',
+      importBtn: '导入到 CCS',
+      keyName: '名称',
+      keyVal: 'API 密钥',
+      keyUsage: '用量',
+      keyOps: '操作'
+    },
+    steps: {
+      title: '只需三步，即刻起航',
+      subtitle: '直观高效的接入流程，数秒内开启您的满血开发之旅',
+      step1Title: '一、创建 API 密钥',
+      step1Desc: '在 3API 密钥面板一键生成您专属的 API 接入令牌。',
+      step2Title: '二、导入到 CCS',
+      step2Desc: '在密钥行操作区点击「导入到 CCS」，实时流光分发至客户端。',
+      step3Title: '三、在 CCS 点击启用',
+      step3Desc: '打开 CC Switch 客户端，点击 3API 节点的启用按钮，瞬间激活代理。'
+    },
+    codex: {
+      title: '无缝驱动顶级 AI 开发工具',
+      subtitle: '3API 原生满血模型，为您的高端开发智能体提供极速、无降智的核心算力支持',
+      newtask: '新建任务',
+      scheduled: '已安排',
+      plugins: '插件',
+      projects: '项目',
+      notasks: '无任务',
+      tasks: '任务',
+      identifyModel: '识别当前模型',
+      startPreview: '启动本地预览',
+      settings: '设置',
+      userPrompt: '你好，你是什么模型？',
+      inputPlaceholder: '要求后续变更',
+      fullAccess: '完全访问',
+      tokenRate: '5.6 Sol 轻度',
+      outputTitle: '输出',
+      outputDesc: '创建文件或站点',
+      sourcesTitle: '来源',
+      sourcesDesc: '附加文件或连接应用'
+    },
+    testimonials: {
+      title: '开发者与团队的使用体验',
+      subtitle: '全球数千名全栈工程师和开发团队正在使用 3API 驱动他们的日常智能开发流程'
     },
     // 用户痛点区块
     painPoints: {
