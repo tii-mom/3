@@ -125,8 +125,8 @@
             >
               {{ siteName }}.
             </h1>
-            <p class="mb-8 text-base text-gray-600 dark:text-dark-300 leading-relaxed max-w-[45ch] mx-auto lg:mx-0">
-              Subscription aggregation, session persistence, and real-time pay-as-you-go billing. Connected instantly to your local developer client.
+             <p class="mb-8 text-base text-gray-600 dark:text-dark-300 leading-relaxed max-w-[45ch] mx-auto lg:mx-0">
+              {{ siteSubtitle }}
             </p>
 
             <!-- CTA Button -->
@@ -845,6 +845,7 @@ function triggerImportSimulation() {
 
 // Site settings - directly from appStore (already initialized from injected config)
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || '3API')
+const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || 'Subscription aggregation, session persistence, and real-time pay-as-you-go billing. Connected instantly to your local developer client.')
 const siteLogo = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
 const docUrl = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.doc_url || appStore.docUrl || ''))
 const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
@@ -910,7 +911,7 @@ onMounted(() => {
   }
 
   // Start Codex Response Typing Animation
-  let fullResponse = '你好，我是 Codex，基于 GPT-5 的编程与协作智能体。已通过 3API 一键接入，极速响应，原生满血体验！'
+  let fullResponse = '你好，我是 Codex，基于 GPT 的编程与协作智能体。'
   let responseCharIndex = 0
   const typingTimer = setInterval(() => {
     if (responseCharIndex < fullResponse.length) {
