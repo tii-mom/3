@@ -39,7 +39,8 @@ RUN --mount=type=cache,id=sub2api-pnpm-store,target=/root/.local/share/pnpm/stor
 # Copy only that subtree to keep the build dependency minimal.
 COPY frontend/ ./
 COPY docs/legal/ /app/docs/legal/
-RUN pnpm run build
+# pnpm-workspace.yaml uses v11 allowBuilds format; pnpm@9 misreads it as workspace root
+RUN rm -f pnpm-workspace.yaml && pnpm run build
 
 # -----------------------------------------------------------------------------
 # Stage 2: Backend Builder
