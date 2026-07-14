@@ -40,7 +40,8 @@ RUN --mount=type=cache,id=sub2api-pnpm-store,target=/root/.local/share/pnpm/stor
 COPY frontend/ ./
 COPY docs/legal/ /app/docs/legal/
 # pnpm-workspace.yaml uses v11 allowBuilds format; pnpm@9 misreads it as workspace root
-RUN rm -f pnpm-workspace.yaml && pnpm run build
+# Skip vue-tsc type-checking in Docker (dev concern only) to avoid OOM on low-memory servers
+RUN rm -f pnpm-workspace.yaml && NODE_OPTIONS="--max-old-space-size=1024" npx vite build
 
 # -----------------------------------------------------------------------------
 # Stage 2: Backend Builder
