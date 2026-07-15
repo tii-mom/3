@@ -9,6 +9,9 @@
 
   html {
     @apply scroll-smooth antialiased;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   body {
@@ -68,10 +71,10 @@
   .btn {
     @apply inline-flex items-center justify-center gap-2;
     @apply rounded-xl px-4 py-2.5 text-sm font-medium;
-    @apply transition-all duration-200 ease-out;
     @apply focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:ring-offset-2;
     @apply disabled:transform-none disabled:cursor-not-allowed disabled:opacity-50;
     @apply active:scale-[0.98];
+    transition: all 300ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .btn-primary {
@@ -217,12 +220,41 @@
     @apply rounded-2xl;
     @apply border border-gray-100 dark:border-dark-700/50;
     @apply shadow-card;
-    @apply transition-all duration-300;
+    transition: all 300ms cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+
+  .card-premium {
+    @apply bg-white dark:bg-dark-800/60;
+    @apply rounded-3xl;
+    @apply border border-gray-100/80 dark:border-white/[0.06];
+    @apply backdrop-blur-xl;
+    box-shadow:
+      0 1px 3px rgba(0,0,0,0.04),
+      0 4px 16px rgba(0,0,0,0.04),
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      inset 0 -1px 0 rgba(0,0,0,0.02);
+    transition: all 400ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .card-premium:hover {
+    @apply border-gray-200/80 dark:border-white/[0.1];
+    box-shadow:
+      0 2px 6px rgba(0,0,0,0.06),
+      0 10px 40px rgba(0,0,0,0.06),
+      inset 0 1px 0 rgba(255,255,255,0.1),
+      inset 0 -1px 0 rgba(0,0,0,0.02);
+    transform: translateY(-1px);
   }
 
   .card-hover {
-    @apply hover:-translate-y-0.5 hover:shadow-card-hover;
+    @apply hover:shadow-card-hover;
     @apply hover:border-gray-200 dark:hover:border-dark-600;
+    transition: all 400ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .card-hover:hover {
+    transform: translateY(-2px);
   }
 
   .card-glass {
@@ -276,6 +308,7 @@
 
   .stat-value {
     @apply text-2xl font-bold text-gray-900 dark:text-white truncate;
+    font-variant-numeric: tabular-nums;
   }
 
   .stat-label {
@@ -301,19 +334,21 @@
 
   .table {
     @apply w-full text-sm;
+    font-variant-numeric: tabular-nums;
   }
 
   .table th {
     @apply px-4 py-3 text-left font-medium;
-    @apply text-gray-600 dark:text-dark-300;
-    @apply bg-gray-50 dark:bg-dark-800/50;
-    @apply border-b border-gray-200 dark:border-dark-700;
+    @apply text-gray-500 dark:text-dark-400;
+    @apply bg-gray-50/80 dark:bg-dark-800/30;
+    @apply border-b border-gray-200/80 dark:border-dark-700/60;
+    @apply text-xs uppercase tracking-wider;
   }
 
   .table td {
     @apply px-4 py-3;
     @apply text-gray-700 dark:text-gray-300;
-    @apply border-b border-gray-100 dark:border-dark-800;
+    @apply border-b border-gray-100/80 dark:border-dark-800/60;
   }
 
   .table tr:last-child td {
@@ -329,30 +364,51 @@
   .badge {
     @apply inline-flex items-center gap-1;
     @apply rounded-full px-2.5 py-0.5 text-xs font-medium;
+    font-variant-numeric: tabular-nums;
   }
 
   .badge-primary {
-    @apply bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400;
+    @apply bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-300;
   }
 
   .badge-success {
-    @apply bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400;
+    @apply text-emerald-600 dark:text-emerald-300;
+    background-color: rgba(16, 185, 129, 0.08);
+  }
+
+  .dark .badge-success {
+    background-color: rgba(16, 185, 129, 0.12);
   }
 
   .badge-warning {
-    @apply bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400;
+    @apply text-amber-600 dark:text-amber-300;
+    background-color: rgba(245, 158, 11, 0.08);
+  }
+
+  .dark .badge-warning {
+    background-color: rgba(245, 158, 11, 0.12);
   }
 
   .badge-danger {
-    @apply bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400;
+    @apply text-red-600 dark:text-red-300;
+    background-color: rgba(239, 68, 68, 0.08);
+  }
+
+  .dark .badge-danger {
+    background-color: rgba(239, 68, 68, 0.12);
   }
 
   .badge-gray {
-    @apply bg-gray-100 text-gray-700 dark:bg-dark-700 dark:text-dark-300;
+    @apply bg-gray-100/80 text-gray-600 dark:bg-dark-700/60 dark:text-dark-300;
   }
 
   .badge-purple {
-    @apply bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400;
+    @apply text-purple-600 dark:text-purple-300;
+    background-color: rgba(147, 51, 234, 0.08);
+  }
+
+  .dark .badge-purple {
+    background-color: rgba(147, 51, 234, 0.12);
   }
 
   /* ============ 下拉菜单 ============ */
@@ -526,20 +582,18 @@
   /* ============ 侧边栏 ============ */
   .sidebar {
     @apply fixed inset-y-0 left-0 z-40;
-    @apply w-64 bg-white dark:bg-dark-900;
-    @apply border-r border-gray-200 dark:border-dark-800;
+    @apply w-64 bg-white/95 dark:bg-dark-900/95;
+    @apply backdrop-blur-xl;
+    @apply border-r border-gray-200/60 dark:border-dark-800/60;
     @apply flex flex-col;
-    @apply transition-transform duration-300;
-    transition-property: width, transform;
+    transition: width 300ms cubic-bezier(0.16, 1, 0.3, 1), transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .sidebar-header {
     @apply h-16 px-6;
     @apply flex items-center gap-3;
-    @apply border-b border-gray-100 dark:border-dark-800;
-    transition:
-      padding 0.2s ease,
-      gap 0.2s ease;
+    @apply border-b border-gray-100/80 dark:border-dark-800/60;
+    transition: padding 200ms cubic-bezier(0.16, 1, 0.3, 1), gap 200ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .sidebar-nav {
@@ -550,19 +604,21 @@
     @apply flex items-center gap-3 rounded-xl py-2.5;
     @apply overflow-hidden;
     @apply text-sm font-medium;
-    @apply text-gray-600 dark:text-dark-300;
-    @apply transition-all duration-200;
-    @apply hover:bg-gray-100 dark:hover:bg-dark-800;
+    @apply text-gray-500 dark:text-dark-400;
+    @apply hover:bg-gray-50 dark:hover:bg-dark-800/60;
     @apply hover:text-gray-900 dark:hover:text-white;
     @apply active:scale-[0.98];
     padding-left: 1.0625rem;
     padding-right: 0.875rem;
+    transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .sidebar-link-active {
-    @apply bg-primary-50 dark:bg-primary-900/20;
+    @apply bg-primary-50/80 dark:bg-primary-900/15;
     @apply text-primary-600 dark:text-primary-400;
-    @apply hover:bg-primary-100 dark:hover:bg-primary-900/30;
+    @apply hover:bg-primary-100/80 dark:hover:bg-primary-900/25;
+    box-shadow: inset 3px 0 0 0 theme('colors.primary.500');
+    border-radius: 0 0.75rem 0.75rem 0;
   }
 
   .sidebar-section {
@@ -571,8 +627,8 @@
 
   .sidebar-section-title {
     @apply mb-2 px-3;
-    @apply text-xs font-semibold uppercase tracking-wider;
-    @apply text-gray-400 dark:text-dark-500;
+    @apply text-[10px] font-semibold uppercase tracking-[0.12em];
+    @apply text-gray-400/80 dark:text-dark-500/80;
   }
 
   /* ============ 页面头部 ============ */
@@ -625,20 +681,20 @@
   /* ============ 标签页 ============ */
   .tabs {
     @apply flex gap-1 p-1;
-    @apply rounded-xl bg-gray-100 dark:bg-dark-800;
+    @apply rounded-xl bg-gray-100/80 dark:bg-dark-800/60;
   }
 
   .tab {
     @apply rounded-lg px-4 py-2 text-sm font-medium;
-    @apply text-gray-600 dark:text-dark-400;
-    @apply transition-all duration-200;
+    @apply text-gray-500 dark:text-dark-400;
     @apply hover:text-gray-900 dark:hover:text-white;
+    transition: all 250ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .tab-active {
-    @apply bg-white dark:bg-dark-700;
+    @apply bg-white dark:bg-dark-700/80;
     @apply text-gray-900 dark:text-white;
-    @apply shadow-sm;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.08);
   }
 
   /* ============ 进度条 ============ */
