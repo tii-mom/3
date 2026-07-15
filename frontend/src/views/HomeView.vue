@@ -332,6 +332,55 @@
           </div>
         </div>
 
+        <!-- Codex App Download Section -->
+        <div class="mb-16 rounded-3xl border border-gray-200/50 bg-white/65 p-8 shadow-xl backdrop-blur-md dark:border-dark-700/50 dark:bg-dark-900/60 text-center relative overflow-hidden">
+          <div class="pointer-events-none absolute -left-20 -top-20 h-48 w-48 rounded-full bg-primary-500/5 blur-2xl"></div>
+          <div class="pointer-events-none absolute -right-20 -bottom-20 h-48 w-48 rounded-full bg-orange-500/5 blur-2xl"></div>
+          
+          <div class="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-orange-600 shadow-md shadow-primary-500/20 text-white">
+            <Icon name="download" size="lg" />
+          </div>
+          <h2 class="mb-2 text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+            下载 OpenAI Codex 官方客户端
+          </h2>
+          <p class="mb-6 text-sm text-gray-600 dark:text-dark-400 max-w-[60ch] mx-auto leading-relaxed">
+            为您整理了官方最新的 Windows 与 macOS 桌面版客户端。国内直连高速下载，安装后在设置中填入本站的 API 地址 <strong>https://api.3api.shop/v1</strong> 和您的令牌即可免翻墙使用。
+          </p>
+          
+          <div class="flex flex-wrap items-center justify-center gap-4">
+            <!-- Windows Download -->
+            <a
+              href="https://api.3api.shop/downloads/Codex-x64.msix"
+              class="inline-flex items-center gap-2.5 rounded-2xl bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 text-sm font-semibold transition-all shadow-md active:scale-[0.98] dark:bg-gray-800 dark:hover:bg-gray-700"
+            >
+              <svg class="h-4 w-4 fill-current" viewBox="0 0 24 24">
+                <path d="M0 3.449L9.75 2.1v9.45H0V3.449zM0 12.45h9.75v9.45L0 20.551v-8.1zM11.25 1.899L24 0v11.55H11.25V1.899zM11.25 12.45H24v11.55l-12.75-1.9v-9.65z"/>
+              </svg>
+              Windows 版下载 (.msix)
+            </a>
+            <!-- Mac Apple Silicon -->
+            <a
+              href="https://api.3api.shop/downloads/Codex-mac-arm64.dmg"
+              class="inline-flex items-center gap-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 text-sm font-semibold transition-all border border-gray-200/50 active:scale-[0.98] dark:bg-dark-800 dark:hover:bg-dark-700 dark:text-white dark:border-dark-700/50"
+            >
+              <svg class="h-4 w-4 fill-current" viewBox="0 0 24 24">
+                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-.96.04-2.13.64-2.82 1.45-.6.69-1.12 1.83-.98 2.94 1.07.08 2.15-.52 2.81-1.33z"/>
+              </svg>
+              Mac 苹果芯片版 (.dmg)
+            </a>
+            <!-- Mac Intel -->
+            <a
+              href="https://api.3api.shop/downloads/Codex-mac-x64.dmg"
+              class="inline-flex items-center gap-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 text-sm font-semibold transition-all border border-gray-200/50 active:scale-[0.98] dark:bg-dark-800 dark:hover:bg-dark-700 dark:text-white dark:border-dark-700/50"
+            >
+              <svg class="h-4 w-4 fill-current" viewBox="0 0 24 24">
+                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-.96.04-2.13.64-2.82 1.45-.6.69-1.12 1.83-.98 2.94 1.07.08 2.15-.52 2.81-1.33z"/>
+              </svg>
+              Mac 英特尔芯片版 (.dmg)
+            </a>
+          </div>
+        </div>
+
         <!-- SVG Technology Logo Wall (Social Proof) -->
         <div class="mb-16 border-y border-gray-200/10 dark:border-dark-800/20 py-6">
           <div class="mx-auto flex flex-wrap items-center justify-center gap-10 md:gap-16 opacity-35 dark:opacity-20 select-none grayscale hover:grayscale-0 transition-all duration-300">
