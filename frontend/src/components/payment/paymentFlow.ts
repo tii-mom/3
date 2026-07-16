@@ -98,7 +98,7 @@ export function normalizeVisibleMethod(method: string): VisiblePaymentMethod | '
 export function getVisibleMethods(methods: Record<string, MethodLimit>): Record<string, MethodLimit> {
   const visible: Record<string, MethodLimit> = {}
 
-  Object.entries(methods).forEach(([type, limit]) => {
+  Object.entries(methods || {}).forEach(([type, limit]) => {
     const normalized = normalizeVisibleMethod(type) || type.trim()
     if (!normalized) return
 
