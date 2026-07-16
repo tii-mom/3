@@ -17,6 +17,39 @@ export default {
     // User-focused value proposition
     heroSubtitle: 'One Key, All AI Models',
     heroDescription: 'No need to manage multiple subscriptions. Access Claude, GPT, Gemini and more with a single API key',
+    badge: {
+      vpnFree: '🇨🇳 Mainland Friendly · VPN Free Dedicated Connection'
+    },
+    download: {
+      windows: 'Windows Client',
+      windowsDesc: 'x64 · Windows 10+',
+      macArm: 'Mac Apple Silicon',
+      macArmDesc: 'Apple Chip · macOS',
+      macIntel: 'Mac Intel',
+      macIntelDesc: 'Intel · macOS'
+    },
+    platform: {
+      mobile: 'Mobile',
+      web: 'Web',
+      desktop: 'Desktop'
+    },
+    terminal: {
+      comment: '# Set your custom API gateway endpoint'
+    },
+    stats: {
+      responseTime: 'Response Time (Demo)',
+      uptime: 'Proxy Uptime (Demo)'
+    },
+    bento: {
+      title: 'No Desktop? Access directly on Mobile',
+      subtitle: 'Log in to your dashboard to use active models, image generation, and creative tools.',
+      mobileTitle: 'Mobile Web App Support',
+      mobileDesc: 'No VPN needed. Use active models directly inside your mobile browser for uninterrupted workflows.',
+      modelsTitle: 'Global Elite Models, Unified Access',
+      modelsDesc: 'Single API endpoint aggregates OpenAI, Claude, Gemini, DeepSeek and more based on active setup.',
+      toolsTitle: 'Images, Slides & Asset Management',
+      toolsDesc: 'Support GPT Image 2 creation; Slides generation and stocks analysis available when enabled, pay-as-you-go.'
+    },
     tags: {
       subscriptionToApi: 'Subscription to API',
       stickySession: 'Session Persistence',
@@ -25,7 +58,7 @@ export default {
       officialNativeDesc: 'Provide official channel native API interfaces without any castration or debasing. Support the latest models to ensure native speed and output quality.'
     },
     ccswitch: {
-      title: 'One-click CcSwitch Import',
+      title: 'Configure CcSwitch',
       desc: 'Zero configuration access. Make your client gain full-blood AI capabilities in a second. No tedious settings, direct import of API keys and routing configs.',
       btn: 'Download CCS',
       hint: '* Ensure CcSwitch client is installed and 3API account is logged in',
@@ -35,7 +68,22 @@ export default {
       keyName: 'Name',
       keyVal: 'API Key',
       keyUsage: 'Usage',
-      keyOps: 'Actions'
+      keyOps: 'Actions',
+      waitImport: 'Waiting for Import',
+      enabled: '3API Active',
+      enable: 'Enable',
+      clientDownload: 'Download CC Switch',
+      externalDownload: 'External Download'
+    },
+    onboarding: {
+      title: 'Get Started in Three Steps',
+      subtitle: 'From client downloading to model integration, get up and running in just three steps.',
+      step1Title: 'Step 1: Download Client',
+      step1Desc: 'Download the latest OpenAI Codex desktop app or install CC Switch proxy utility via direct links.',
+      step2Title: 'Step 2: Configure Endpoint',
+      step2Desc: 'Configure 3API gateway base URL and API key inside your Codex or CC Switch settings.',
+      step3Title: 'Step 3: Unlock Creativity',
+      step3Desc: 'Access models directly inside your dashboard/browser, or connect Codex, Cursor and other clients.'
     },
     steps: {
       title: 'Get Started in Three Steps',
@@ -49,13 +97,13 @@ export default {
     },
     codex: {
       title: 'Powering Advanced AI Coding Agents',
-      subtitle: '3API native full-power models feed your coding assistant with ultra-fast, uncensored contextual logic',
+      subtitle: '3API native full-power models feed your coding assistant with ultra-fast, uncensored contextual logic.',
       newtask: 'New Task',
       scheduled: 'Scheduled',
       plugins: 'Plugins',
       projects: 'Projects',
       notasks: 'no tasks',
-      tasks: 'Tasks',
+      tasks: 'Current Task',
       identifyModel: 'Identify Current Model',
       startPreview: 'Start Local Preview',
       settings: 'Settings',
@@ -66,7 +114,15 @@ export default {
       outputTitle: 'Output',
       outputDesc: 'Create files or site',
       sourcesTitle: 'Sources',
-      sourcesDesc: 'Attach files or connect apps'
+      sourcesDesc: 'Attach files or connect apps',
+      apiConnected: 'API Connected',
+      streamingResponse: 'api.3api.shop/v1 · streaming response (Demo)',
+      demoGpt: 'GPT-5.6 · Sol · High ⌄ (Demo)',
+      envInfo: 'Environment',
+      envChanges: 'Changes',
+      envLocal: 'Local',
+      envBackground: 'Background Process',
+      envBrowser: 'Browser'
     },
     testimonials: {
       title: 'Trusted by Developers and Teams',
@@ -155,9 +211,10 @@ export default {
     },
     // CTA section
     cta: {
-      title: 'Ready to Get Started?',
-      description: 'Sign up now and get free trial credits to experience seamless AI access',
-      button: 'Sign Up Free'
+      title: 'Ready to Unlock Infinite Creativity?',
+      description: 'Available instantly. Skip tedious setup. Get native full-speed Codex coding in three steps.',
+      button: 'Join 3API Free',
+      goToDashboard: 'Go to Dashboard'
     },
     footer: {
       allRightsReserved: 'All rights reserved.'

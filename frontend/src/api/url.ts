@@ -15,6 +15,13 @@ function normalizeAPIBaseURL(value: unknown): string {
 }
 
 export function getAPIBaseURL(): string {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname
+    // 当运行在 Cloudflare Pages 静态域名下时，将 API 请求分发至腾讯云 API 接口域
+    if (host === '3api.shop' || host === 'sub2api-cj7.pages.dev' || host.endsWith('.pages.dev')) {
+      return 'https://api.3api.shop/api/v1'
+    }
+  }
   return API_BASE_URL
 }
 

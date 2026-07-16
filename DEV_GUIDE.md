@@ -344,3 +344,32 @@ sub2api-bmai/
 - [Ent 文档](https://entgo.io/docs/getting-started)
 - [Vue3 文档](https://vuejs.org/)
 - [pnpm 文档](https://pnpm.io/)
+
+## 八、生产部署与 2GB 内存 VPS 优化方案
+
+为了解决腾讯云 VPS 只有 2GB 内存而在编译 Go + 嵌入前端静态资源时频繁因 OOM（内存溢出）导致 Swap 分区疯狂读写（编译需要 20~30 分钟）的性能痛点，项目引入了以下优化方案：
+
+### 1. GitHub Actions 云端构建流水线 (CI/CD)
+*   **配置文件**：`.github/workflows/deploy.yml`。
+*   **构建机制**：
+    *   在每次 `push` 到 `main` 分支时触发。
+    *   在 GitHub 云端虚拟机中安装 Node.js/pnpm 并编译前端；同时通过 Docker Buildx 打包完整的生产镜像。
+    *   编译结果自动推送到 GitHub Container Registry (GHCR): `ghcr.io/tii-mom/3:latest`。
+    *   **优点**：完全避免在 VPS 上进行重型编译，实现服务器 CPU & 内存的零开销构建。
+
+### 2. Cloudflare R2 安装包对象存储托管
+*   **存储桶**：`3api-public-assets`。
+*   **托管域名**：`https://pub-e818eceec7614e3084a8a2ad38b6e3f1.r2.dev/`。
+*   **机制**：
+    *   将体积较大的客户端安装包（如 Windows `.msix`、macOS `.dmg`）从腾讯云服务器剥离。
+    *   用户下载时直连 Cloudflare 全球 CDN 边缘节点，不仅下载速度快，而且**完全免除 VPS 的出网带宽和磁盘 I/O 占用**。
+
+### 3. VPS 一键秒级热重载
+*   **脚本路径**：`/opt/sub2api-deploy/deploy.sh`。
+*   **更新方式**：
+    *   当云端镜像编译完成后，SSH 登录服务器，进入对应目录执行：
+        ```bash
+        cd /opt/sub2api-deploy && ./deploy.sh
+        ```
+    *   脚本会执行 `docker compose pull` 从 GHCR 获取最新镜像，然后 `up -d --force-recreate` 重新创建服务，部署时间缩短至 **10~15 秒**。
+

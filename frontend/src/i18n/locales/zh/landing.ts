@@ -17,6 +17,39 @@ export default {
     // 新增：面向用户的价值主张
     heroSubtitle: '一个密钥，畅用多个 AI 模型',
     heroDescription: '无需管理多个订阅账号，一站式接入 Claude、GPT、Gemini 等主流 AI 服务',
+    badge: {
+      vpnFree: '🇨🇳 中国大陆免 VPN · 专线直连使用'
+    },
+    download: {
+      windows: 'Windows 客户端',
+      windowsDesc: 'x64 · Windows 10+',
+      macArm: 'Mac Apple Silicon 版',
+      macArmDesc: 'Apple 芯片 · macOS',
+      macIntel: 'Mac Intel 芯片版',
+      macIntelDesc: 'Intel · macOS'
+    },
+    platform: {
+      mobile: '手机端',
+      web: '网页端',
+      desktop: '桌面端'
+    },
+    terminal: {
+      comment: '# 填入自定义接口地址'
+    },
+    stats: {
+      responseTime: 'Response Time (示例)',
+      uptime: 'Proxy Uptime (示例)'
+    },
+    bento: {
+      title: '没有电脑，手机也能直接使用',
+      subtitle: '登录后台即可使用已开通的模型、图片生成与创作工具。',
+      mobileTitle: '手机移动端在线使用',
+      mobileDesc: '不用翻墙，登录后台即可在手机浏览器中调用已开通的模型与工具，工作流不受设备限制。',
+      modelsTitle: '世界顶级模型，一站接入',
+      modelsDesc: '统一 API 接口聚合 OpenAI、Claude、Gemini、DeepSeek 等模型，按后台实际开通状态使用。',
+      toolsTitle: '图片、PPT 与资产管理能力',
+      toolsDesc: '支持 GPT Image 2 在线生成；PPT 制作和 A 股资产分析可由后台开通后使用，并按实际调用计费。'
+    },
     tags: {
       subscriptionToApi: '订阅转 API',
       stickySession: '会话保持',
@@ -25,7 +58,7 @@ export default {
       officialNativeDesc: '提供官方渠道原生 API 接口，无任何阉割与降智。支持最新模型特性，确保企业级极速响应与原生输出质量。'
     },
     ccswitch: {
-      title: '一键导入 CcSwitch',
+      title: '配置 CcSwitch',
       desc: '零配置接入，让您的客户端瞬间具备满血 AI 能力。无需繁琐设置，直接导入 API 密钥及路由配置。',
       btn: '下载 CCS',
       hint: '* 导入前请确保已安装 CcSwitch 客户端并已登录 3API 账号',
@@ -35,13 +68,28 @@ export default {
       keyName: '名称',
       keyVal: 'API 密钥',
       keyUsage: '用量',
-      keyOps: '操作'
+      keyOps: '操作',
+      waitImport: '等待导入',
+      enabled: '3API 已启用',
+      enable: '启用',
+      clientDownload: '下载 CC Switch',
+      externalDownload: '外部下载'
+    },
+    onboarding: {
+      title: '三步即可使用，零门槛起航',
+      subtitle: '从下载客户端到接入模型，只需三步。免 VPN 直连，把可用的 AI 能力带到每一台设备。',
+      step1Title: '第一步：下载客户端',
+      step1Desc: '高速直连下载最新 OpenAI Codex 桌面客户端，或安装轻量级密钥代理 CC Switch 工具。',
+      step2Title: '第二步：一键配置接口',
+      step2Desc: '在 Codex 或 CC Switch 中配置 3API 接口与密钥，即可调用后台已开通的模型与额度。',
+      step3Title: '第三步：解锁无限创意',
+      step3Desc: '直接在手机或浏览器中使用已开通的模型，或继续接入 Codex、Cursor 等客户端。'
     },
     steps: {
       title: '只需三步，即刻起航',
       subtitle: '直观高效的接入流程，数秒内开启您的满血开发之旅',
       step1Title: '一、创建 API 密钥',
-      step1Desc: '在 3API 密钥面板一键生成您专属的 API 接入令牌。',
+      step1Desc: '在 3API 密钥面板一键生成您专属 of API 接入令牌。',
       step2Title: '二、导入到 CCS',
       step2Desc: '在密钥行操作区点击「导入到 CCS」，实时流光分发至客户端。',
       step3Title: '三、在 CCS 点击启用',
@@ -49,13 +97,13 @@ export default {
     },
     codex: {
       title: '无缝驱动顶级 AI 开发工具',
-      subtitle: '3API 原生满血模型，为您的高端开发智能体提供极速、无降智的核心算力支持',
+      subtitle: '3API 原生满血模型，为您的高端开发智能体提供极速、无降智的核心算力支持。',
       newtask: '新建任务',
       scheduled: '已安排',
       plugins: '插件',
       projects: '项目',
       notasks: '无任务',
-      tasks: '任务',
+      tasks: '当前任务',
       identifyModel: '识别当前模型',
       startPreview: '启动本地预览',
       settings: '设置',
@@ -66,7 +114,15 @@ export default {
       outputTitle: '输出',
       outputDesc: '创建文件或站点',
       sourcesTitle: '来源',
-      sourcesDesc: '附加文件或连接应用'
+      sourcesDesc: '附加文件或连接应用',
+      apiConnected: '连接正常',
+      streamingResponse: 'api.3api.shop/v1 · 流式响应 (示例)',
+      demoGpt: 'GPT-5.6 · Sol · 极高 ⌄ (示例)',
+      envInfo: '环境信息',
+      envChanges: '变更',
+      envLocal: '本地',
+      envBackground: '后台进程',
+      envBrowser: '浏览器'
     },
     testimonials: {
       title: '开发者与团队的使用体验',
@@ -155,9 +211,10 @@ export default {
     },
     // CTA 区块
     cta: {
-      title: '准备好开始了吗？',
-      description: '注册即可获得免费试用额度，体验一站式 AI 服务',
-      button: '免费注册'
+      title: '准备好解锁无限创意了吗？',
+      description: '立即可用，免除繁琐配置，三步直达原生满血的 Codex 开发体验。',
+      button: '免费加入 3API',
+      goToDashboard: '进入控制台'
     },
     footer: {
       allRightsReserved: '保留所有权利。'

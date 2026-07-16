@@ -345,6 +345,7 @@ import {
   loadOAuthAffiliateCode,
   oauthAffiliatePayload
 } from '@/utils/oauthAffiliate'
+import { getAPIBaseURL } from '@/api/url'
 
 const route = useRoute()
 const router = useRouter()
@@ -550,7 +551,7 @@ function resolveRedirectTarget(): string {
 }
 
 function resolveWeChatStartURL(intent: 'bind_current_user' | 'adopt_existing_user_by_email'): string | null {
-  const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api/v1'
+  const apiBase = getAPIBaseURL()
   const normalized = apiBase.replace(/\/$/, '')
   const mode = resolveRequestedWeChatOAuthMode()
   if (!mode) {

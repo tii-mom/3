@@ -13,6 +13,7 @@ import {
   type ReleaseInfo
 } from '@/api/admin/system'
 import { getPublicSettings as fetchPublicSettingsAPI } from '@/api/auth'
+import { apiClient } from '@/api/client'
 
 export const useAppStore = defineStore('app', () => {
   // ==================== State ====================
@@ -301,6 +302,11 @@ export const useAppStore = defineStore('app', () => {
     apiBaseUrl.value = config.api_base_url || ''
     docUrl.value = config.doc_url || ''
     publicSettingsLoaded.value = true
+
+    // 动态绑定 apiClient 的基准 URL，确保无论当前域名为何，API 调用能自动匹配正确的 API 端点
+    if (config.api_base_url) {
+      apiClient.defaults.baseURL = config.api_base_url
+    }
   }
 
   /**

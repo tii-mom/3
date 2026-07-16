@@ -32,6 +32,7 @@ import { useI18n } from 'vue-i18n'
 import GitHubMark from './GitHubMark.vue'
 import GoogleMark from './GoogleMark.vue'
 import { resolveAffiliateReferralCode, storeOAuthAffiliateCode } from '@/utils/oauthAffiliate'
+import { getAPIBaseURL } from '@/api/url'
 
 type EmailOAuthProvider = 'github' | 'google'
 const EMAIL_OAUTH_PENDING_PROVIDER_KEY = 'email_oauth_pending_provider'
@@ -75,7 +76,7 @@ function startLogin(provider: EmailOAuthProvider): void {
   const affiliateCode = resolveAffiliateReferralCode(props.affCode, route.query.aff, route.query.aff_code)
   storeOAuthAffiliateCode(affiliateCode)
   window.sessionStorage.setItem(EMAIL_OAUTH_PENDING_PROVIDER_KEY, provider)
-  const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api/v1'
+  const apiBase = getAPIBaseURL()
   const normalized = apiBase.replace(/\/$/, '')
   const params = new URLSearchParams({ redirect: redirectTo })
   if (affiliateCode) {
