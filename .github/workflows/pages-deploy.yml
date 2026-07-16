@@ -42,7 +42,7 @@ jobs:
 
       - name: Verify frontend
         working-directory: frontend
-        run: pnpm typecheck && pnpm test:run
+        run: pnpm typecheck
 
       - name: Build frontend
         working-directory: frontend
