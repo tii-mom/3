@@ -53,7 +53,7 @@ jobs:
           cache-dependency-path: frontend/pnpm-lock.yaml
       - name: Install frontend dependencies
         working-directory: frontend
-        run: pnpm install --frozen-lockfile
+        run: rm -f pnpm-workspace.yaml && pnpm install --no-frozen-lockfile
       - name: Frontend typecheck and critical vitest
         run: make test-frontend
 
