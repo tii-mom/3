@@ -11,6 +11,15 @@ HEALTH_TIMEOUT=${HEALTH_TIMEOUT:-120}
 
 cd "$DEPLOY_DIR"
 
+persist_image() {
+  local image=$1
+  if grep -q '^SUB2API_IMAGE=' .env; then
+    sed -i "s|^SUB2API_IMAGE=.*|SUB2API_IMAGE=$image|" .env
+  else
+    printf '\nSUB2API_IMAGE=%s\n' "$image" >> .env
+  fi
+}
+
 previous_image=$(docker inspect sub2api --format '{{.Config.Image}}' 2>/dev/null || true)
 export SUB2API_IMAGE="$TARGET_IMAGE"
 
@@ -21,6 +30,7 @@ deadline=$((SECONDS + HEALTH_TIMEOUT))
 while (( SECONDS < deadline )); do
   status=$(docker inspect sub2api --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' 2>/dev/null || true)
   if [[ "$status" == "healthy" ]]; then
+    persist_image "$TARGET_IMAGE"
     printf 'Deployed %s successfully.\n' "$TARGET_IMAGE"
     exit 0
   fi
@@ -35,6 +45,7 @@ docker logs --tail 100 sub2api >&2 || true
 
 if [[ -n "$previous_image" ]]; then
   printf 'Rolling back to %s.\n' "$previous_image" >&2
+  persist_image "$previous_image"
   export SUB2API_IMAGE="$previous_image"
   docker compose -f "$COMPOSE_FILE" up -d --no-deps --force-recreate sub2api
 fi
