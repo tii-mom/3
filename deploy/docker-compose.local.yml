@@ -242,21 +242,25 @@ services:
     volumes:
       # Local directory mapping for easy migration
       - ./redis_data:/data:Z
-    command: >
-        sh -c '
-          redis-server
-          --save 60 1
-          --appendonly yes
-          --appendfsync everysec
-          ${REDIS_PASSWORD:+--requirepass "$REDIS_PASSWORD"}'
+    # Production requires REDIS_PASSWORD. One shell script arg so flags are not dropped.
+    command:
+      - sh
+      - -c
+      - |
+        if [ -z "$$REDISCLI_AUTH" ]; then
+          echo "REDIS_PASSWORD/REDISCLI_AUTH is required" >&2
+          exit 1
+        fi
+        exec redis-server --save 60 1 --appendonly yes --appendfsync everysec --requirepass "$$REDISCLI_AUTH"
     environment:
       - TZ=${TZ:-Asia/Shanghai}
       # REDISCLI_AUTH is used by redis-cli for authentication (safer than -a flag)
-      - REDISCLI_AUTH=${REDIS_PASSWORD:-}
+      - REDISCLI_AUTH=${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     networks:
       - sub2api-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      # redis-cli auto-uses REDISCLI_AUTH when set
+      test: ["CMD", "redis-cli", "--no-auth-warning", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
