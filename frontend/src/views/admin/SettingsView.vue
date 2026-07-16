@@ -9032,6 +9032,13 @@ async function loadSettings() {
   loadFailed.value = false;
   try {
     const settings = await adminAPI.settings.getSettings();
+    // Guard against non-JSON/HTML responses (misconfigured api baseURL).
+    if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
+      throw new Error(
+        t("common.error") +
+          ": invalid settings response (check API base URL /api/v1)",
+      );
+    }
     settings.payment_load_balance_strategy =
       settings.payment_load_balance_strategy || "round-robin";
     // Only assign non-null values from backend (null means unconfigured, keep defaults)
@@ -10421,10 +10428,22 @@ async function loadProviders() {
   providersLoading.value = true;
   try {
     const res = await adminAPI.payment.getProviders();
+    // Axios interceptor unwraps {code,data}; support both unwrapped array and {data:[]}.
+    const raw = Array.isArray(res)
+      ? res
+      : Array.isArray(res?.data)
+        ? res.data
+        : null;
+    if (!raw) {
+      throw new Error(
+        t("common.error") +
+          ": invalid payment providers response (check API base URL /api/v1)",
+      );
+    }
     // Normalize supported_types: backend returns null when the list is empty
     // (Go nil slice → JSON null). Without this, ProviderCard's isSelected()
     // throws TypeError on null.includes(), causing the card to vanish.
-    providers.value = (res.data || []).map((p) => ({
+    providers.value = raw.map((p) => ({
       ...p,
       supported_types: Array.isArray(p.supported_types)
         ? p.supported_types

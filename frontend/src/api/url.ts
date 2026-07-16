@@ -30,6 +30,51 @@ export function getAPIBaseURL(): string {
   return API_BASE_URL
 }
 
+/**
+ * Resolve the axios baseURL for admin/user JSON APIs.
+ *
+ * Site setting `api_base_url` is often the public gateway origin for client tools
+ * (e.g. `https://api.3api.shop` for Claude Code / OpenAI clients) and may omit
+ * `/api/v1`. The SPA client must always call the versioned admin/user API path.
+ * Without this, requests hit the SPA shell HTML and crash settings pages.
+ */
+export function resolveApiClientBaseURL(configured?: string | null): string {
+  const fallback = getAPIBaseURL()
+  const raw = String(configured || '').trim().replace(/\/+$/, '')
+  if (!raw) {
+    return fallback
+  }
+
+  // Relative base
+  if (raw.startsWith('/')) {
+    if (raw === DEFAULT_API_BASE_URL || raw.startsWith(`${DEFAULT_API_BASE_URL}/`)) {
+      return DEFAULT_API_BASE_URL
+    }
+    return fallback
+  }
+
+  // Absolute / protocol-relative
+  if (/^[a-z][a-z\d+.-]*:\/\//i.test(raw) || raw.startsWith('//')) {
+    try {
+      const absolute = raw.startsWith('//') ? `https:${raw}` : raw
+      const url = new URL(absolute)
+      const path = url.pathname.replace(/\/+$/, '') || '/'
+      if (path === DEFAULT_API_BASE_URL || path.startsWith(`${DEFAULT_API_BASE_URL}/`)) {
+        return `${url.origin}${DEFAULT_API_BASE_URL}`
+      }
+      if (path === '/' ) {
+        return `${url.origin}${DEFAULT_API_BASE_URL}`
+      }
+      // Custom prefix mount, e.g. https://example.com/sub2api
+      return `${url.origin}${path}${DEFAULT_API_BASE_URL}`
+    } catch {
+      return fallback
+    }
+  }
+
+  return fallback
+}
+
 export function buildApiUrl(path: string): string {
   const base = getAPIBaseURL().replace(/\/+$/, '')
   let suffix = normalizePath(path)
