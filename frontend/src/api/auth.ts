@@ -25,7 +25,12 @@ export type LoginResponse = AuthResponse | TotpLoginResponse
  * Type guard to check if login response requires 2FA
  */
 export function isTotp2FARequired(response: LoginResponse): response is TotpLoginResponse {
-  return 'requires_2fa' in response && response.requires_2fa === true
+  return (
+    typeof response === 'object' &&
+    response !== null &&
+    'requires_2fa' in response &&
+    response.requires_2fa === true
+  )
 }
 
 /**
