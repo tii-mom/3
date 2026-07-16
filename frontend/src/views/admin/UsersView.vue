@@ -1553,16 +1553,16 @@ const loadUsers = async () => {
     if (signal.aborted) {
       return
     }
-    users.value = response.items
-    pagination.total = response.total
-    pagination.pages = response.pages
+    users.value = response?.items || []
+    pagination.total = response?.total || 0
+    pagination.pages = response?.pages || 1
     usageStats.value = {}
     userAttributeValues.value = {}
     platformQuotaStats.value = {}
 
     // Defer heavy secondary data so table can render first.
-    if (response.items.length > 0) {
-      const userIds = response.items.map((u) => u.id)
+    if (users.value.length > 0) {
+      const userIds = users.value.map((u) => u.id)
       const seq = ++secondaryDataSeq
       window.setTimeout(() => {
         if (signal.aborted || seq !== secondaryDataSeq) return

@@ -1470,13 +1470,13 @@ const loadApiKeys = async () => {
       signal
     })
     if (signal.aborted) return
-    apiKeys.value = response.items
-    pagination.value.total = response.total
-    pagination.value.pages = response.pages
+    apiKeys.value = response?.items || []
+    pagination.value.total = response?.total || 0
+    pagination.value.pages = response?.pages || 1
 
     // Load usage stats for all API keys in the list
-    if (response.items.length > 0) {
-      const keyIds = response.items.map((k) => k.id)
+    if (apiKeys.value.length > 0) {
+      const keyIds = apiKeys.value.map((k) => k.id)
       try {
         const usageResponse = await usageAPI.getDashboardApiKeysUsage(keyIds, { signal })
         if (signal.aborted) return
