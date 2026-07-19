@@ -67,3 +67,12 @@ func TestDistributionReversalMigrationAddsAuditAndDebtRecovery(t *testing.T) {
 	require.Contains(t, sql, "WHERE first_recharge_bonus_usd > 0 AND status = 'APPLIED'")
 	require.Contains(t, sql, "CHECK (reversal_type IN ('CHARGEBACK', 'REFUND', 'ADMIN_CORRECTION'))")
 }
+
+func TestDistributionProfileRepairBackfillsZeroSafeProfiles(t *testing.T) {
+	sql := normalizedMigration(t, "185_distribution_profile_repair.sql")
+	require.Contains(t, sql, "INSERT INTO distribution_members")
+	require.Contains(t, sql, "INSERT INTO distribution_relations")
+	require.Contains(t, sql, "chain.depth < 5")
+	require.Contains(t, sql, "INSERT INTO distribution_cash_wallets")
+	require.Contains(t, sql, "ON CONFLICT DO NOTHING")
+}

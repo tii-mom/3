@@ -140,6 +140,11 @@ WITH programs AS (
     SELECT p.id, p.tenant_id, u.id, u.id, 0
     FROM programs p CROSS JOIN (VALUES ($1::bigint), ($2::bigint)) AS u(id)
     ON CONFLICT DO NOTHING
+), wallets AS (
+    INSERT INTO distribution_cash_wallets (program_id, tenant_id, user_id)
+    SELECT p.id, p.tenant_id, u.id
+    FROM programs p CROSS JOIN (VALUES ($1::bigint), ($2::bigint)) AS u(id)
+    ON CONFLICT DO NOTHING
 )
 INSERT INTO distribution_relations (program_id, tenant_id, ancestor_user_id, descendant_user_id, depth)
 SELECT p.id, p.tenant_id, r.ancestor_user_id, $1, r.depth + 1
@@ -159,6 +164,10 @@ WITH programs AS (
     SELECT id, tenant_id FROM distribution_programs WHERE code = 'compute_company'
 ), members AS (
     INSERT INTO distribution_members (program_id, tenant_id, user_id)
+    SELECT id, tenant_id, $1 FROM programs
+    ON CONFLICT DO NOTHING
+), wallets AS (
+    INSERT INTO distribution_cash_wallets (program_id, tenant_id, user_id)
     SELECT id, tenant_id, $1 FROM programs
     ON CONFLICT DO NOTHING
 )
