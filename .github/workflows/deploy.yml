@@ -13,6 +13,8 @@ permissions:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      image_digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -68,14 +70,13 @@ jobs:
           echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
           push: true
-          tags: |
-            ${{ steps.lowercase.outputs.image }}:latest
-            ${{ steps.lowercase.outputs.image }}:${{ github.sha }}
+          tags: ${{ steps.lowercase.outputs.image }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
@@ -85,8 +86,10 @@ jobs:
             DATE=${{ steps.image_meta.outputs.date }}
 
   deploy-to-vps:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     needs: build-and-push
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Configure SSH
         env:
@@ -104,4 +107,4 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
           ssh -o BatchMode=yes "$VPS_USER@$VPS_HOST" \
-            "/opt/sub2api-deploy/production-deploy.sh '${{ github.sha }}'"
+            "/opt/sub2api-deploy/production-deploy.sh '${{ needs.build-and-push.outputs.image_digest }}'"

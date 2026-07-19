@@ -5,8 +5,16 @@ set -Eeuo pipefail
 DEPLOY_DIR=${DEPLOY_DIR:-/opt/sub2api-deploy}
 COMPOSE_FILE=${COMPOSE_FILE:-$DEPLOY_DIR/docker-compose.local.yml}
 IMAGE_REPOSITORY=${IMAGE_REPOSITORY:-ghcr.io/tii-mom/3}
-IMAGE_TAG=${1:-latest}
-TARGET_IMAGE="$IMAGE_REPOSITORY:$IMAGE_TAG"
+IMAGE_REF=${1:-}
+if [[ -z "$IMAGE_REF" ]]; then
+  printf 'Usage: %s <image-tag-or-sha256-digest>\n' "$0" >&2
+  exit 1
+fi
+if [[ "$IMAGE_REF" == sha256:* ]]; then
+  TARGET_IMAGE="$IMAGE_REPOSITORY@$IMAGE_REF"
+else
+  TARGET_IMAGE="$IMAGE_REPOSITORY:$IMAGE_REF"
+fi
 HEALTH_TIMEOUT=${HEALTH_TIMEOUT:-120}
 
 cd "$DEPLOY_DIR"
