@@ -103,5 +103,5 @@ func TestCaptureUsageBillingBatchImageBalance_RejectsActualCostOverHold(t *testi
 	_, err := captureUsageBillingBatchImageBalance(context.Background(), &sql.Tx{}, &service.BatchImageBalanceHoldCommand{
 		UserID: 42, HoldAmount: 1, ActualAmount: 1.1,
 	})
-	require.ErrorIs(t, err, service.ErrBatchImageActualCostExceedsHold)
+	require.ErrorIs(t, err, service.ErrBatchImageSettlementCostExceedsHold)
 }
