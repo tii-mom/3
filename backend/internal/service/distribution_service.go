@@ -605,17 +605,13 @@ RETURNING id`, programID, eventID, orderID, userID, reversalType, baseMinor, cre
 }
 
 func (s *DistributionService) Dashboard(ctx context.Context, userID int64) (*DistributionDashboard, error) {
-	_ = s.Thaw(ctx, userID)
 	dashboard := &DistributionDashboard{LevelCounts: map[int]int64{}, Tiers: []DistributionTier{}}
 	var programID int64
 	err := s.db.QueryRowContext(ctx, `SELECT id, enabled FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company'`).Scan(&programID, &dashboard.Enabled)
 	if err != nil {
 		return nil, err
 	}
-	if err := ensureDistributionMemberDB(ctx, s.db, programID, userID); err != nil {
-		return nil, err
-	}
-	if err := s.db.QueryRowContext(ctx, `SELECT team_volume_cny_minor, current_tier FROM distribution_members WHERE program_id = $1 AND user_id = $2`, programID, userID).Scan(&dashboard.TeamVolumeMinor, &dashboard.CurrentTier); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT team_volume_cny_minor, current_tier FROM distribution_members WHERE program_id = $1 AND user_id = $2`, programID, userID).Scan(&dashboard.TeamVolumeMinor, &dashboard.CurrentTier); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT depth, COUNT(*) FROM distribution_relations WHERE program_id = $1 AND ancestor_user_id = $2 AND depth BETWEEN 1 AND 5 GROUP BY depth`, programID, userID)
@@ -632,7 +628,9 @@ func (s *DistributionService) Dashboard(ctx context.Context, userID int64) (*Dis
 		dashboard.LevelCounts[depth] = count
 	}
 	_ = rows.Close()
-	_ = s.db.QueryRowContext(ctx, `SELECT available_cny_minor, frozen_cny_minor, withdrawing_cny_minor, debt_cny_minor, lifetime_earned_cny_minor FROM distribution_cash_wallets WHERE program_id = $1 AND user_id = $2`, programID, userID).Scan(&dashboard.AvailableMinor, &dashboard.FrozenMinor, &dashboard.WithdrawingMinor, &dashboard.DebtMinor, &dashboard.LifetimeMinor)
+	if err := s.db.QueryRowContext(ctx, `SELECT available_cny_minor, frozen_cny_minor, withdrawing_cny_minor, debt_cny_minor, lifetime_earned_cny_minor FROM distribution_cash_wallets WHERE program_id = $1 AND user_id = $2`, programID, userID).Scan(&dashboard.AvailableMinor, &dashboard.FrozenMinor, &dashboard.WithdrawingMinor, &dashboard.DebtMinor, &dashboard.LifetimeMinor); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
 	tierRows, err := s.db.QueryContext(ctx, `SELECT tier, threshold_cny_minor, level1_bps, level2_bps, level3_bps, level4_bps, level5_bps FROM distribution_tier_configs WHERE program_id = $1 AND config_version = (SELECT current_config_version FROM distribution_programs WHERE id = $1) ORDER BY tier`, programID)
 	if err != nil {
 		return nil, err
@@ -1277,19 +1275,10 @@ func ensureDistributionMemberTx(ctx context.Context, tx *sql.Tx, programID, user
 	if _, err := tx.ExecContext(ctx, `INSERT INTO distribution_members (program_id, tenant_id, user_id) VALUES ($1, 1, $2) ON CONFLICT DO NOTHING`, programID, userID); err != nil {
 		return err
 	}
-	_, err := tx.ExecContext(ctx, `INSERT INTO distribution_relations (program_id, tenant_id, ancestor_user_id, descendant_user_id, depth) VALUES ($1, 1, $2, $2, 0) ON CONFLICT DO NOTHING`, programID, userID)
-	return err
-}
-
-type dbExecer interface {
-	ExecContext(context.Context, string, ...any) (sql.Result, error)
-}
-
-func ensureDistributionMemberDB(ctx context.Context, db dbExecer, programID, userID int64) error {
-	if _, err := db.ExecContext(ctx, `INSERT INTO distribution_members (program_id, tenant_id, user_id) VALUES ($1, 1, $2) ON CONFLICT DO NOTHING`, programID, userID); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO distribution_relations (program_id, tenant_id, ancestor_user_id, descendant_user_id, depth) VALUES ($1, 1, $2, $2, 0) ON CONFLICT DO NOTHING`, programID, userID); err != nil {
 		return err
 	}
-	_, err := db.ExecContext(ctx, `INSERT INTO distribution_relations (program_id, tenant_id, ancestor_user_id, descendant_user_id, depth) VALUES ($1, 1, $2, $2, 0) ON CONFLICT DO NOTHING`, programID, userID)
+	_, err := tx.ExecContext(ctx, `INSERT INTO distribution_cash_wallets (program_id, tenant_id, user_id) VALUES ($1, 1, $2) ON CONFLICT DO NOTHING`, programID, userID)
 	return err
 }
 
