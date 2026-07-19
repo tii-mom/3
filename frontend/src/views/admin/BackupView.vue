@@ -164,15 +164,6 @@
                       {{ t('admin.backup.actions.download') }}
                     </button>
                     <button
-                      v-if="record.status === 'completed'"
-                      type="button"
-                      class="btn btn-secondary btn-xs"
-                      :disabled="restoringId === record.id"
-                      @click="restoreBackup(record.id)"
-                    >
-                      {{ restoringId === record.id ? t('common.loading') : t('admin.backup.actions.restore') }}
-                    </button>
-                    <button
                       type="button"
                       class="btn btn-danger btn-xs"
                       @click="removeBackup(record.id)"
@@ -315,12 +306,10 @@ const savingSchedule = ref(false)
 const backups = ref<BackupRecord[]>([])
 const loadingBackups = ref(false)
 const creatingBackup = ref(false)
-const restoringId = ref('')
 const manualExpireDays = ref(14)
 
 // Polling
 const pollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
-const restoringPollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
 const MAX_POLL_COUNT = 900
 
 function updateRecordInList(updated: BackupRecord) {
@@ -366,46 +355,9 @@ function stopPolling() {
   }
 }
 
-function startRestorePolling(backupId: string) {
-  stopRestorePolling()
-  let count = 0
-  restoringPollingTimer.value = setInterval(async () => {
-    if (count++ >= MAX_POLL_COUNT) {
-      stopRestorePolling()
-      restoringId.value = ''
-      appStore.showWarning(t('admin.backup.operations.restoreRunning'))
-      return
-    }
-    try {
-      const record = await adminAPI.backup.getBackup(backupId)
-      updateRecordInList(record)
-      if (record.restore_status === 'completed' || record.restore_status === 'failed') {
-        stopRestorePolling()
-        restoringId.value = ''
-        if (record.restore_status === 'completed') {
-          appStore.showSuccess(t('admin.backup.actions.restoreSuccess'))
-        } else {
-          appStore.showError(record.restore_error || t('admin.backup.operations.restoreFailed'))
-        }
-        await loadBackups()
-      }
-    } catch {
-      // 轮询失败时不中断
-    }
-  }, 2000)
-}
-
-function stopRestorePolling() {
-  if (restoringPollingTimer.value) {
-    clearInterval(restoringPollingTimer.value)
-    restoringPollingTimer.value = null
-  }
-}
-
 function handleVisibilityChange() {
   if (document.hidden) {
     stopPolling()
-    stopRestorePolling()
   } else {
     // 标签页恢复时刷新列表，检查是否仍有活跃操作
     loadBackups().then(() => {
@@ -413,11 +365,6 @@ function handleVisibilityChange() {
       if (running) {
         creatingBackup.value = true
         startPolling(running.id)
-      }
-      const restoring = backups.value.find(r => r.restore_status === 'running')
-      if (restoring) {
-        restoringId.value = restoring.id
-        startRestorePolling(restoring.id)
       }
     })
   }
@@ -546,25 +493,6 @@ async function downloadBackup(id: string) {
   }
 }
 
-async function restoreBackup(id: string) {
-  if (!window.confirm(t('admin.backup.actions.restoreConfirm'))) return
-  const password = window.prompt(t('admin.backup.actions.restorePasswordPrompt'))
-  if (!password) return
-  restoringId.value = id
-  try {
-    const record = await adminAPI.backup.restoreBackup(id, password)
-    updateRecordInList(record)
-    startRestorePolling(id)
-  } catch (error: any) {
-    if (error?.response?.status === 409) {
-      appStore.showWarning(t('admin.backup.operations.restoreRunning'))
-    } else {
-      appStore.showError(error?.message || t('errors.networkError'))
-    }
-    restoringId.value = ''
-  }
-}
-
 async function removeBackup(id: string) {
   if (!window.confirm(t('admin.backup.actions.deleteConfirm'))) return
   try {
@@ -613,16 +541,10 @@ onMounted(async () => {
     creatingBackup.value = true
     startPolling(runningBackup.id)
   }
-  const restoringBackup = backups.value.find(r => r.restore_status === 'running')
-  if (restoringBackup) {
-    restoringId.value = restoringBackup.id
-    startRestorePolling(restoringBackup.id)
-  }
 })
 
 onBeforeUnmount(() => {
   stopPolling()
-  stopRestorePolling()
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>

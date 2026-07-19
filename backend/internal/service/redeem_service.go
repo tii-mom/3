@@ -516,7 +516,8 @@ func (s *RedeemService) Redeem(ctx context.Context, userID int64, code string) (
 	// 事务提交成功后失效缓存
 	s.invalidateRedeemCaches(ctx, userID, redeemCode)
 
-	// 余额类正数兑换码触发邀请返利（best-effort，失败不影响兑换结果）
+	// Preserve the legacy admin redeem-code rebate contract. User-generated
+	// VCH vouchers are routed to VoucherService and never reach this branch.
 	if redeemCode.Type == RedeemTypeBalance && redeemCode.Value > 0 {
 		s.tryAccrueAffiliateRebateForRedeem(ctx, userID, redeemCode.Value)
 	}
@@ -638,18 +639,17 @@ func (s *RedeemService) Delete(ctx context.Context, id int64) error {
 }
 
 // GetStats 获取兑换码统计信息
-func (s *RedeemService) GetStats(ctx context.Context) (map[string]any, error) {
-	// TODO: 实现统计逻辑
-	// 统计未使用、已使用的兑换码数量
-	// 统计总面值等
-
-	stats := map[string]any{
-		"total_codes":  0,
-		"unused_codes": 0,
-		"used_codes":   0,
-		"total_value":  0.0,
+func (s *RedeemService) GetStats(ctx context.Context) (*RedeemCodeStats, error) {
+	repo, ok := s.redeemRepo.(interface {
+		GetStats(context.Context, time.Time) (*RedeemCodeStats, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("redeem code statistics are unavailable")
 	}
-
+	stats, err := repo.GetStats(ctx, time.Now())
+	if err != nil {
+		return nil, fmt.Errorf("get redeem code statistics: %w", err)
+	}
 	return stats, nil
 }
 

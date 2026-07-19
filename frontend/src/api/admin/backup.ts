@@ -24,6 +24,7 @@ export interface BackupRecord {
   file_name: string
   s3_key: string
   size_bytes: number
+  sha256?: string
   triggered_by: string
   error_message?: string
   started_at: string
@@ -96,12 +97,6 @@ export async function getDownloadURL(id: string): Promise<{ url: string }> {
   return data
 }
 
-// Restore
-export async function restoreBackup(id: string, password: string): Promise<BackupRecord> {
-  const { data } = await apiClient.post<BackupRecord>(`/admin/backups/${id}/restore`, { password })
-  return data
-}
-
 export const backupAPI = {
   getS3Config,
   updateS3Config,
@@ -113,7 +108,6 @@ export const backupAPI = {
   getBackup,
   deleteBackup,
   getDownloadURL,
-  restoreBackup,
 }
 
 export default backupAPI

@@ -5,6 +5,7 @@
  */
 
 import { apiClient, buildGatewayUrl } from '../client'
+import { getSessionAccessToken } from '../authSession'
 import type { PaginatedResponse } from '@/types'
 
 export type OpsQueryMode = 'auto' | 'raw' | 'preagg'
@@ -601,7 +602,7 @@ export function subscribeQPS(onMessage: (data: any) => void, options: SubscribeQ
     // Do NOT put admin JWT in the URL query string (it can leak via access logs, proxies, etc).
     // Browsers cannot set Authorization headers for WebSockets, so we pass the token via
     // Sec-WebSocket-Protocol (subprotocol list): ["3api-admin", "jwt.<token>"].
-    const rawToken = String(options.token ?? localStorage.getItem('auth_token') ?? '').trim()
+    const rawToken = String(options.token ?? getSessionAccessToken() ?? '').trim()
     const protocols: string[] = [OPS_WS_BASE_PROTOCOL]
     if (rawToken) protocols.push(`jwt.${rawToken}`)
 
@@ -828,6 +829,7 @@ export interface OpsRuntimeLogConfig {
 export interface OpsSystemLog {
   id: number
   created_at: string
+  host: string
   level: string
   component: string
   message: string
@@ -849,6 +851,7 @@ export interface OpsSystemLogQuery {
   time_range?: '5m' | '30m' | '1h' | '6h' | '24h' | '7d' | '30d'
   start_time?: string
   end_time?: string
+  host?: string
   level?: string
   component?: string
   request_id?: string
@@ -864,6 +867,7 @@ export interface OpsSystemLogQuery {
 export interface OpsSystemLogCleanupRequest {
   start_time?: string
   end_time?: string
+  host?: string
   level?: string
   component?: string
   request_id?: string
@@ -932,10 +936,6 @@ export interface OpsErrorLog {
   request_type?: number | null
   user_agent?: string
 
-  // 已删除 KEY 所有者(INVALID_API_KEY 归因快照):认证失败行 user_id 为空,
-  // 用户列以此回退显示所有者
-  deleted_key_owner_user_id?: number | null
-  deleted_key_owner_email?: string | null
 }
 
 export interface OpsErrorDetail extends OpsErrorLog {
@@ -954,11 +954,6 @@ export interface OpsErrorDetail extends OpsErrorLog {
   time_to_first_token_ms?: number | null
 
   is_business_limited: boolean
-
-  // Deleted key owner info (INVALID_API_KEY attribution);
-  // owner user_id/email 已上移到 OpsErrorLog(列表用户列回退)
-  attempted_key_prefix?: string | null
-  deleted_key_name?: string | null
 
   // Bound (non-deleted) key prefix, snapshotted at error time
   api_key_prefix?: string | null

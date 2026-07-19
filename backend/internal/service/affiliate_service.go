@@ -209,6 +209,11 @@ type AffiliateService struct {
 	settingService       *SettingService
 	authCacheInvalidator APIKeyAuthCacheInvalidator
 	billingCacheService  *BillingCacheService
+	distributionService  *DistributionService
+}
+
+func (s *AffiliateService) SetDistributionService(distributionService *DistributionService) {
+	s.distributionService = distributionService
 }
 
 func NewAffiliateService(repo AffiliateRepository, settingService *SettingService, authCacheInvalidator APIKeyAuthCacheInvalidator, billingCacheService *BillingCacheService) *AffiliateService {
@@ -274,10 +279,9 @@ func (s *AffiliateService) BindInviterByCode(ctx context.Context, userID int64, 
 	if s == nil || s.repo == nil {
 		return infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
 	}
-	// 总开关关闭时，注册阶段静默忽略 aff 参数（不报错，避免阻断注册流程）
-	if !s.IsEnabled(ctx) {
-		return nil
-	}
+	// Feature switches control reward accrual, not the immutable inviter
+	// relationship. Keep binding registrations while programs are disabled so
+	// a staged rollout does not create permanent gaps in the five-level tree.
 	if !isValidAffiliateCodeFormat(code) {
 		return ErrAffiliateCodeInvalid
 	}

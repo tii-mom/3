@@ -154,6 +154,11 @@ export default {
     usage: 'Usage',
     redeem: 'Redeem',
     affiliate: 'Affiliate Rebates',
+    distribution: 'Compute Company',
+    balanceVouchers: 'Balance Vouchers',
+    financeOperations: 'Finance Operations',
+    saasControl: 'SaaS Control',
+    saasPartner: 'SaaS Partner',
     affiliateManagement: 'Affiliate Rebates',
     affiliateInviteRecords: 'Invite Records',
     affiliateRebateRecords: 'Rebate Records',
@@ -190,6 +195,18 @@ export default {
     channelMonitor: 'Channel Monitor',
     channelStatus: 'Channel Status',
     riskControl: 'Risk Control',
+    securityAudit: 'Security Audit',
+    contentModeration: 'Content Moderation',
+    promptAudit: 'Prompt Audit',
+    auditLogs: 'Audit Logs',
+  },
+
+  finance: {
+    vouchers: { title: 'Balance Vouchers', subtitle: 'Create, cancel, and track credit vouchers', amount: 'Face value (USD)', totp: 'Two-factor code', feeHint: 'An 8% fee is reserved and refunded with cancelled or expired vouchers.', securityNote: 'The complete voucher is shown once. Redeemed credit cannot be used to create another voucher.', createdCode: 'Voucher created', history: 'Voucher history', code: 'Voucher', fee: 'Fee' },
+    distribution: { title: 'Compute Company', subtitle: 'Team volume, five-level commission, and payouts', overview: 'Overview', team: 'Team', ledger: 'Commission ledger', withdraw: 'Withdraw', teamVolume: 'Team volume', currentTier: 'Current tier', tiers: 'Commission tiers', tier: 'Tier', threshold: 'Threshold', levels: 'Five-level team', order: 'Order', depth: 'Level', rate: 'Rate', commission: 'Commission', payout: 'Alipay payout account', realName: 'Real name', alipay: 'Alipay account', submitWithdrawal: 'Submit withdrawal', me: 'Me', net: 'Net payout', debt: 'Commission debt' },
+    admin: { title: 'Finance Operations', withdrawals: 'Withdrawals', vouchers: 'Voucher risk', commissions: 'Commission audit', recharges: 'Recharge and bonus', relations: 'Five-level relations', approve: 'Approve', paid: 'Confirm paid', reject: 'Reject', reason: 'Reason', reference: 'Payment reference', lock: 'Lock', unlock: 'Unlock', payoutDetails: 'Payout details', securityFields: 'Secure operation fields', bucketShadow: 'Credit buckets in shadow mode', bucketEnforced: 'Credit buckets enforced', policy: 'Distribution policy version', version: 'Version', freezeHours: 'Freeze hours', dailyLimit: 'Daily withdrawal limit', feeBps: 'Withdrawal fee (bps)', bonusBps: 'First recharge bonus (bps)', bonusCap: 'First recharge bonus cap (USD)', legacyStack: 'Stack legacy rebate', publishPolicy: 'Publish new version', reverseChargeback: 'Reverse chargeback', reversalSecurityRequired: 'TOTP and a reversal reason are required', reverseChargebackConfirm: 'Reverse this recharge, bonus, team volume, and every related commission?' },
+    saas: { title: 'White-label SaaS Control', fund: 'Fund wholesale', domain: 'Bind domain', jobs: 'Provisioning jobs', tenants: 'Tenants', plans: 'Plans', subscriptions: 'Subscriptions', domains: 'Domains', resources: 'Resource allocation', withdrawals: 'Partner withdrawals', verify: 'Verify DNS', recordPayment: 'Record payment' }
+    ,partner: { title: 'SaaS Partner', withdrawing: 'Withdrawing', siteName: 'Site name', retailMultiplier: 'Retail multiplier', paymentProvider: 'Payment provider', paymentConfig: 'Payment configuration' }
   },
 
   // Auth
@@ -211,6 +228,8 @@ export default {
     emailPlaceholder: 'Enter your email',
     passwordLabel: 'Password',
     passwordPlaceholder: 'Enter your password',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
     createPasswordPlaceholder: 'Create a strong password',
     passwordHint: 'At least 6 characters',
     emailRequired: 'Email is required',
@@ -411,6 +430,15 @@ export default {
     invalidResetLinkHint: 'This password reset link is invalid or has expired. Please request a new one.',
     requestNewResetLink: 'Request New Reset Link',
     invalidOrExpiredToken: 'The password reset link is invalid or has expired. Please request a new one.'
+  },
+
+  // Step-up (sudo) 2FA prompt
+  stepUp: {
+    title: 'Two-Factor Verification Required',
+    hint: 'Enter the 6-digit code from your authenticator app to continue this sensitive operation.',
+    verifyFailed: 'Verification failed, please try again',
+    notEnabled: 'This operation requires two-factor authentication. Please enable TOTP in your profile first.',
+    adminApiKeyForbidden: 'Admin API keys cannot perform this operation. Use a two-factor verified admin session.'
   },
 
   // Dashboard

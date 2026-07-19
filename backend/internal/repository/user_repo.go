@@ -20,9 +20,12 @@ import (
 	dbuser "github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/ent/userallowedgroup"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/creditctx"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/creditledger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/lib/pq"
+	"github.com/shopspring/decimal"
 
 	entsql "entgo.io/ent/dialect/sql"
 )
@@ -106,6 +109,9 @@ func (r *userRepository) Create(ctx context.Context, userIn *service.User) error
 		return err
 	}
 	if err := ensureEmailAuthIdentityWithClient(txCtx, txClient, created.ID, created.Email, "user_repo_create"); err != nil {
+		return err
+	}
+	if err := creditledger.InitializeNewAccount(txCtx, txClient, created.ID, decimal.NewFromFloat(userIn.Balance)); err != nil && !creditledger.IsSchemaUnavailable(err) {
 		return err
 	}
 
@@ -737,70 +743,48 @@ func (r *userRepository) filterUsersByAttributes(ctx context.Context, attrs map[
 }
 
 func (r *userRepository) UpdateBalance(ctx context.Context, id int64, amount float64) error {
-	client := clientFromContext(ctx, r.client)
-	update := client.User.Update().Where(dbuser.IDEQ(id)).AddBalance(amount)
-	// Track cumulative recharge amount for percentage-based notifications
-	if amount > 0 {
-		update = update.AddTotalRecharged(amount)
-	}
-	n, err := update.Save(ctx)
-	if err != nil {
-		return translatePersistenceError(err, service.ErrUserNotFound, nil)
-	}
-	if n == 0 {
-		return service.ErrUserNotFound
-	}
-	return nil
+	return r.applyCreditAdjustment(ctx, id, decimal.NewFromFloat(amount), creditctx.FromContext(ctx), false)
 }
 
 func (r *userRepository) ApplyRedeemBalanceAdjustment(ctx context.Context, id int64, delta float64) error {
-	const updateSQL = `
-		UPDATE users
-		SET balance = GREATEST(balance + $1, 0), updated_at = NOW()
-		WHERE id = $2 AND deleted_at IS NULL
-	`
-	client := clientFromContext(ctx, r.client)
-	result, err := client.ExecContext(ctx, updateSQL, delta, id)
-	if err != nil {
-		return err
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if affected == 0 {
-		return service.ErrUserNotFound
-	}
-	return nil
+	return r.applyCreditAdjustment(ctx, id, decimal.NewFromFloat(delta), creditctx.FromContext(ctx), true)
 }
 
 // DeductBalance 扣除用户余额
 // 透支策略：允许余额变为负数，确保当前请求能够完成
 // 中间件会阻止余额 <= 0 的用户发起后续请求
 func (r *userRepository) DeductBalance(ctx context.Context, id int64, amount float64) error {
-	client := clientFromContext(ctx, r.client)
-	n, err := client.User.Update().
-		Where(dbuser.IDEQ(id), dbuser.BalanceGTE(amount)).
-		AddBalance(-amount).
-		Save(ctx)
-	if err != nil {
-		return err
+	metadata := creditctx.FromContext(ctx)
+	if metadata.EntryType == "balance_adjustment" {
+		metadata.EntryType = "usage_debit"
 	}
-	if n > 0 {
-		return nil
+	if metadata.SourceType == "legacy_balance_update" {
+		metadata.SourceType = "api_usage"
 	}
+	return r.applyCreditAdjustment(ctx, id, decimal.NewFromFloat(amount).Neg(), metadata, false)
+}
 
-	n, err = client.User.Update().
-		Where(dbuser.IDEQ(id)).
-		AddBalance(-amount).
-		Save(ctx)
+func (r *userRepository) applyCreditAdjustment(ctx context.Context, userID int64, amount decimal.Decimal, metadata creditctx.Metadata, floorAtZero bool) error {
+	apply := func(applyCtx context.Context, client *dbent.Client) error {
+		_, _, err := creditledger.Apply(applyCtx, client, userID, amount, metadata, floorAtZero)
+		if errors.Is(err, creditledger.ErrUserNotFound) {
+			return service.ErrUserNotFound
+		}
+		return err
+	}
+	if tx := dbent.TxFromContext(ctx); tx != nil {
+		return apply(ctx, tx.Client())
+	}
+	tx, err := r.client.Tx(ctx)
 	if err != nil {
 		return err
 	}
-	if n == 0 {
-		return service.ErrUserNotFound
+	defer func() { _ = tx.Rollback() }()
+	txCtx := dbent.NewTxContext(ctx, tx)
+	if err := apply(txCtx, tx.Client()); err != nil {
+		return err
 	}
-	return nil
+	return tx.Commit()
 }
 
 func (r *userRepository) UpdateConcurrency(ctx context.Context, id int64, amount int) error {
@@ -862,6 +846,39 @@ func (r *userRepository) BatchAddConcurrency(ctx context.Context, userIDs []int6
 		delta, pq.Array(userIDs))
 	if err != nil {
 		return 0, fmt.Errorf("batch add concurrency: %w", err)
+	}
+	affected, _ := res.RowsAffected()
+	return int(affected), nil
+}
+
+func (r *userRepository) BatchUpdateLimits(ctx context.Context, userIDs []int64, concurrency, rpmLimit *int) (int, error) {
+	if len(userIDs) == 0 || (concurrency == nil && rpmLimit == nil) {
+		return 0, nil
+	}
+
+	setClauses := make([]string, 0, 3)
+	args := make([]any, 0, 3)
+	if concurrency != nil {
+		value := max(*concurrency, 0)
+		args = append(args, value)
+		setClauses = append(setClauses, fmt.Sprintf("concurrency = $%d", len(args)))
+	}
+	if rpmLimit != nil {
+		value := max(*rpmLimit, 0)
+		args = append(args, value)
+		setClauses = append(setClauses, fmt.Sprintf("rpm_limit = $%d", len(args)))
+	}
+	setClauses = append(setClauses, "updated_at = NOW()")
+	args = append(args, pq.Array(userIDs))
+
+	query := fmt.Sprintf(
+		"UPDATE users SET %s WHERE id = ANY($%d) AND deleted_at IS NULL",
+		strings.Join(setClauses, ", "),
+		len(args),
+	)
+	res, err := r.sql.ExecContext(ctx, query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("batch update user limits: %w", err)
 	}
 	affected, _ := res.RowsAffected()
 	return int(affected), nil
@@ -1006,24 +1023,44 @@ func (r *userRepository) syncUserAllowedGroupsWithClient(ctx context.Context, cl
 		return nil
 	}
 
-	// Keep join table as the source of truth for reads.
-	if _, err := client.UserAllowedGroup.Delete().Where(userallowedgroup.UserIDEQ(userID)).Exec(ctx); err != nil {
+	existingRows, err := client.UserAllowedGroup.Query().
+		Where(userallowedgroup.UserIDEQ(userID)).
+		All(ctx)
+	if err != nil {
 		return err
 	}
 
-	unique := make(map[int64]struct{}, len(groupIDs))
+	desired := make(map[int64]struct{}, len(groupIDs))
 	for _, id := range groupIDs {
 		if id <= 0 {
 			continue
 		}
-		unique[id] = struct{}{}
+		desired[id] = struct{}{}
 	}
 
-	if len(unique) > 0 {
-		creates := make([]*dbent.UserAllowedGroupCreate, 0, len(unique))
-		for groupID := range unique {
+	existing := make(map[int64]struct{}, len(existingRows))
+	removed := make([]int64, 0)
+	for _, row := range existingRows {
+		existing[row.GroupID] = struct{}{}
+		if _, keep := desired[row.GroupID]; !keep {
+			removed = append(removed, row.GroupID)
+		}
+	}
+	if len(removed) > 0 {
+		if _, err := client.UserAllowedGroup.Delete().
+			Where(userallowedgroup.UserIDEQ(userID), userallowedgroup.GroupIDIn(removed...)).
+			Exec(ctx); err != nil {
+			return err
+		}
+	}
+
+	creates := make([]*dbent.UserAllowedGroupCreate, 0, len(desired))
+	for groupID := range desired {
+		if _, present := existing[groupID]; !present {
 			creates = append(creates, client.UserAllowedGroup.Create().SetUserID(userID).SetGroupID(groupID))
 		}
+	}
+	if len(creates) > 0 {
 		if err := client.UserAllowedGroup.
 			CreateBulk(creates...).
 			OnConflictColumns(userallowedgroup.FieldUserID, userallowedgroup.FieldGroupID).

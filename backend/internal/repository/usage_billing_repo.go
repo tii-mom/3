@@ -4,11 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/creditctx"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/creditledger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/shopspring/decimal"
 )
 
 type usageBillingRepository struct {
@@ -179,12 +183,20 @@ func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, t
 	}
 
 	if cmd.BalanceCost > 0 {
-		newBalance, sufficient, err := deductUsageBillingBalance(ctx, tx, cmd.UserID, cmd.BalanceCost)
+		newBalance, sufficient, err := deductUsageBillingBalance(ctx, tx, cmd.UserID, cmd.BalanceCost, cmd.APIKeyID, cmd.RequestID)
 		if err != nil {
 			return err
 		}
 		result.NewBalance = &newBalance
 		result.BalanceOverdrafted = !sufficient
+	}
+
+	if cmd.WholesaleCost > 0 && cmd.WholesaleTenantID != nil {
+		newBalance, err := deductWholesaleBalance(ctx, tx, *cmd.WholesaleTenantID, cmd.WholesaleCost, cmd.RequestID, cmd.APIKeyID)
+		if err != nil {
+			return err
+		}
+		result.NewWholesaleBalance = &newBalance
 	}
 
 	if cmd.APIKeyQuotaCost > 0 {
@@ -210,6 +222,35 @@ func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, t
 	}
 
 	return nil
+}
+
+func deductWholesaleBalance(ctx context.Context, tx *sql.Tx, tenantID int64, amount float64, requestID string, apiKeyID int64) (float64, error) {
+	amountDecimal := decimal.NewFromFloat(amount).Round(8)
+	if !amountDecimal.IsPositive() {
+		return 0, nil
+	}
+	var balanceRaw string
+	err := tx.QueryRowContext(ctx, `
+UPDATE saas_wholesale_wallets
+SET balance_usd = balance_usd - $2, lifetime_used_usd = lifetime_used_usd + $2, updated_at = NOW()
+WHERE tenant_id = $1 AND balance_usd >= $2
+RETURNING balance_usd::text`, tenantID, amountDecimal.String()).Scan(&balanceRaw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, service.ErrTenantWholesaleBalanceInsufficient
+	}
+	if err != nil {
+		return 0, err
+	}
+	balanceDecimal, err := decimal.NewFromString(balanceRaw)
+	if err != nil {
+		return 0, err
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO saas_wholesale_ledger (tenant_id, action, amount_usd, balance_after, source_type, source_id, idempotency_key) VALUES ($1, 'usage_debit', $2, $3, 'api_request', $4, $5) ON CONFLICT DO NOTHING`, tenantID, amountDecimal.Neg().String(), balanceDecimal.String(), requestID, fmt.Sprintf("wholesale:%d:%s", apiKeyID, requestID))
+	balance, _ := balanceDecimal.Float64()
+	if err != nil {
+		return 0, err
+	}
+	return balance, nil
 }
 
 func incrementUsageBillingSubscription(ctx context.Context, tx *sql.Tx, subscriptionID int64, costUSD float64) error {
@@ -240,63 +281,56 @@ func incrementUsageBillingSubscription(ctx context.Context, tx *sql.Tx, subscrip
 	return service.ErrSubscriptionNotFound
 }
 
-func deductUsageBillingBalance(ctx context.Context, tx *sql.Tx, userID int64, amount float64) (float64, bool, error) {
-	var newBalance float64
-	err := tx.QueryRowContext(ctx, `
-		UPDATE users
-		SET balance = balance - $1,
-			updated_at = NOW()
-		WHERE id = $2 AND deleted_at IS NULL AND balance >= $1
-		RETURNING balance
-	`, amount, userID).Scan(&newBalance)
-	if err == nil {
-		return newBalance, true, nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		return 0, false, err
-	}
-
-	err = tx.QueryRowContext(ctx, `
-		UPDATE users
-		SET balance = balance - $1,
-			updated_at = NOW()
-		WHERE id = $2 AND deleted_at IS NULL
-		RETURNING balance
-	`, amount, userID).Scan(&newBalance)
-	if errors.Is(err, sql.ErrNoRows) {
+func deductUsageBillingBalance(ctx context.Context, tx *sql.Tx, userID int64, amount float64, apiKeyID int64, requestID string) (float64, bool, error) {
+	account, _, err := creditledger.Apply(ctx, tx, userID, decimal.NewFromFloat(amount).Neg(), creditctx.Metadata{
+		EntryType: "usage_debit", SourceType: "api_request", SourceID: requestID,
+		IdempotencyKey: fmt.Sprintf("usage:%d:%s", apiKeyID, requestID),
+	}, false)
+	if errors.Is(err, creditledger.ErrUserNotFound) {
 		return 0, false, service.ErrUserNotFound
 	}
 	if err != nil {
 		return 0, false, err
 	}
-	return newBalance, false, nil
+	balance, _ := account.Balance().Float64()
+	return balance, account.Debt.IsZero(), nil
 }
 
 func reserveUsageBillingBatchImageBalance(ctx context.Context, tx *sql.Tx, cmd *service.BatchImageBalanceHoldCommand) (*service.BatchImageBalanceHoldResult, error) {
 	if cmd.HoldAmount <= 0 {
 		return &service.BatchImageBalanceHoldResult{}, nil
 	}
-	var balance, frozen float64
-	err := tx.QueryRowContext(ctx, `
-		UPDATE users
-		SET balance = balance - $1,
-			frozen_balance = COALESCE(frozen_balance, 0) + $1,
-			updated_at = NOW()
-		WHERE id = $2 AND deleted_at IS NULL AND balance >= $1
-		RETURNING balance, frozen_balance
-	`, cmd.HoldAmount, cmd.UserID).Scan(&balance, &frozen)
-	if err == nil {
-		return &service.BatchImageBalanceHoldResult{NewBalance: &balance, FrozenBalance: &frozen}, nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
+	if err := creditledger.EnsureAccount(ctx, tx, cmd.UserID); err != nil {
+		if errors.Is(err, creditledger.ErrUserNotFound) {
+			return nil, service.ErrUserNotFound
+		}
 		return nil, err
 	}
-	if exists, existsErr := userExistsForBilling(ctx, tx, cmd.UserID); existsErr != nil {
-		return nil, existsErr
-	} else if !exists {
-		return nil, service.ErrUserNotFound
+	var transferableRaw, nonTransferableRaw string
+	if err := tx.QueryRowContext(ctx, `SELECT transferable_credit::text, non_transferable_credit::text FROM user_credit_accounts WHERE user_id = $1 FOR UPDATE`, cmd.UserID).Scan(&transferableRaw, &nonTransferableRaw); err != nil {
+		return nil, err
 	}
-	return nil, service.ErrBatchImageInsufficientBalance
+	transferable, _ := decimal.NewFromString(transferableRaw)
+	nonTransferable, _ := decimal.NewFromString(nonTransferableRaw)
+	hold := decimal.NewFromFloat(cmd.HoldAmount)
+	if transferable.Add(nonTransferable).LessThan(hold) {
+		return nil, service.ErrBatchImageInsufficientBalance
+	}
+	nonTransferableHold := decimal.Min(nonTransferable, hold)
+	transferableHold := hold.Sub(nonTransferableHold)
+	account, _, err := creditledger.Apply(ctx, tx, cmd.UserID, hold.Neg(), creditctx.Metadata{EntryType: "batch_image_hold", SourceType: "batch_image", SourceID: cmd.BatchID, IdempotencyKey: fmt.Sprintf("batch-hold:%d:%s", cmd.APIKeyID, cmd.BatchID)}, true)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO user_credit_holds (tenant_id, user_id, hold_key, transferable_amount, non_transferable_amount) VALUES (1, $1, $2, $3, $4) ON CONFLICT DO NOTHING`, cmd.UserID, cmd.BatchID, transferableHold.String(), nonTransferableHold.String()); err != nil {
+		return nil, err
+	}
+	var frozen float64
+	if err := tx.QueryRowContext(ctx, `UPDATE users SET frozen_balance = COALESCE(frozen_balance, 0) + $2, updated_at = NOW() WHERE id = $1 RETURNING frozen_balance`, cmd.UserID, hold.String()).Scan(&frozen); err != nil {
+		return nil, err
+	}
+	balance, _ := account.Balance().Float64()
+	return &service.BatchImageBalanceHoldResult{NewBalance: &balance, FrozenBalance: &frozen}, nil
 }
 
 func captureUsageBillingBatchImageBalance(ctx context.Context, tx *sql.Tx, cmd *service.BatchImageBalanceHoldCommand) (*service.BatchImageBalanceHoldResult, error) {
@@ -306,29 +340,7 @@ func captureUsageBillingBatchImageBalance(ctx context.Context, tx *sql.Tx, cmd *
 	if cmd.ActualAmount-cmd.HoldAmount > 0.00000001 {
 		return nil, service.ErrBatchImageSettlementCostExceedsHold
 	}
-	var balance, frozen float64
-	err := tx.QueryRowContext(ctx, `
-		UPDATE users
-		SET balance = balance
-				+ CASE WHEN $1 > $2 THEN $1 - $2 ELSE 0 END
-				- CASE WHEN $2 > $1 THEN $2 - $1 ELSE 0 END,
-			frozen_balance = COALESCE(frozen_balance, 0) - $1,
-			updated_at = NOW()
-		WHERE id = $3 AND deleted_at IS NULL AND COALESCE(frozen_balance, 0) >= $1
-		RETURNING balance, frozen_balance
-	`, cmd.HoldAmount, cmd.ActualAmount, cmd.UserID).Scan(&balance, &frozen)
-	if err == nil {
-		return &service.BatchImageBalanceHoldResult{NewBalance: &balance, FrozenBalance: &frozen}, nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		return nil, err
-	}
-	if exists, existsErr := userExistsForBilling(ctx, tx, cmd.UserID); existsErr != nil {
-		return nil, existsErr
-	} else if !exists {
-		return nil, service.ErrUserNotFound
-	}
-	return nil, errors.New("batch image frozen balance is insufficient")
+	return settleUsageBillingBatchImageHold(ctx, tx, cmd, "CAPTURED")
 }
 
 func releaseUsageBillingBatchImageBalance(ctx context.Context, tx *sql.Tx, cmd *service.BatchImageBalanceHoldCommand) (*service.BatchImageBalanceHoldResult, error) {
@@ -345,27 +357,70 @@ func releaseUsageBillingBatchImageBalance(ctx context.Context, tx *sql.Tx, cmd *
 		logger.LegacyPrintf("repository.usage_billing", "[BatchImage] release skipped, hold was never reserved: batch=%s", cmd.BatchID)
 		return &service.BatchImageBalanceHoldResult{}, nil
 	}
-	var balance, frozen float64
-	err := tx.QueryRowContext(ctx, `
-		UPDATE users
-		SET balance = balance + $1,
-			frozen_balance = COALESCE(frozen_balance, 0) - $1,
-			updated_at = NOW()
-		WHERE id = $2 AND deleted_at IS NULL AND COALESCE(frozen_balance, 0) >= $1
-		RETURNING balance, frozen_balance
-	`, cmd.HoldAmount, cmd.UserID).Scan(&balance, &frozen)
-	if err == nil {
-		return &service.BatchImageBalanceHoldResult{NewBalance: &balance, FrozenBalance: &frozen}, nil
+	return settleUsageBillingBatchImageHold(ctx, tx, cmd, "RELEASED")
+}
+
+func settleUsageBillingBatchImageHold(ctx context.Context, tx *sql.Tx, cmd *service.BatchImageBalanceHoldCommand, target string) (*service.BatchImageBalanceHoldResult, error) {
+	var transferableRaw, nonTransferableRaw string
+	var status string
+	err := tx.QueryRowContext(ctx, `SELECT transferable_amount::text, non_transferable_amount::text, status FROM user_credit_holds WHERE tenant_id = 1 AND user_id = $1 AND hold_key = $2 FOR UPDATE`, cmd.UserID, cmd.BatchID).Scan(&transferableRaw, &nonTransferableRaw, &status)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, errors.New("batch image credit hold not found")
 	}
-	if !errors.Is(err, sql.ErrNoRows) {
+	if err != nil {
 		return nil, err
 	}
-	if exists, existsErr := userExistsForBilling(ctx, tx, cmd.UserID); existsErr != nil {
-		return nil, existsErr
-	} else if !exists {
-		return nil, service.ErrUserNotFound
+	if status != "HELD" {
+		return &service.BatchImageBalanceHoldResult{}, nil
 	}
-	return nil, errors.New("batch image frozen balance is insufficient")
+	transferableHeld, _ := decimal.NewFromString(transferableRaw)
+	nonTransferableHeld, _ := decimal.NewFromString(nonTransferableRaw)
+	hold := transferableHeld.Add(nonTransferableHeld)
+	actual := decimal.Zero
+	if target == "CAPTURED" {
+		actual = decimal.NewFromFloat(cmd.ActualAmount)
+	}
+	if actual.GreaterThan(hold) {
+		return nil, service.ErrBatchImageSettlementCostExceedsHold
+	}
+	actualFromNonTransferable := decimal.Min(nonTransferableHeld, actual)
+	actualFromTransferable := actual.Sub(actualFromNonTransferable)
+	transferableRefund := transferableHeld.Sub(actualFromTransferable)
+	nonTransferableRefund := nonTransferableHeld.Sub(actualFromNonTransferable)
+	var account creditledger.Account
+	if nonTransferableRefund.IsPositive() {
+		account, _, err = creditledger.Apply(ctx, tx, cmd.UserID, nonTransferableRefund, creditctx.Metadata{EntryType: "batch_image_refund", SourceType: "batch_image", SourceID: cmd.BatchID, IdempotencyKey: fmt.Sprintf("batch-refund-nontransferable:%d:%s:%s", cmd.APIKeyID, cmd.BatchID, target)}, false)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if transferableRefund.IsPositive() {
+		account, _, err = creditledger.Apply(ctx, tx, cmd.UserID, transferableRefund, creditctx.Metadata{EntryType: "batch_image_refund", SourceType: "batch_image", SourceID: cmd.BatchID, IdempotencyKey: fmt.Sprintf("batch-refund-transferable:%d:%s:%s", cmd.APIKeyID, cmd.BatchID, target), Transferable: true}, false)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if !transferableRefund.IsPositive() && !nonTransferableRefund.IsPositive() {
+		if err := tx.QueryRowContext(ctx, `SELECT transferable_credit::text, non_transferable_credit::text, debt::text FROM user_credit_accounts WHERE user_id = $1`, cmd.UserID).Scan(&transferableRaw, &nonTransferableRaw, &status); err != nil {
+			return nil, err
+		}
+		account.Transferable, _ = decimal.NewFromString(transferableRaw)
+		account.NonTransferable, _ = decimal.NewFromString(nonTransferableRaw)
+		account.Debt, _ = decimal.NewFromString(status)
+	}
+	var frozen float64
+	err = tx.QueryRowContext(ctx, `UPDATE users SET frozen_balance = frozen_balance - $2, updated_at = NOW() WHERE id = $1 AND frozen_balance >= $2 RETURNING frozen_balance`, cmd.UserID, hold.String()).Scan(&frozen)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, errors.New("batch image frozen balance is insufficient")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE user_credit_holds SET status = $3, actual_amount = $4, settled_at = NOW() WHERE user_id = $1 AND hold_key = $2`, cmd.UserID, cmd.BatchID, target, actual.String()); err != nil {
+		return nil, err
+	}
+	balance, _ := account.Balance().Float64()
+	return &service.BatchImageBalanceHoldResult{NewBalance: &balance, FrozenBalance: &frozen}, nil
 }
 
 // batchImageHoldClaimExists 检查 hold request id 是否已在 dedup（或归档）表中被 claim，
@@ -395,22 +450,6 @@ func batchImageHoldClaimExists(ctx context.Context, tx *sql.Tx, holdRequestID st
 		return false, nil
 	}
 	return false, err
-}
-
-func userExistsForBilling(ctx context.Context, tx *sql.Tx, userID int64) (bool, error) {
-	var exists int
-	err := tx.QueryRowContext(ctx, `
-		SELECT 1
-		FROM users
-		WHERE id = $1 AND deleted_at IS NULL
-	`, userID).Scan(&exists)
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return true, nil
 }
 
 func incrementUsageBillingAPIKeyQuota(ctx context.Context, tx *sql.Tx, apiKeyID int64, amount float64) (bool, error) {

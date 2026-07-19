@@ -60,17 +60,17 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: 9
+          version: 11.9.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'pnpm'
           cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Install dependencies
-        run: rm -f pnpm-workspace.yaml && pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
         working-directory: frontend
 
       - name: Build frontend

@@ -17,7 +17,9 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/internal/payment"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/creditctx"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	"github.com/shopspring/decimal"
 )
 
 // ErrOrderNotFound is returned by HandlePaymentNotification when the webhook
@@ -334,8 +336,14 @@ func (s *PaymentService) doBalance(ctx context.Context, o *dbent.PaymentOrder, l
 
 	switch action {
 	case redeemActionSkipCompleted:
-		if err := s.applyAffiliateRebateForOrder(ctx, o); err != nil {
+		distribution, err := s.applyDistributionForOrder(ctx, o)
+		if err != nil {
 			return err
+		}
+		if !distribution.Enabled || distribution.StackWithLegacy {
+			if err := s.applyAffiliateRebateForOrder(ctx, o); err != nil {
+				return err
+			}
 		}
 		// Code already created and redeemed — just mark completed
 		return s.markCompleted(ctx, o, lease, "RECHARGE_SUCCESS")
@@ -347,13 +355,41 @@ func (s *PaymentService) doBalance(ctx context.Context, o *dbent.PaymentOrder, l
 	case redeemActionRedeem:
 		// Code exists but unused — skip creation, proceed to redeem
 	}
-	if _, err := s.redeemService.Redeem(ContextSkipRedeemAffiliate(ctx), o.UserID, o.RechargeCode); err != nil {
+	creditCtx := creditctx.WithMetadata(ContextSkipRedeemAffiliate(ctx), creditctx.Metadata{
+		EntryType:      "paid_recharge",
+		SourceType:     "payment_order",
+		SourceID:       strconv.FormatInt(o.ID, 10),
+		IdempotencyKey: fmt.Sprintf("payment_order:%d:credit", o.ID),
+		Transferable:   true,
+		CountRecharge:  true,
+	})
+	if _, err := s.redeemService.Redeem(creditCtx, o.UserID, o.RechargeCode); err != nil {
 		return fmt.Errorf("redeem balance: %w", err)
 	}
-	if err := s.applyAffiliateRebateForOrder(ctx, o); err != nil {
+	distribution, err := s.applyDistributionForOrder(ctx, o)
+	if err != nil {
 		return err
 	}
+	if !distribution.Enabled || distribution.StackWithLegacy {
+		if err := s.applyAffiliateRebateForOrder(ctx, o); err != nil {
+			return err
+		}
+	}
 	return s.markCompleted(ctx, o, lease, "RECHARGE_SUCCESS")
+}
+
+func (s *PaymentService) applyDistributionForOrder(ctx context.Context, order *dbent.PaymentOrder) (DistributionProcessResult, error) {
+	if s.distributionService == nil || order == nil {
+		return DistributionProcessResult{}, nil
+	}
+	return s.distributionService.ProcessRecharge(
+		ctx,
+		order.ID,
+		order.UserID,
+		decimal.NewFromFloat(order.PayAmount),
+		decimal.NewFromFloat(order.FeeRate),
+		decimal.NewFromFloat(order.Amount),
+	)
 }
 
 func (s *PaymentService) markCompleted(ctx context.Context, o *dbent.PaymentOrder, lease *paymentFulfillmentLease, auditAction string) error {

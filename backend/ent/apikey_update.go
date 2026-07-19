@@ -134,6 +134,47 @@ func (_u *APIKeyUpdate) SetNillableStatus(v *string) *APIKeyUpdate {
 	return _u
 }
 
+// SetKeyType sets the "key_type" field.
+func (_u *APIKeyUpdate) SetKeyType(v string) *APIKeyUpdate {
+	_u.mutation.SetKeyType(v)
+	return _u
+}
+
+// SetNillableKeyType sets the "key_type" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableKeyType(v *string) *APIKeyUpdate {
+	if v != nil {
+		_u.SetKeyType(*v)
+	}
+	return _u
+}
+
+// SetTenantID sets the "tenant_id" field.
+func (_u *APIKeyUpdate) SetTenantID(v int64) *APIKeyUpdate {
+	_u.mutation.ResetTenantID()
+	_u.mutation.SetTenantID(v)
+	return _u
+}
+
+// SetNillableTenantID sets the "tenant_id" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableTenantID(v *int64) *APIKeyUpdate {
+	if v != nil {
+		_u.SetTenantID(*v)
+	}
+	return _u
+}
+
+// AddTenantID adds value to the "tenant_id" field.
+func (_u *APIKeyUpdate) AddTenantID(v int64) *APIKeyUpdate {
+	_u.mutation.AddTenantID(v)
+	return _u
+}
+
+// ClearTenantID clears the value of the "tenant_id" field.
+func (_u *APIKeyUpdate) ClearTenantID() *APIKeyUpdate {
+	_u.mutation.ClearTenantID()
+	return _u
+}
+
 // SetLastUsedAt sets the "last_used_at" field.
 func (_u *APIKeyUpdate) SetLastUsedAt(v time.Time) *APIKeyUpdate {
 	_u.mutation.SetLastUsedAt(v)
@@ -560,6 +601,11 @@ func (_u *APIKeyUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "APIKey.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.KeyType(); ok {
+		if err := apikey.KeyTypeValidator(v); err != nil {
+			return &ValidationError{Name: "key_type", err: fmt.Errorf(`ent: validator failed for field "APIKey.key_type": %w`, err)}
+		}
+	}
 	if _u.mutation.UserCleared() && len(_u.mutation.UserIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "APIKey.user"`)
 	}
@@ -595,6 +641,18 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.KeyType(); ok {
+		_spec.SetField(apikey.FieldKeyType, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.TenantID(); ok {
+		_spec.SetField(apikey.FieldTenantID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedTenantID(); ok {
+		_spec.AddField(apikey.FieldTenantID, field.TypeInt64, value)
+	}
+	if _u.mutation.TenantIDCleared() {
+		_spec.ClearField(apikey.FieldTenantID, field.TypeInt64)
 	}
 	if value, ok := _u.mutation.LastUsedAt(); ok {
 		_spec.SetField(apikey.FieldLastUsedAt, field.TypeTime, value)
@@ -918,6 +976,47 @@ func (_u *APIKeyUpdateOne) SetNillableStatus(v *string) *APIKeyUpdateOne {
 	if v != nil {
 		_u.SetStatus(*v)
 	}
+	return _u
+}
+
+// SetKeyType sets the "key_type" field.
+func (_u *APIKeyUpdateOne) SetKeyType(v string) *APIKeyUpdateOne {
+	_u.mutation.SetKeyType(v)
+	return _u
+}
+
+// SetNillableKeyType sets the "key_type" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableKeyType(v *string) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetKeyType(*v)
+	}
+	return _u
+}
+
+// SetTenantID sets the "tenant_id" field.
+func (_u *APIKeyUpdateOne) SetTenantID(v int64) *APIKeyUpdateOne {
+	_u.mutation.ResetTenantID()
+	_u.mutation.SetTenantID(v)
+	return _u
+}
+
+// SetNillableTenantID sets the "tenant_id" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableTenantID(v *int64) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetTenantID(*v)
+	}
+	return _u
+}
+
+// AddTenantID adds value to the "tenant_id" field.
+func (_u *APIKeyUpdateOne) AddTenantID(v int64) *APIKeyUpdateOne {
+	_u.mutation.AddTenantID(v)
+	return _u
+}
+
+// ClearTenantID clears the value of the "tenant_id" field.
+func (_u *APIKeyUpdateOne) ClearTenantID() *APIKeyUpdateOne {
+	_u.mutation.ClearTenantID()
 	return _u
 }
 
@@ -1360,6 +1459,11 @@ func (_u *APIKeyUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "APIKey.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.KeyType(); ok {
+		if err := apikey.KeyTypeValidator(v); err != nil {
+			return &ValidationError{Name: "key_type", err: fmt.Errorf(`ent: validator failed for field "APIKey.key_type": %w`, err)}
+		}
+	}
 	if _u.mutation.UserCleared() && len(_u.mutation.UserIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "APIKey.user"`)
 	}
@@ -1412,6 +1516,18 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.KeyType(); ok {
+		_spec.SetField(apikey.FieldKeyType, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.TenantID(); ok {
+		_spec.SetField(apikey.FieldTenantID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedTenantID(); ok {
+		_spec.AddField(apikey.FieldTenantID, field.TypeInt64, value)
+	}
+	if _u.mutation.TenantIDCleared() {
+		_spec.ClearField(apikey.FieldTenantID, field.TypeInt64)
 	}
 	if value, ok := _u.mutation.LastUsedAt(); ok {
 		_spec.SetField(apikey.FieldLastUsedAt, field.TypeTime, value)

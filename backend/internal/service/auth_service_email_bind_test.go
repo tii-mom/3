@@ -42,6 +42,23 @@ type flakyEmailBindDefaultSubAssignerStub struct {
 	calls []*service.AssignSubscriptionInput
 }
 
+// These tests exercise the auth transaction boundary with SQLite. The
+// production repository's balance path intentionally uses PostgreSQL-only
+// locking and JSONB syntax, so keep this unit fixture focused on the auth
+// behavior while still applying the balance change through the active tx.
+type emailBindUserRepository struct {
+	service.UserRepository
+	client *dbent.Client
+}
+
+func (r *emailBindUserRepository) UpdateBalance(ctx context.Context, id int64, amount float64) error {
+	client := r.client
+	if tx := dbent.TxFromContext(ctx); tx != nil {
+		client = tx.Client()
+	}
+	return client.User.UpdateOneID(id).AddBalance(amount).Exec(ctx)
+}
+
 func (s *flakyEmailBindDefaultSubAssignerStub) AssignOrExtendSubscription(
 	_ context.Context,
 	input *service.AssignSubscriptionInput,
@@ -90,7 +107,8 @@ CREATE TABLE IF NOT EXISTS user_provider_default_grants (
 	client := enttest.NewClient(t, enttest.WithOptions(dbent.Driver(drv)))
 	t.Cleanup(func() { _ = client.Close() })
 
-	repo := repository.NewUserRepository(client, db)
+	baseRepo := repository.NewUserRepository(client, db)
+	repo := &emailBindUserRepository{UserRepository: baseRepo, client: client}
 	cfg := &config.Config{
 		JWT: config.JWTConfig{
 			Secret:     "test-bind-email-secret",
@@ -961,6 +979,9 @@ func (s *emailBindUserRepoStub) BatchSetConcurrency(context.Context, []int64, in
 	return 0, nil
 }
 func (s *emailBindUserRepoStub) BatchAddConcurrency(context.Context, []int64, int) (int, error) {
+	return 0, nil
+}
+func (s *emailBindUserRepoStub) BatchUpdateLimits(context.Context, []int64, *int, *int) (int, error) {
 	return 0, nil
 }
 

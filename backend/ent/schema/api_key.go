@@ -47,6 +47,12 @@ func (APIKey) Fields() []ent.Field {
 		field.String("status").
 			MaxLen(20).
 			Default(domain.StatusActive),
+		field.String("key_type").
+			MaxLen(24).
+			Default("user"),
+		field.Int64("tenant_id").
+			Optional().
+			Nillable(),
 		field.Time("last_used_at").
 			Optional().
 			Nillable().

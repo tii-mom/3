@@ -13,11 +13,14 @@ func RegisterUserRoutes(
 	v1 *gin.RouterGroup,
 	h *handler.Handlers,
 	jwtAuth middleware.JWTAuthMiddleware,
+	auditLog middleware.AuditLogMiddleware,
 	settingService *service.SettingService,
 ) {
 	authenticated := v1.Group("")
 	authenticated.Use(gin.HandlerFunc(jwtAuth))
 	authenticated.Use(middleware.BackendModeUserGuard(settingService))
+	// 用户管理面变更类操作入审计（含 TOTP 启用/禁用、step-up 验证、密码修改等安全事件）
+	authenticated.Use(gin.HandlerFunc(auditLog))
 	{
 		// 用户接口
 		user := authenticated.Group("/user")
@@ -52,6 +55,8 @@ func RegisterUserRoutes(
 				totp.POST("/setup", h.Totp.InitiateSetup)
 				totp.POST("/enable", h.Totp.Enable)
 				totp.POST("/disable", h.Totp.Disable)
+				// 敏感操作二次验证：授予当前会话一段时间的 step-up 权限
+				totp.POST("/step-up", h.Totp.StepUp)
 			}
 		}
 
@@ -106,6 +111,38 @@ func RegisterUserRoutes(
 		{
 			redeem.POST("", h.Redeem.Redeem)
 			redeem.GET("/history", h.Redeem.GetHistory)
+		}
+
+		vouchers := authenticated.Group("/user/vouchers")
+		{
+			vouchers.POST("", h.Voucher.Create)
+			vouchers.GET("", h.Voucher.List)
+			vouchers.POST("/:id/cancel", h.Voucher.Cancel)
+		}
+
+		distribution := authenticated.Group("/distribution")
+		{
+			distribution.GET("/dashboard", h.Distribution.Dashboard)
+			distribution.GET("/tree", h.Distribution.Tree)
+			distribution.GET("/ledger", h.Distribution.Ledger)
+			distribution.GET("/payout-account", h.Distribution.GetPayoutAccount)
+			distribution.PUT("/payout-account", h.Distribution.SavePayoutAccount)
+			distribution.GET("/withdrawals", h.Distribution.ListWithdrawals)
+			distribution.POST("/withdrawals", h.Distribution.CreateWithdrawal)
+		}
+
+		partner := authenticated.Group("/saas/partner")
+		{
+			partner.GET("/dashboard", h.Partner.Dashboard)
+			partner.GET("/withdrawals", h.Partner.ListWithdrawals)
+			partner.POST("/withdrawals", h.Partner.CreateWithdrawal)
+		}
+
+		tenant := authenticated.Group("/saas/tenant")
+		{
+			tenant.GET("/config", h.Partner.TenantControl)
+			tenant.PUT("/config", h.Partner.UpdateTenantControl)
+			tenant.POST("/domains", h.Partner.AddTenantDomain)
 		}
 
 		// 用户订阅

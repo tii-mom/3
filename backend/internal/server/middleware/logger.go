@@ -6,6 +6,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/requestmetrics"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -18,12 +19,16 @@ func Logger() gin.HandlerFunc {
 
 		// 请求路径
 		path := c.Request.URL.Path
+		if path != "/health" && path != "/health/live" && path != "/health/ready" && path != "/setup/status" && path != "/api/v1/admin/dashboard/realtime" {
+			finish := requestmetrics.Begin()
+			defer finish()
+		}
 
 		// 处理请求
 		c.Next()
 
 		// 跳过健康检查等高频探针路径的日志
-		if path == "/health" || path == "/setup/status" {
+		if path == "/health" || path == "/health/live" || path == "/health/ready" || path == "/setup/status" {
 			return
 		}
 
@@ -37,6 +42,21 @@ func Logger() gin.HandlerFunc {
 		accountID, hasAccountID := c.Request.Context().Value(ctxkey.AccountID).(int64)
 		platform, _ := c.Request.Context().Value(ctxkey.Platform).(string)
 		model, _ := c.Request.Context().Value(ctxkey.Model).(string)
+		reason, rejected := GetIngressRejectReason(c)
+		if rejected {
+			recordIngressReject(c, reason)
+			allowed, droppedSummary := globalIngressRejectAccessSampler.allow(endTime)
+			if droppedSummary > 0 {
+				logger.FromContext(c.Request.Context()).Info("ingress rejection access logs dropped",
+					zap.String("component", "http.access"),
+					zap.Uint64("dropped_count", droppedSummary),
+					zap.Bool(logger.OpsSystemLogSkipField, true),
+				)
+			}
+			if !allowed {
+				return
+			}
+		}
 
 		fields := []zap.Field{
 			zap.String("component", "http.access"),
@@ -46,6 +66,12 @@ func Logger() gin.HandlerFunc {
 			zap.String("protocol", protocol),
 			zap.String("method", method),
 			zap.String("path", path),
+		}
+		if rejected {
+			fields = append(fields,
+				zap.String("ingress_reject_reason", string(reason)),
+				zap.Bool(logger.OpsSystemLogSkipField, true),
+			)
 		}
 		if hasAccountID && accountID > 0 {
 			fields = append(fields, zap.Int64("account_id", accountID))

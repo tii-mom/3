@@ -79,6 +79,13 @@ type DashboardStats struct {
 	Tpm int64 `json:"tpm"` // 近5分钟平均每分钟Token数
 }
 
+type RealtimeMetrics struct {
+	ActiveRequests      int64   `json:"active_requests"`
+	RequestsPerMinute   int64   `json:"requests_per_minute"`
+	AverageResponseTime float64 `json:"average_response_time"`
+	ErrorRate           float64 `json:"error_rate"`
+}
+
 // TrendDataPoint represents a single point in trend data
 type TrendDataPoint struct {
 	Date                string  `json:"date"`

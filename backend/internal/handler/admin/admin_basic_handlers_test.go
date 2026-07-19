@@ -2,24 +2,48 @@ package admin
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+type stubRedeemStatsRepository struct {
+	service.RedeemCodeRepository
+}
+
+func (s *stubRedeemStatsRepository) GetStats(context.Context, time.Time) (*service.RedeemCodeStats, error) {
+	return &service.RedeemCodeStats{
+		TotalCodes:            8,
+		ActiveCodes:           3,
+		UsedCodes:             4,
+		ExpiredCodes:          1,
+		TotalValueDistributed: 25.5,
+		ByType: map[string]int64{
+			service.RedeemTypeBalance:      5,
+			service.RedeemTypeConcurrency:  1,
+			service.RedeemTypeSubscription: 2,
+			service.RedeemTypeInvitation:   0,
+		},
+	}, nil
+}
 
 func setupAdminRouter() (*gin.Engine, *stubAdminService) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	adminSvc := newStubAdminService()
 
-	userHandler := NewUserHandler(adminSvc, nil, nil, nil)
+	userHandler := NewUserHandler(adminSvc, nil, nil, nil, nil, nil, nil)
 	groupHandler := NewGroupHandler(adminSvc, nil, nil)
 	proxyHandler := NewProxyHandler(adminSvc)
-	redeemHandler := NewRedeemHandler(adminSvc, nil)
+	redeemService := service.NewRedeemService(&stubRedeemStatsRepository{}, nil, nil, nil, nil, nil, nil, nil)
+	redeemHandler := NewRedeemHandler(adminSvc, redeemService)
 
 	router.GET("/api/v1/admin/users", userHandler.List)
 	router.GET("/api/v1/admin/users/:id", userHandler.GetByID)
@@ -59,7 +83,7 @@ func setupAdminRouter() (*gin.Engine, *stubAdminService) {
 	router.DELETE("/api/v1/admin/redeem-codes/:id", redeemHandler.Delete)
 	router.POST("/api/v1/admin/redeem-codes/batch-delete", redeemHandler.BatchDelete)
 	router.POST("/api/v1/admin/redeem-codes/:id/expire", redeemHandler.Expire)
-	router.GET("/api/v1/admin/redeem-codes/:id/stats", redeemHandler.GetStats)
+	router.GET("/api/v1/admin/redeem-codes/stats", redeemHandler.GetStats)
 
 	return router, adminSvc
 }
@@ -207,6 +231,8 @@ func TestGroupHandlerEndpoints(t *testing.T) {
 	req = httptest.NewRequest(http.MethodGet, "/api/v1/admin/groups/2/stats", nil)
 	router.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), `"total_api_keys":1`)
+	require.Contains(t, rec.Body.String(), `"active_api_keys":1`)
 
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/api/v1/admin/groups/2/api-keys", nil)
@@ -271,6 +297,8 @@ func TestProxyHandlerEndpoints(t *testing.T) {
 	req = httptest.NewRequest(http.MethodGet, "/api/v1/admin/proxies/4/stats", nil)
 	router.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), `"total_requests":12`)
+	require.Contains(t, rec.Body.String(), `"success_rate":75`)
 
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/api/v1/admin/proxies/4/accounts", nil)
@@ -315,7 +343,9 @@ func TestRedeemHandlerEndpoints(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	rec = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/admin/redeem-codes/5/stats", nil)
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/admin/redeem-codes/stats", nil)
 	router.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), `"total_codes":8`)
+	require.Contains(t, rec.Body.String(), `"total_value_distributed":25.5`)
 }

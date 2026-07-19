@@ -128,6 +128,7 @@ describe('admin UsageView distribution metric toggles', () => {
     getSnapshotV2.mockReset()
     getById.mockReset()
     getModelStats.mockReset()
+    listErrorLogs.mockReset()
 
     list.mockResolvedValue({
       items: [],
@@ -150,6 +151,7 @@ describe('admin UsageView distribution metric toggles', () => {
       groups: [],
     })
     getModelStats.mockResolvedValue({ models: [] })
+    listErrorLogs.mockResolvedValue({ items: [], total: 0, pages: 0 })
   })
 
   afterEach(() => {
@@ -366,6 +368,7 @@ describe('admin UsageView ranking tab', () => {
     getStats.mockReset()
     getSnapshotV2.mockReset()
     getModelStats.mockReset()
+    listErrorLogs.mockReset()
 
     list.mockResolvedValue({ items: [], total: 0, pages: 0 })
     getStats.mockResolvedValue({
@@ -374,6 +377,7 @@ describe('admin UsageView ranking tab', () => {
     })
     getSnapshotV2.mockResolvedValue({ trend: [], models: [], groups: [] })
     getModelStats.mockResolvedValue({ models: [] })
+    listErrorLogs.mockResolvedValue({ items: [], total: 0, pages: 0 })
   })
 
   afterEach(() => {
@@ -411,5 +415,36 @@ describe('admin UsageView ranking tab', () => {
     expect((wrapper.vm as any).activeTab).toBe('usage')
     expect((wrapper.vm as any).filters.user_id).toBe(5)
     expect(list).toHaveBeenCalledWith(expect.objectContaining({ user_id: 5 }), expect.anything())
+  })
+
+  it('exposes detail tabs with roving focus and keyboard navigation', async () => {
+    const wrapper = mount(UsageView, {
+      attachTo: document.body,
+      global: { stubs: {
+        AppLayout: AppLayoutStub, UsageStatsCards: true, UsageFilters: UsageFiltersStub,
+        UsageTable: true, UsageExportProgress: true, UsageCleanupDialog: true,
+        UserBalanceHistoryModal: true, Pagination: true, Select: true,
+        DateRangePicker: true, Icon: true, TokenUsageTrend: true,
+        ModelDistributionChart: true, GroupDistributionChart: true, EndpointDistributionChart: true,
+        UserTokenRanking: true, OpsErrorLogTable: true, OpsErrorDetailModal: true,
+      } },
+    })
+    vi.advanceTimersByTime(120)
+    await flushPromises()
+
+    expect(wrapper.find('[role="tablist"]').exists()).toBe(true)
+    const tabs = wrapper.findAll('[role="tab"]')
+    expect(tabs).toHaveLength(3)
+    expect(tabs[0].attributes('aria-selected')).toBe('true')
+    expect(tabs[1].attributes('tabindex')).toBe('-1')
+
+    await tabs[0].trigger('keydown', { key: 'ArrowRight' })
+    await flushPromises()
+
+    expect((wrapper.vm as any).activeTab).toBe('errors')
+    expect(tabs[1].attributes('aria-selected')).toBe('true')
+    expect(document.activeElement).toBe(tabs[1].element)
+    expect(wrapper.get('#usage-detail-panel-errors').attributes('role')).toBe('tabpanel')
+    wrapper.unmount()
   })
 })

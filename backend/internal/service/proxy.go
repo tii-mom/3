@@ -73,5 +73,14 @@ type ProxyAccountSummary struct {
 	Name     string
 	Platform string
 	Type     string
+	Status   string
 	Notes    *string
+}
+
+type ProxyStats struct {
+	TotalAccounts  int64   `json:"total_accounts"`
+	ActiveAccounts int64   `json:"active_accounts"`
+	TotalRequests  int64   `json:"total_requests"`
+	SuccessRate    float64 `json:"success_rate"`
+	AverageLatency float64 `json:"average_latency"`
 }

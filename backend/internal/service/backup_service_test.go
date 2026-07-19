@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
 
 // ─── Mocks ───
@@ -345,6 +346,7 @@ func TestBackupService_CreateBackup_Streaming(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "completed", record.Status)
 	require.Greater(t, record.SizeBytes, int64(0))
+	require.Len(t, record.SHA256, 64)
 	require.NotEmpty(t, record.S3Key)
 
 	// 验证 S3 上确实有文件
@@ -412,6 +414,26 @@ func TestBackupService_RestoreBackup_Streaming(t *testing.T) {
 
 	// 验证 psql 收到的数据是否与原始 dump 内容一致
 	require.Equal(t, dumpContent, string(dumper.restored))
+}
+
+func TestBackupService_RestoreBackupRejectsChecksumMismatchBeforeDatabaseWrite(t *testing.T) {
+	repo := newMockSettingRepo()
+	seedS3Config(t, repo)
+	dumper := &mockDumper{dumpData: []byte("SELECT 1;\n")}
+	store := newMockObjectStore()
+	svc := newTestBackupService(repo, dumper, store)
+
+	record, err := svc.CreateBackup(context.Background(), "manual", 14)
+	require.NoError(t, err)
+	store.mu.Lock()
+	store.objects[record.S3Key][0] ^= 0xff
+	store.mu.Unlock()
+	dumper.restored = nil
+
+	err = svc.RestoreBackup(context.Background(), record.ID)
+	require.Error(t, err)
+	require.Equal(t, "BACKUP_INTEGRITY_FAILED", infraerrors.Reason(err))
+	require.Empty(t, dumper.restored)
 }
 
 func TestBackupService_RestoreBackup_NotCompleted(t *testing.T) {
@@ -676,28 +698,10 @@ func TestGracefulShutdown(t *testing.T) {
 	}
 }
 
-func TestStartRestore_Async(t *testing.T) {
-	repo := newMockSettingRepo()
-	seedS3Config(t, repo)
+func TestStartRestore_OnlineRestoreDisabled(t *testing.T) {
+	svc := newTestBackupService(newMockSettingRepo(), &mockDumper{}, newMockObjectStore())
 
-	dumpContent := "-- PostgreSQL dump\nCREATE TABLE test (id int);\n"
-	dumper := &mockDumper{dumpData: []byte(dumpContent)}
-	store := newMockObjectStore()
-	svc := newTestBackupService(repo, dumper, store)
-
-	// 先创建一个备份（同步方式）
-	record, err := svc.CreateBackup(context.Background(), "manual", 14)
-	require.NoError(t, err)
-
-	// 异步恢复
-	restored, err := svc.StartRestore(context.Background(), record.ID)
-	require.NoError(t, err)
-	require.Equal(t, "running", restored.RestoreStatus)
-
-	svc.wg.Wait()
-
-	// 验证最终状态
-	final, err := svc.GetBackupRecord(context.Background(), record.ID)
-	require.NoError(t, err)
-	require.Equal(t, "completed", final.RestoreStatus)
+	restored, err := svc.StartRestore(context.Background(), "backup-id")
+	require.Nil(t, restored)
+	require.ErrorIs(t, err, ErrOnlineRestoreDisabled)
 }

@@ -154,6 +154,11 @@ export default {
     usage: '使用记录',
     redeem: '兑换',
     affiliate: '邀请返利',
+    distribution: '算力公司',
+    balanceVouchers: '额度兑换码',
+    financeOperations: '财务运营',
+    saasControl: 'SaaS 控制面',
+    saasPartner: 'SaaS 合作伙伴',
     affiliateManagement: '邀请返利',
     affiliateInviteRecords: '邀请记录',
     affiliateRebateRecords: '返利记录',
@@ -190,6 +195,18 @@ export default {
     channelMonitor: '渠道监控',
     channelStatus: '渠道状态',
     riskControl: '风控中心',
+    securityAudit: '安全审计',
+    contentModeration: '内容审核',
+    promptAudit: '提示词审计',
+    auditLogs: '操作日志',
+  },
+
+  finance: {
+    vouchers: { title: '额度兑换码', subtitle: '创建、撤销和跟踪用户额度凭证', amount: '面值（USD）', totp: '两步验证码', feeHint: '创建手续费 8%，撤销或到期时一并退回。', securityNote: '完整兑换码仅显示一次。兑换所得额度不可再次生成兑换码。', createdCode: '兑换码已创建', history: '兑换码记录', code: '兑换码', fee: '手续费' },
+    distribution: { title: '算力公司', subtitle: '团队业绩、五级佣金与提现', overview: '概览', team: '团队', ledger: '佣金明细', withdraw: '提现', teamVolume: '团队业绩', currentTier: '当前档位', tiers: '返佣档位', tier: '档位', threshold: '业绩门槛', levels: '五层人数', order: '订单', depth: '层级', rate: '比例', commission: '佣金', payout: '支付宝收款账户', realName: '姓名', alipay: '支付宝账号', submitWithdrawal: '提交提现', me: '本人', net: '实际打款', debt: '佣金债务' },
+    admin: { title: '财务运营', withdrawals: '提现审核', vouchers: '兑换码风控', commissions: '佣金对账', recharges: '充值与首充', relations: '五层关系', approve: '批准', paid: '确认打款', reject: '拒绝', reason: '原因', reference: '打款流水号', lock: '冻结', unlock: '解冻', payoutDetails: '收款详情', securityFields: '安全操作信息', bucketShadow: '额度桶影子模式', bucketEnforced: '额度桶已生效', policy: '分销政策版本', version: '版本', freezeHours: '冻结小时', dailyLimit: '每日提现次数', feeBps: '提现费率（bps）', bonusBps: '首充奖励（bps）', bonusCap: '首充奖励上限（USD）', legacyStack: '叠加旧返利', publishPolicy: '发布新版本', reverseChargeback: '拒付冲正', reversalSecurityRequired: '请输入 TOTP 和冲正原因', reverseChargebackConfirm: '确认冲正该笔充值、首充赠额、团队业绩及全部关联佣金？' },
+    saas: { title: '白牌 SaaS 控制面', fund: '批发充值', domain: '绑定域名', jobs: '部署任务', tenants: '租户', plans: '套餐', subscriptions: '订阅', domains: '域名', resources: '资源分配', withdrawals: '合作提现', verify: '验证 DNS', recordPayment: '记录付款' }
+    ,partner: { title: 'SaaS 合作伙伴', withdrawing: '提现中', siteName: '站点名称', retailMultiplier: '零售倍率', paymentProvider: '支付渠道', paymentConfig: '支付渠道配置' }
   },
 
   // Auth
@@ -211,6 +228,8 @@ export default {
     emailPlaceholder: '请输入邮箱',
     passwordLabel: '密码',
     passwordPlaceholder: '请输入密码',
+    showPassword: '显示密码',
+    hidePassword: '隐藏密码',
     createPasswordPlaceholder: '创建一个安全的密码',
     passwordHint: '至少 6 个字符',
     emailRequired: '请输入邮箱',
@@ -410,6 +429,15 @@ export default {
     invalidResetLinkHint: '此密码重置链接无效或已过期。请重新请求一个新链接。',
     requestNewResetLink: '请求新的重置链接',
     invalidOrExpiredToken: '密码重置链接无效或已过期。请重新请求一个新链接。'
+  },
+
+  // Step-up（敏感操作二次验证）
+  stepUp: {
+    title: '需要二次验证',
+    hint: '请输入身份验证器应用中的 6 位验证码以继续此敏感操作。',
+    verifyFailed: '验证失败，请重试',
+    notEnabled: '此操作需要开启二次验证，请先在个人资料中启用 TOTP。',
+    adminApiKeyForbidden: '管理 API Key 无法执行此操作，请使用已通过二次验证的管理员会话。'
   },
 
   // Dashboard

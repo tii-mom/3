@@ -196,6 +196,16 @@ func (s *adminServiceImpl) GetProxyAccounts(ctx context.Context, proxyID int64) 
 	return s.proxyRepo.ListAccountSummariesByProxyID(ctx, proxyID)
 }
 
+func (s *adminServiceImpl) GetProxyStats(ctx context.Context, proxyID int64) (*ProxyStats, error) {
+	repo, ok := s.proxyRepo.(interface {
+		GetStats(context.Context, int64) (*ProxyStats, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("proxy statistics are unavailable")
+	}
+	return repo.GetStats(ctx, proxyID)
+}
+
 func (s *adminServiceImpl) CheckProxyExists(ctx context.Context, host string, port int, username, password string) (bool, error) {
 	return s.proxyRepo.ExistsByHostPortAuth(ctx, host, port, username, password)
 }

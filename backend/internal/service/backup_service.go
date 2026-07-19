@@ -3,10 +3,12 @@ package service
 import (
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -36,6 +38,7 @@ var (
 	ErrRestoreInProgress     = infraerrors.Conflict("RESTORE_IN_PROGRESS", "a restore is already in progress")
 	ErrBackupRecordsCorrupt  = infraerrors.InternalServer("BACKUP_RECORDS_CORRUPT", "backup records data is corrupted")
 	ErrBackupS3ConfigCorrupt = infraerrors.InternalServer("BACKUP_S3_CONFIG_CORRUPT", "backup S3 config data is corrupted")
+	ErrOnlineRestoreDisabled = infraerrors.Forbidden("ONLINE_RESTORE_DISABLED", "online database restore is disabled; use the offline maintenance procedure")
 )
 
 // ─── 接口定义 ───
@@ -92,6 +95,7 @@ type BackupRecord struct {
 	FileName      string `json:"file_name"`
 	S3Key         string `json:"s3_key"`
 	SizeBytes     int64  `json:"size_bytes"`
+	SHA256        string `json:"sha256,omitempty"`
 	TriggeredBy   string `json:"triggered_by"` // manual, scheduled
 	ErrorMsg      string `json:"error_message,omitempty"`
 	StartedAt     string `json:"started_at"`
@@ -513,7 +517,8 @@ func (s *BackupService) CreateBackup(ctx context.Context, triggeredBy string, ex
 	}()
 
 	contentType := "application/gzip"
-	sizeBytes, err := objectStore.Upload(ctx, s3Key, pr, contentType)
+	hasher := sha256.New()
+	sizeBytes, err := objectStore.Upload(ctx, s3Key, io.TeeReader(pr, hasher), contentType)
 	if err != nil {
 		_ = pr.CloseWithError(err) // 确保 gzip goroutine 不会悬挂
 		gzErr := <-gzipDone        // 安全等待 gzip goroutine 完成
@@ -527,9 +532,16 @@ func (s *BackupService) CreateBackup(ctx context.Context, triggeredBy string, ex
 		_ = s.saveRecord(ctx, record)
 		return record, fmt.Errorf("backup upload: %w", err)
 	}
-	<-gzipDone // 确保 gzip goroutine 已退出
+	if gzErr := <-gzipDone; gzErr != nil {
+		record.Status = "failed"
+		record.ErrorMsg = fmt.Sprintf("gzip/dump failed: %v", gzErr)
+		record.FinishedAt = time.Now().Format(time.RFC3339)
+		_ = s.saveRecord(ctx, record)
+		return record, fmt.Errorf("backup compression: %w", gzErr)
+	}
 
 	record.SizeBytes = sizeBytes
+	record.SHA256 = fmt.Sprintf("%x", hasher.Sum(nil))
 	record.Status = "completed"
 	record.FinishedAt = time.Now().Format(time.RFC3339)
 	if err := s.saveRecord(ctx, record); err != nil {
@@ -681,7 +693,8 @@ func (s *BackupService) executeBackup(record *BackupRecord, objectStore BackupOb
 	}()
 
 	contentType := "application/gzip"
-	sizeBytes, err := objectStore.Upload(ctx, record.S3Key, pr, contentType)
+	hasher := sha256.New()
+	sizeBytes, err := objectStore.Upload(ctx, record.S3Key, io.TeeReader(pr, hasher), contentType)
 	if err != nil {
 		_ = pr.CloseWithError(err) // 确保 gzip goroutine 不会悬挂
 		gzErr := <-gzipDone        // 安全等待 gzip goroutine 完成
@@ -696,9 +709,17 @@ func (s *BackupService) executeBackup(record *BackupRecord, objectStore BackupOb
 		_ = s.saveRecord(context.Background(), record)
 		return
 	}
-	<-gzipDone // 确保 gzip goroutine 已退出
+	if gzErr := <-gzipDone; gzErr != nil {
+		record.Status = "failed"
+		record.ErrorMsg = fmt.Sprintf("gzip/dump failed: %v", gzErr)
+		record.Progress = ""
+		record.FinishedAt = time.Now().Format(time.RFC3339)
+		_ = s.saveRecord(context.Background(), record)
+		return
+	}
 
 	record.SizeBytes = sizeBytes
+	record.SHA256 = fmt.Sprintf("%x", hasher.Sum(nil))
 	record.Status = "completed"
 	record.Progress = ""
 	record.FinishedAt = time.Now().Format(time.RFC3339)
@@ -729,6 +750,9 @@ func (s *BackupService) RestoreBackup(ctx context.Context, backupID string) erro
 	if record.Status != "completed" {
 		return infraerrors.BadRequest("BACKUP_NOT_COMPLETED", "can only restore from a completed backup")
 	}
+	if len(record.SHA256) != sha256.Size*2 {
+		return infraerrors.BadRequest("BACKUP_CHECKSUM_MISSING", "backup has no valid SHA-256 checksum and cannot be restored")
+	}
 
 	s3Cfg, err := s.loadS3Config(ctx)
 	if err != nil {
@@ -746,8 +770,38 @@ func (s *BackupService) RestoreBackup(ctx context.Context, backupID string) erro
 	}
 	defer func() { _ = body.Close() }()
 
-	// 流式解压 gzip -> psql（不将全部数据加载到内存）
-	gzReader, err := gzip.NewReader(body)
+	// Verify the complete compressed artifact before psql receives any bytes.
+	tmp, err := os.CreateTemp("", "sub2api-restore-*.sql.gz")
+	if err != nil {
+		return fmt.Errorf("create restore staging file: %w", err)
+	}
+	tmpPath := tmp.Name()
+	defer func() {
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
+	}()
+
+	hasher := sha256.New()
+	downloadReader := io.Reader(body)
+	if record.SizeBytes > 0 {
+		downloadReader = io.LimitReader(body, record.SizeBytes+1)
+	}
+	written, err := io.Copy(io.MultiWriter(tmp, hasher), downloadReader)
+	if err != nil {
+		return fmt.Errorf("stage restore artifact: %w", err)
+	}
+	if record.SizeBytes > 0 && written != record.SizeBytes {
+		return infraerrors.BadRequest("BACKUP_INTEGRITY_FAILED", "backup size does not match its record")
+	}
+	actualChecksum := fmt.Sprintf("%x", hasher.Sum(nil))
+	if !strings.EqualFold(actualChecksum, record.SHA256) {
+		return infraerrors.BadRequest("BACKUP_INTEGRITY_FAILED", "backup SHA-256 checksum verification failed")
+	}
+	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("rewind restore artifact: %w", err)
+	}
+
+	gzReader, err := gzip.NewReader(tmp)
 	if err != nil {
 		return fmt.Errorf("gzip reader: %w", err)
 	}
@@ -761,110 +815,10 @@ func (s *BackupService) RestoreBackup(ctx context.Context, backupID string) erro
 	return nil
 }
 
-// StartRestore 异步恢复备份，立即返回
+// StartRestore rejects online restore. RestoreBackup is reserved for offline
+// maintenance tooling, where application writers have already been stopped.
 func (s *BackupService) StartRestore(ctx context.Context, backupID string) (*BackupRecord, error) {
-	if s.shuttingDown.Load() {
-		return nil, infraerrors.ServiceUnavailable("SERVER_SHUTTING_DOWN", "server is shutting down")
-	}
-
-	s.opMu.Lock()
-	if s.restoring {
-		s.opMu.Unlock()
-		return nil, ErrRestoreInProgress
-	}
-	s.restoring = true
-	s.opMu.Unlock()
-
-	// 初始化阶段出错时自动重置标志
-	launched := false
-	defer func() {
-		if !launched {
-			s.opMu.Lock()
-			s.restoring = false
-			s.opMu.Unlock()
-		}
-	}()
-
-	record, err := s.GetBackupRecord(ctx, backupID)
-	if err != nil {
-		return nil, err
-	}
-	if record.Status != "completed" {
-		return nil, infraerrors.BadRequest("BACKUP_NOT_COMPLETED", "can only restore from a completed backup")
-	}
-
-	s3Cfg, err := s.loadS3Config(ctx)
-	if err != nil {
-		return nil, err
-	}
-	objectStore, err := s.getOrCreateStore(ctx, s3Cfg)
-	if err != nil {
-		return nil, fmt.Errorf("init object store: %w", err)
-	}
-
-	record.RestoreStatus = "running"
-	_ = s.saveRecord(ctx, record)
-
-	launched = true
-	result := *record
-
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		defer func() {
-			s.opMu.Lock()
-			s.restoring = false
-			s.opMu.Unlock()
-		}()
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LegacyPrintf("service.backup", "[Backup] restore panic recovered: %v", r)
-				record.RestoreStatus = "failed"
-				record.RestoreError = fmt.Sprintf("internal panic: %v", r)
-				_ = s.saveRecord(context.Background(), record)
-			}
-		}()
-		s.executeRestore(record, objectStore)
-	}()
-
-	return &result, nil
-}
-
-// executeRestore 后台执行恢复
-func (s *BackupService) executeRestore(record *BackupRecord, objectStore BackupObjectStore) {
-	ctx, cancel := context.WithTimeout(s.bgCtx, 30*time.Minute)
-	defer cancel()
-
-	body, err := objectStore.Download(ctx, record.S3Key)
-	if err != nil {
-		record.RestoreStatus = "failed"
-		record.RestoreError = fmt.Sprintf("S3 download failed: %v", err)
-		_ = s.saveRecord(context.Background(), record)
-		return
-	}
-	defer func() { _ = body.Close() }()
-
-	gzReader, err := gzip.NewReader(body)
-	if err != nil {
-		record.RestoreStatus = "failed"
-		record.RestoreError = fmt.Sprintf("gzip reader: %v", err)
-		_ = s.saveRecord(context.Background(), record)
-		return
-	}
-	defer func() { _ = gzReader.Close() }()
-
-	if err := s.dumper.Restore(ctx, gzReader); err != nil {
-		record.RestoreStatus = "failed"
-		record.RestoreError = fmt.Sprintf("pg restore: %v", err)
-		_ = s.saveRecord(context.Background(), record)
-		return
-	}
-
-	record.RestoreStatus = "completed"
-	record.RestoredAt = time.Now().Format(time.RFC3339)
-	if err := s.saveRecord(context.Background(), record); err != nil {
-		logger.LegacyPrintf("service.backup", "[Backup] 保存恢复记录失败: %v", err)
-	}
+	return nil, ErrOnlineRestoreDisabled
 }
 
 // ─── 备份记录管理 ───
