@@ -466,17 +466,6 @@ func (s *OpenAIQuotaService) buildCodexQuotaHeaders(ctx context.Context, account
 	return headers, key.taskID, nil
 }
 
-func (s *OpenAIQuotaService) redactQuotaErrorBody(ctx context.Context, accountID int64, body string) string {
-	if s == nil || s.accountRepo == nil {
-		return body
-	}
-	account, err := s.accountRepo.GetByID(ctx, accountID)
-	if err != nil || account == nil {
-		return body
-	}
-	return string(redactAgentIdentitySensitiveBodyForAccount(ctx, s.accountRepo, account, []byte(body)))
-}
-
 // buildCodexCommonHeaders sets the request headers expected by the chatgpt.com
 // backend so calls succeed past Cloudflare/WASM checks.
 func buildCodexCommonHeaders(accessToken, chatGPTAccountID string, fedRAMP bool) map[string]string {

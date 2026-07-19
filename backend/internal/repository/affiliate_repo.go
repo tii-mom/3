@@ -946,28 +946,6 @@ LIMIT 1`, strings.ToUpper(strings.TrimSpace(code)))
 	return &out, nil
 }
 
-func queryUserBalance(ctx context.Context, client affiliateQueryExecer, userID int64) (float64, error) {
-	rows, err := client.QueryContext(ctx,
-		"SELECT balance::double precision FROM users WHERE id = $1 LIMIT 1",
-		userID,
-	)
-	if err != nil {
-		return 0, err
-	}
-	defer func() { _ = rows.Close() }()
-	if !rows.Next() {
-		if err := rows.Err(); err != nil {
-			return 0, err
-		}
-		return 0, service.ErrUserNotFound
-	}
-	var balance float64
-	if err := rows.Scan(&balance); err != nil {
-		return 0, err
-	}
-	return balance, nil
-}
-
 type affiliateTransferSnapshot struct {
 	BalanceAfter        float64
 	AvailableQuotaAfter float64

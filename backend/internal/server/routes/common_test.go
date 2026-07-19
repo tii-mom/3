@@ -16,12 +16,12 @@ func TestHealthRoutesDistinguishLivenessAndReadiness(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	db, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	mock.ExpectPing()
 
 	mini := miniredis.RunT(t)
 	redisClient := redis.NewClient(&redis.Options{Addr: mini.Addr()})
-	defer redisClient.Close()
+	defer func() { _ = redisClient.Close() }()
 
 	router := gin.New()
 	RegisterCommonRoutes(router, db, redisClient)

@@ -13,12 +13,12 @@ import (
 )
 
 const (
-	authTransportHeader  = "X-Auth-Transport"
-	authTransportCookie  = "cookie"
-	refreshTokenCookie   = "sub2api_refresh"
-	csrfTokenCookie      = "sub2api_csrf"
-	csrfTokenHeader      = "X-CSRF-Token"
-	authCookiePath       = "/api/v1/auth"
+	authTransportHeader = "X-Auth-Transport"
+	authTransportCookie = "cookie"
+	refreshTokenCookie  = "sub2api_refresh"
+	csrfTokenCookie     = "sub2api_csrf"
+	csrfTokenHeader     = "X-CSRF-Token"
+	authCookiePath      = "/api/v1/auth"
 )
 
 func cookieAuthRequested(c *gin.Context) bool {

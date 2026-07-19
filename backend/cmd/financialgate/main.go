@@ -134,7 +134,7 @@ func main() {
 	if err != nil {
 		fatal(fmt.Errorf("open database: %w", err))
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	db.SetMaxOpenConns(4)
 	db.SetMaxIdleConns(2)
 	if err := db.PingContext(ctx); err != nil {
@@ -228,7 +228,7 @@ func readOutboxStatus(ctx context.Context, db *sql.DB, result map[string]int64) 
 	if err != nil {
 		return fmt.Errorf("read outbox status: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var status string
 		var count int64
