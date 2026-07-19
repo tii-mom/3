@@ -99,6 +99,15 @@ RUN --mount=type=cache,id=sub2api-gomod,target=/go/pkg/mod \
     -o /app/sub2api \
     ./cmd/server
 
+# Build the production preflight gate separately. It is never started by the
+# application entrypoint; operators invoke it only against an isolated restore.
+RUN --mount=type=cache,id=sub2api-gomod,target=/go/pkg/mod \
+    --mount=type=cache,id=sub2api-gobuild,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build \
+    -trimpath \
+    -o /app/financialgate \
+    ./cmd/financialgate
+
 # -----------------------------------------------------------------------------
 # Stage 3: PostgreSQL Client (version-matched with docker-compose)
 # -----------------------------------------------------------------------------
@@ -142,6 +151,7 @@ WORKDIR /app
 
 # Copy binary/resources with ownership to avoid extra full-layer chown copy
 COPY --from=backend-builder --chown=sub2api:sub2api /app/sub2api /app/sub2api
+COPY --from=backend-builder --chown=sub2api:sub2api /app/financialgate /app/financialgate
 COPY --from=backend-builder --chown=sub2api:sub2api /app/backend/resources /app/resources
 
 # Create data directory
