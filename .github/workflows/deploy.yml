@@ -100,6 +100,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - name: Checkout release source
+        uses: actions/checkout@v6
+
       - name: Validate preflight-approved digest and confirmation
         env:
           IMAGE_DIGEST: ${{ inputs.image_digest }}
@@ -125,4 +128,5 @@ jobs:
           IMAGE_DIGEST: ${{ inputs.image_digest }}
         run: |
           ssh -o BatchMode=yes "$VPS_USER@$VPS_HOST" \
-            "/opt/sub2api-deploy/production-deploy.sh '$IMAGE_DIGEST'"
+            "bash -s -- '$IMAGE_DIGEST'" \
+            < deploy/production-deploy.sh
