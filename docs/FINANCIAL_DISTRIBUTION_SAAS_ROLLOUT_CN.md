@@ -163,3 +163,12 @@ SELECT status, COUNT(*), MAX(attempts) FROM financial_outbox_events GROUP BY sta
 - 第二白牌实例在 `512 MiB / 1 CPU / 256 PID` 限制下健康运行，使用独立数据库和 Redis DB；停止该实例不影响主实例，恢复后自身健康检查通过。
 - 最终回归通过：`go test ./...`、`go test -tags=unit ./internal/service`、`pnpm typecheck`、`pnpm lint:check`、`pnpm test:run`、`pnpm build`。
 - 官方 `Wei-Shaw/sub2api` 主分支当前为 `0.1.161`（`d4b9797ff72024960a035cf22fdd8f213e149169`），本项目基线为 `0.1.152`，且内部仓库不是 GitHub fork、无可直接比较的共同提交；文件级差异约 `892` 项。必须在本功能分支固定提交后创建独立上游集成分支逐项合并和复测，禁止直接覆盖当前已验收代码。
+
+## 10. 2026-07-19 官方 0.1.161 集成验收记录
+
+- 以官方 `v0.1.152` 为三方合并基准，将官方 `v0.1.161` 功能提交 `19149ca196eeae4a4482e5299dc6fa4ba0b06c8c` 和主分支版本同步提交 `d4b9797ff72024960a035cf22fdd8f213e149169` 集成到独立分支；财务、批发、鉴权和部署边界保留 3API 定制实现。
+- 升级后 PostgreSQL `18.4` 空库迁移总数为 `234`，第二次执行仍为 `234`；十项财务对账均为零。500 个订单、32 worker 产生 500 个充值事件和 2,500 笔佣金，耗时 `4.170s`，约 `119.9 orders/s`。
+- 逻辑备份通过 `pg_restore --single-transaction` 恢复到独立数据库，恢复库保持 `234` 个迁移，十项财务对账均为零。
+- 最终回归通过：`go test ./...`、`go test -tags=unit ./internal/service -count=1`、Testcontainers 仓储集成测试、`pnpm typecheck`、`pnpm lint:check`、182 个前端测试文件共 1,237 项测试以及 `pnpm build`。
+- 生产镜像 `3api-financial-gate:upstream-0161` 摘要为 `sha256:452809d6f839b2ab8cf25b9e5d02d2acdfab9f0aed21d7dbee50831addf2154a`，大小 `38,136,988` 字节，内嵌版本 `0.1.161`。应用主进程以 `sub2api` 用户运行，`/health` 同时报 PostgreSQL 和 Redis 为 `ok`。
+- 根 Dockerfile 已移除不必要的远程 Dockerfile frontend 语法声明，避免受限网络环境在业务构建开始前阻塞；Docker Desktop 自带 BuildKit 可直接解析现有 cache mount 指令。

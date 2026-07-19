@@ -114,7 +114,7 @@ func (h *AuthHandler) respondWithTokenPair(c *gin.Context, user *service.User) {
 			return
 		}
 		// 回退到只返回Access Token
-		token, tokenErr := h.authService.GenerateToken(user)
+		token, tokenErr := h.authService.GenerateToken(c.Request.Context(), user)
 		if tokenErr != nil {
 			response.InternalError(c, "Failed to generate token")
 			return
