@@ -141,7 +141,7 @@
               <div class="home-console-routes">
                 <div class="home-route home-route-active"><span class="home-provider-mark">O</span><span>OpenAI 主路由</span><strong>684ms</strong></div>
                 <div class="home-route"><span class="home-provider-mark">A</span><span>Claude 备用路由</span><strong>ready</strong></div>
-                <router-link class="home-route" :to="isAuthenticated ? '/saas-partner' : '/login'"><Icon name="server" /><span>白牌 SaaS 租户</span><strong>12</strong></router-link>
+                <div class="home-route"><span class="home-provider-mark">G</span><span>Gemini 直连路由</span><strong>ready</strong></div>
                 <router-link class="home-route" :to="isAuthenticated ? '/distribution' : '/login'"><Icon name="users" /><span>算力公司网络</span><strong>5 层</strong></router-link>
               </div>
             </div>
@@ -159,9 +159,9 @@
             </p>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
             <!-- Step 1 Card -->
-            <div class="rounded-4xl p-1.5 bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200/50 dark:border-white/[0.05] shadow-glass shadow-primary-500/2 reveal flex">
+            <div class="md:col-span-2 rounded-4xl p-1.5 bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200/50 dark:border-white/[0.05] shadow-glass shadow-primary-500/2 reveal flex">
               <div class="rounded-[calc(2rem-0.375rem)] bg-white dark:bg-dark-900/80 p-6 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] flex flex-col justify-between w-full">
                 <div>
                   <div class="flex items-center justify-between mb-6">
@@ -206,7 +206,7 @@
             </div>
 
             <!-- Step 2 Card -->
-            <div class="rounded-4xl p-1.5 bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200/50 dark:border-white/[0.05] shadow-glass shadow-primary-500/2 reveal delay-100 flex">
+            <div class="md:col-span-1 rounded-4xl p-1.5 bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200/50 dark:border-white/[0.05] shadow-glass shadow-primary-500/2 reveal delay-100 flex">
               <div class="rounded-[calc(2rem-0.375rem)] bg-white dark:bg-dark-900/80 p-6 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] flex flex-col justify-between w-full">
                 <div>
                   <div class="flex items-center justify-between mb-6">
@@ -251,7 +251,7 @@
             </div>
 
             <!-- Step 3 Card -->
-            <div class="rounded-4xl p-1.5 bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200/50 dark:border-white/[0.05] shadow-glass shadow-primary-500/2 reveal delay-200 flex">
+            <div class="md:col-span-1 rounded-4xl p-1.5 bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200/50 dark:border-white/[0.05] shadow-glass shadow-primary-500/2 reveal delay-200 flex">
               <div class="rounded-[calc(2rem-0.375rem)] bg-white dark:bg-dark-900/80 p-6 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] flex flex-col justify-between w-full">
                 <div>
                   <div class="flex items-center justify-between mb-6">
@@ -353,46 +353,65 @@
           </div>
         </section>
 
-        <!-- White-label SaaS + Compute Company experience -->
-        <section class="home-business mb-32">
-          <div class="home-section-intro reveal">
-            <span class="home-eyebrow">BUSINESS SURFACES</span>
-            <h2>{{ t('home.business.title') }}</h2>
-            <p>{{ t('home.business.subtitle') }}</p>
-          </div>
-
-          <div class="home-business-grid">
-            <router-link class="home-business-card home-business-saas reveal" :to="isAuthenticated ? '/saas-partner' : '/login'">
-              <div class="home-business-copy">
-                <span class="home-eyebrow">WHITE-LABEL SAAS</span>
-                <h3>{{ t('home.business.saasTitle') }}</h3>
-                <p>{{ t('home.business.saasDesc') }}</p>
-                <span class="home-business-link">{{ t('home.business.openPartner') }} <Icon name="arrowRight" /></span>
-              </div>
-              <div class="home-tenant-preview" aria-hidden="true">
-                <div class="home-preview-toolbar"><span>BRAND CONTROL</span><span class="home-status-chip">ACTIVE</span></div>
-                <div class="home-preview-grid">
-                  <div class="home-preview-controls"><span>站点名称</span><span>品牌 Logo</span><span>零售倍率</span><span>支付渠道</span><span>自定义域名</span></div>
-                  <div class="home-tenant-screen"><div class="flex items-center justify-between"><strong>NORTHSTACK</strong><span>登录</span></div><div><span class="home-eyebrow">YOUR BRAND, OUR CORE</span><strong>独立品牌的 AI API 服务</strong><small>tenant.example.com</small></div><div class="home-tenant-meta"><span>批发余额 $12,486.20</span><span>Dedicated</span></div></div>
+        <!-- Compute Company & 5-Level Distribution Network -->
+        <section class="home-business mb-32 reveal">
+          <div class="rounded-4xl p-1.5 bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200/50 dark:border-white/[0.05] shadow-glass shadow-primary-500/2 w-full">
+            <div class="rounded-[calc(2rem-0.375rem)] bg-white dark:bg-dark-900/80 p-8 md:p-12 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+              <div class="lg:col-span-6 space-y-6">
+                <span class="home-eyebrow">COMPUTE COMPANY</span>
+                <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white mt-1">
+                  {{ t('home.business.computeTitle') }}
+                </h2>
+                <p class="text-slate-600 dark:text-gray-400 mt-4 leading-relaxed font-sans text-sm max-w-xl">
+                  {{ t('home.business.computeDesc') }}
+                </p>
+                <div>
+                  <router-link :to="isAuthenticated ? '/distribution' : '/login'" class="btn btn-primary rounded-full px-6 py-2.5 inline-flex items-center gap-2 font-medium">
+                    <span>{{ t('home.business.openCompute') }}</span>
+                    <Icon name="arrowRight" class="h-4 w-4" />
+                  </router-link>
                 </div>
               </div>
-            </router-link>
+              <div class="lg:col-span-6 bg-slate-50 dark:bg-[#121418]/60 border border-slate-200/60 dark:border-white/[0.06] rounded-2xl p-6 relative overflow-hidden">
+                <div class="home-network-preview flex flex-col justify-center items-center gap-6 py-6" aria-hidden="true">
+                  <div class="flex items-center gap-8 w-full justify-center relative">
+                    <div class="flex flex-col gap-2 shrink-0">
+                      <span class="px-4 py-2 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-center text-xs font-mono">直属伙伴</span>
+                      <span class="px-4 py-2 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-center text-xs font-mono">直属伙伴</span>
+                    </div>
 
-            <router-link class="home-business-card home-business-compute reveal delay-100" :to="isAuthenticated ? '/distribution' : '/login'">
-              <div class="home-business-copy">
-                <span class="home-eyebrow">COMPUTE COMPANY</span>
-                <h3>{{ t('home.business.computeTitle') }}</h3>
-                <p>{{ t('home.business.computeDesc') }}</p>
-                <span class="home-business-link">{{ t('home.business.openCompute') }} <Icon name="arrowRight" /></span>
+                    <!-- Connection Lines -->
+                    <div class="flex-1 h-px bg-primary-500/30 relative flex items-center justify-between">
+                      <span class="h-2 w-2 rounded-full bg-primary-500 -mt-0.5"></span>
+                      <span class="h-2 w-2 rounded-full bg-primary-500 -mt-0.5"></span>
+                    </div>
+
+                    <div class="px-6 py-4 border border-primary-500/30 bg-primary-500/5 rounded text-center shrink-0">
+                      <strong class="block text-sm text-slate-900 dark:text-white font-bold">算力公司</strong>
+                      <span class="text-[10px] text-primary-500 font-mono">团队业绩 · 五级佣金</span>
+                    </div>
+
+                    <div class="flex-1 h-px bg-primary-500/30 relative flex items-center justify-between">
+                      <span class="h-2 w-2 rounded-full bg-primary-500 -mt-0.5"></span>
+                      <span class="h-2 w-2 rounded-full bg-primary-500 -mt-0.5"></span>
+                    </div>
+
+                    <div class="flex flex-col gap-2 shrink-0">
+                      <span class="px-4 py-2 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-center text-xs font-mono">终端用户</span>
+                      <span class="px-4 py-2 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-center text-xs font-mono">终端用户</span>
+                    </div>
+                  </div>
+                  
+                  <div class="w-full h-px bg-slate-200 dark:bg-white/[0.06] my-2"></div>
+
+                  <div class="flex gap-2 justify-center">
+                    <span class="px-3 py-1 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-[10px] font-mono">T1 基础</span>
+                    <span class="px-3 py-1 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-[10px] font-mono">T2 增长</span>
+                    <span class="px-3 py-1 border border-primary-500/50 bg-primary-500/5 text-primary-500 rounded text-[10px] font-mono font-bold">T3 规模</span>
+                  </div>
+                </div>
               </div>
-              <div class="home-network-preview" aria-hidden="true">
-                <div class="home-network-line"></div>
-                <div class="home-network-column"><span>直属伙伴</span><span>直属伙伴</span></div>
-                <div class="home-network-core"><strong>算力公司</strong><span>团队业绩 · 五级佣金</span></div>
-                <div class="home-network-column"><span>终端用户</span><span>终端用户</span></div>
-                <div class="home-tier-rail"><span>T1 基础</span><span>T2 成长</span><span class="is-current">T3 规模</span></div>
-              </div>
-            </router-link>
+            </div>
           </div>
         </section>
 
@@ -741,7 +760,7 @@ const userInitial = computed(() => {
 
 const activeCodexTask = ref('website')
 const codexTasks = [
-  { id: 'website', label: '开发网站', prompt: '创建一个响应式 SaaS 控制台，包含登录、用量图表和移动端导航。', response: '已生成 Vue 页面、路由和响应式样式，正在运行视觉检查…', status: 'Building responsive interface', progress: 86 },
+  { id: 'website', label: '开发网站', prompt: '创建一个响应式 API 控制台，包含登录、用量图表和移动端导航。', response: '已生成 Vue 页面、路由和响应式样式，正在运行视觉检查…', status: 'Building responsive interface', progress: 86 },
   { id: 'video', label: '制作视频', prompt: '为新品发布制作 30 秒短视频分镜和字幕时间轴。', response: '已完成分镜拆解、旁白稿与画面提示词，正在合成预览…', status: 'Rendering storyboard preview', progress: 72 },
   { id: 'game', label: '开发游戏', prompt: '制作一个可在浏览器运行的像素风小游戏，加入碰撞和计分。', response: '核心循环、输入控制和碰撞检测已完成，正在运行自动化测试…', status: 'Running gameplay tests', progress: 64 }
 ]

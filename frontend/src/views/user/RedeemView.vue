@@ -2,20 +2,22 @@
   <AppLayout>
     <div class="mx-auto max-w-4xl space-y-6">
       <!-- Current Balance Card -->
-      <div class="card overflow-hidden">
-        <div class="bg-gradient-to-br from-primary-500 to-primary-600 px-6 py-8 text-center">
-          <div
-            class="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm"
-          >
-            <Icon name="creditCard" size="xl" class="text-white" />
+      <div class="card p-6 border-l-4 border-l-primary-500 dark:border-l-primary-500 bg-white dark:bg-dark-800">
+        <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+          <div class="flex items-center gap-4">
+            <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400">
+              <Icon name="creditCard" size="lg" />
+            </div>
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wider text-gray-500">{{ t('redeem.currentBalance') }}</p>
+              <p class="text-3xl font-extrabold text-gray-900 dark:text-white font-mono mt-1">
+                ${{ user?.balance?.toFixed(2) || '0.00' }}
+              </p>
+            </div>
           </div>
-          <p class="text-sm font-medium text-primary-100">{{ t('redeem.currentBalance') }}</p>
-          <p class="mt-2 text-4xl font-bold text-white">
-            ${{ user?.balance?.toFixed(2) || '0.00' }}
-          </p>
-          <p class="mt-2 text-sm text-primary-100">
-            {{ t('redeem.concurrency') }}: {{ user?.concurrency || 0 }} {{ t('redeem.requests') }}
-          </p>
+          <div class="text-right text-xs text-gray-500 dark:text-dark-400 font-mono">
+            {{ t('redeem.concurrency') }}: <span class="font-bold text-gray-900 dark:text-white">{{ user?.concurrency || 0 }}</span> {{ t('redeem.requests') }}
+          </div>
         </div>
       </div>
 
@@ -116,15 +118,15 @@
               <div class="grid gap-px overflow-hidden rounded-lg border border-gray-200 bg-gray-200 sm:grid-cols-3 dark:border-dark-700 dark:bg-dark-700">
                 <div class="bg-white p-4 dark:bg-dark-900">
                   <p class="text-xs font-medium text-gray-500">{{ t('finance.vouchers.maxAvailable') }}</p>
-                  <p class="mt-1 text-xl font-semibold text-gray-950 dark:text-white">{{ formatUSD(maximumVoucherAmount) }}</p>
+                  <p class="mt-1 text-xl font-semibold text-gray-950 dark:text-white font-mono">{{ formatUSD(maximumVoucherAmount) }}</p>
                 </div>
                 <div class="bg-white p-4 dark:bg-dark-900">
                   <p class="text-xs font-medium text-gray-500">{{ t('finance.vouchers.transferable') }}</p>
-                  <p class="mt-1 text-xl font-semibold text-gray-950 dark:text-white">{{ formatUSD(voucherAvailability.transferable_credit) }}</p>
+                  <p class="mt-1 text-xl font-semibold text-gray-950 dark:text-white font-mono">{{ formatUSD(voucherAvailability.transferable_credit) }}</p>
                 </div>
                 <div class="bg-white p-4 dark:bg-dark-900">
                   <p class="text-xs font-medium text-gray-500">{{ t('finance.vouchers.dailyRemaining') }}</p>
-                  <p class="mt-1 text-xl font-semibold text-gray-950 dark:text-white">{{ voucherAvailability.daily_remaining_count }} / {{ voucherAvailability.daily_count }}</p>
+                  <p class="mt-1 text-xl font-semibold text-gray-950 dark:text-white font-mono">{{ voucherAvailability.daily_remaining_count }} / {{ voucherAvailability.daily_count }}</p>
                 </div>
               </div>
 
@@ -134,7 +136,7 @@
                   <div class="mt-2 flex gap-2">
                     <input
                       v-model="voucherAmount"
-                      class="input min-w-0 flex-1"
+                      class="input min-w-0 flex-1 font-mono"
                       inputmode="decimal"
                       :placeholder="formatPlainUSD(voucherAvailability.minimum_usd)"
                     />
@@ -169,7 +171,7 @@
               <div class="flex items-start justify-between gap-4">
                 <div class="min-w-0">
                   <p class="text-sm font-medium text-emerald-800 dark:text-emerald-200">{{ t('finance.vouchers.createdCode') }}</p>
-                  <code class="mt-2 block break-all text-base font-semibold text-emerald-950 dark:text-emerald-100">{{ voucherIssuedCode }}</code>
+                  <code class="mt-2 block break-all text-base font-semibold text-emerald-950 dark:text-emerald-100 font-mono">{{ voucherIssuedCode }}</code>
                 </div>
                 <button type="button" class="btn btn-secondary btn-sm" @click="copyVoucherCode">{{ t('common.copy') }}</button>
               </div>
@@ -191,10 +193,10 @@
                 <tbody>
                   <tr v-for="item in voucherItems" :key="item.id" class="border-t border-gray-100 dark:border-dark-700">
                     <td class="px-4 py-3 font-mono">•••• {{ item.code_last4 }}</td>
-                    <td class="px-4 py-3">{{ formatUSD(item.face_value) }}</td>
-                    <td class="px-4 py-3">{{ formatUSD(item.fee_amount) }}</td>
+                    <td class="px-4 py-3 font-mono">{{ formatUSD(item.face_value) }}</td>
+                    <td class="px-4 py-3 font-mono">{{ formatUSD(item.fee_amount) }}</td>
                     <td class="px-4 py-3">{{ item.status }}</td>
-                    <td class="px-4 py-3">{{ formatDateTime(item.expires_at) }}</td>
+                    <td class="px-4 py-3 font-mono">{{ formatDateTime(item.expires_at) }}</td>
                     <td class="px-4 py-3">
                       <button v-if="item.status === 'ISSUED'" type="button" class="text-sm font-medium text-red-600" @click="cancelUserVoucher(item.id)">
                         {{ t('common.cancel') }}

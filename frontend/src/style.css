@@ -864,6 +864,10 @@
   background: var(--ui-paper) !important;
   color: var(--ui-ink);
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0 !important;
+}
+.app-shell-redesign * {
+  letter-spacing: 0 !important;
 }
 
 .app-shell-grid {
@@ -914,7 +918,7 @@
   min-height: 2.35rem;
   border-radius: 5px;
   color: var(--ui-muted);
-  letter-spacing: 0.005em;
+  letter-spacing: 0;
 }
 
 .app-sidebar-redesign .sidebar-link:hover {
@@ -931,7 +935,7 @@
 
 .app-sidebar-redesign .sidebar-section-title {
   color: var(--ui-muted);
-  letter-spacing: 0.15em;
+  letter-spacing: 0;
 }
 
 .app-header-redesign {
@@ -951,7 +955,7 @@
 .app-shell-redesign h1,
 .app-shell-redesign h2,
 .app-shell-redesign h3 {
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .app-shell-redesign .card,
@@ -975,7 +979,7 @@
 .app-shell-redesign .btn {
   min-height: 2.35rem;
   border-radius: 5px;
-  letter-spacing: 0.005em;
+  letter-spacing: 0;
 }
 
 .app-shell-redesign .btn-primary {
@@ -1032,7 +1036,7 @@
   background: var(--ui-surface-muted);
   border-bottom-color: var(--ui-line);
   color: var(--ui-muted);
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   font-size: 0.68rem;
 }
 
@@ -1080,7 +1084,7 @@
 
 .app-shell-redesign .page-title {
   font-size: 1.6rem;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
 }
 
 .app-shell-redesign .page-description {
@@ -1142,7 +1146,7 @@
   background: var(--ui-surface-muted) !important;
   border-bottom-color: var(--ui-line) !important;
   font-size: 0.68rem;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
