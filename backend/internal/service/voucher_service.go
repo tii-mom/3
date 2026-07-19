@@ -59,6 +59,26 @@ type CreateVoucherInput struct {
 	TOTPCode string
 }
 
+type VoucherAvailability struct {
+	Enabled               bool   `json:"enabled"`
+	CreditBucketsEnforced bool   `json:"credit_buckets_enforced"`
+	TransferableCredit    string `json:"transferable_credit"`
+	NonTransferableCredit string `json:"non_transferable_credit"`
+	Debt                  string `json:"debt"`
+	FeeBPS                int64  `json:"fee_bps"`
+	MinimumUSD            string `json:"minimum_usd"`
+	MaximumUSD            string `json:"maximum_usd"`
+	DailyMaximumUSD       string `json:"daily_maximum_usd"`
+	DailyUsedUSD          string `json:"daily_used_usd"`
+	DailyRemainingUSD     string `json:"daily_remaining_usd"`
+	DailyCount            int64  `json:"daily_count"`
+	DailyUsedCount        int64  `json:"daily_used_count"`
+	DailyRemainingCount   int64  `json:"daily_remaining_count"`
+	ExpiryDays            int    `json:"expiry_days"`
+	StepUpMinimumUSD      string `json:"step_up_minimum_usd"`
+	MaximumFaceValueUSD   string `json:"maximum_face_value_usd"`
+}
+
 type voucherConfig struct {
 	enabled         bool
 	bucketsEnforced bool
@@ -99,6 +119,76 @@ func (s *VoucherService) UpdateEnabled(ctx context.Context, enabled bool) error 
 		}
 	}
 	return s.settings.Set(ctx, "balance_voucher_enabled", strconv.FormatBool(enabled))
+}
+
+func (s *VoucherService) Availability(ctx context.Context, userID int64) (*VoucherAvailability, error) {
+	config, err := s.loadConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var transferableRaw, nonTransferableRaw, debtRaw string
+	if err := s.db.QueryRowContext(ctx, `SELECT transferable_credit::text, non_transferable_credit::text, debt::text FROM user_credit_accounts WHERE user_id = $1`, userID).
+		Scan(&transferableRaw, &nonTransferableRaw, &debtRaw); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+	transferable, err := decimal.NewFromString(transferableRaw)
+	if err != nil {
+		return nil, err
+	}
+	nonTransferable, err := decimal.NewFromString(nonTransferableRaw)
+	if err != nil {
+		return nil, err
+	}
+	debt, err := decimal.NewFromString(debtRaw)
+	if err != nil {
+		return nil, err
+	}
+	var usedCount int64
+	var usedRaw string
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*), COALESCE(SUM(face_value), 0)::text FROM balance_vouchers WHERE tenant_id = $1 AND issuer_user_id = $2 AND created_at >= date_trunc('day', NOW())`, voucherTenantID, userID).
+		Scan(&usedCount, &usedRaw); err != nil {
+		return nil, err
+	}
+	used, err := decimal.NewFromString(usedRaw)
+	if err != nil {
+		return nil, err
+	}
+	remainingDaily := decimal.Max(config.dailyMaximum.Sub(used), decimal.Zero)
+	remainingCount := config.dailyCount - usedCount
+	if remainingCount < 0 {
+		remainingCount = 0
+	}
+	maximumFace := decimal.Zero
+	if config.enabled && config.bucketsEnforced && remainingCount > 0 {
+		maximumFace = maximumVoucherFaceValue(transferable, config.feeBPS)
+		maximumFace = decimal.Min(maximumFace, config.maximum)
+		maximumFace = decimal.Min(maximumFace, remainingDaily)
+		if maximumFace.LessThan(config.minimum) {
+			maximumFace = decimal.Zero
+		}
+	}
+	return &VoucherAvailability{
+		Enabled:               config.enabled,
+		CreditBucketsEnforced: config.bucketsEnforced,
+		TransferableCredit:    transferable.StringFixed(8),
+		NonTransferableCredit: nonTransferable.StringFixed(8),
+		Debt:                  debt.StringFixed(8),
+		FeeBPS:                config.feeBPS,
+		MinimumUSD:            config.minimum.StringFixed(8),
+		MaximumUSD:            config.maximum.StringFixed(8),
+		DailyMaximumUSD:       config.dailyMaximum.StringFixed(8),
+		DailyUsedUSD:          used.StringFixed(8),
+		DailyRemainingUSD:     remainingDaily.StringFixed(8),
+		DailyCount:            config.dailyCount,
+		DailyUsedCount:        usedCount,
+		DailyRemainingCount:   remainingCount,
+		ExpiryDays:            config.expiryDays,
+		StepUpMinimumUSD:      config.stepUpMinimum.StringFixed(8),
+		MaximumFaceValueUSD:   maximumFace.StringFixed(8),
+	}, nil
 }
 
 func (s *VoucherService) Create(ctx context.Context, userID int64, input CreateVoucherInput) (*Voucher, error) {
@@ -620,4 +710,20 @@ func parseDecimalDefault(raw string, fallback decimal.Decimal) decimal.Decimal {
 
 func calculateVoucherFee(amount decimal.Decimal, feeBPS int64) decimal.Decimal {
 	return amount.Mul(decimal.NewFromInt(feeBPS)).Div(decimal.NewFromInt(10000)).Round(8)
+}
+
+func maximumVoucherFaceValue(transferable decimal.Decimal, feeBPS int64) decimal.Decimal {
+	if !transferable.IsPositive() {
+		return decimal.Zero
+	}
+	divisor := decimal.NewFromInt(10000 + feeBPS)
+	if !divisor.IsPositive() {
+		return decimal.Zero
+	}
+	candidate := transferable.Mul(decimal.NewFromInt(10000)).Div(divisor).Truncate(8)
+	step := decimal.New(1, -8)
+	for candidate.IsPositive() && candidate.Add(calculateVoucherFee(candidate, feeBPS)).GreaterThan(transferable) {
+		candidate = candidate.Sub(step)
+	}
+	return decimal.Max(candidate, decimal.Zero)
 }
