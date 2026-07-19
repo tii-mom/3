@@ -38,16 +38,10 @@
             <!-- Brand Logo & Name directly in Hero -->
             <div class="flex items-center gap-3 mb-6">
               <img v-if="siteLogo" :src="siteLogo" alt="Logo" class="h-8 w-auto rounded-lg" />
+              <div v-else class="h-8 w-8 rounded-lg bg-primary-505 bg-gradient-primary flex items-center justify-center text-white font-black text-sm shadow-sm select-none">
+                3
+              </div>
               <span class="text-xl font-black text-slate-900 dark:text-white">{{ siteName }}</span>
-            </div>
-
-            <!-- Mainland Friendly Pill Badge -->
-            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-500/10 border border-primary-500/20 text-xs font-medium text-primary-600 dark:text-primary-400">
-              <span class="relative flex h-2 w-2">
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75"></span>
-                <span class="relative inline-flex rounded-full h-2 w-2 bg-primary-500"></span>
-              </span>
-              <span>{{ t('home.badge.vpnFree') }}</span>
             </div>
 
             <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-7.5xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.15]">
@@ -244,9 +238,17 @@
                       <div class="flex items-center justify-between border-b border-white/[0.04] pb-2"><span class="text-gray-500">{{ t('home.ccswitch.keyName') }}</span><span class="font-mono text-white">3API_Production_Key</span></div>
                       <div class="flex items-center justify-between"><span class="text-gray-500">{{ t('home.ccswitch.keyVal') }}</span><span class="font-mono text-primary-400">sk-proj-3api-***</span></div>
                     </div>
-                    <div class="mt-4 rounded-xl border border-primary-500/20 bg-primary-500/[0.04] p-3">
+                    <div class="mt-4 rounded-xl border border-primary-500/20 bg-primary-500/[0.04] p-3 flex flex-col gap-3">
                       <div class="flex items-center justify-between"><span class="text-xs font-semibold text-white">{{ t('home.ccswitch.clientTitle') }}</span><span class="text-[10px] text-primary-400">{{ isCcsImported ? t('home.ccswitch.enabled') : t('home.ccswitch.waitImport') }}</span></div>
-                      <a href="https://ccswitch.lovable.app/" target="_blank" rel="noopener noreferrer" class="group mt-3 flex items-center justify-center gap-2 border-t border-white/[0.06] pt-3 text-xs font-semibold text-primary-400 transition-colors hover:text-primary-300"><Icon name="download" class="h-4 w-4 transition-transform group-hover:translate-y-0.5" /><span class="truncate">CC Switch {{ t('home.ccswitch.clientDownload') }}</span></a>
+                      <a 
+                        href="https://ccswitch.lovable.app/" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        class="group flex items-center justify-center gap-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold py-2.5 px-3 transition-colors shadow-sm w-full select-none"
+                      >
+                        <Icon name="download" class="h-3.5 w-3.5 transition-transform group-hover:translate-y-0.5" />
+                        <span>下载 CC Switch 客户端</span>
+                      </a>
                     </div>
                   </div>
                 </div>
