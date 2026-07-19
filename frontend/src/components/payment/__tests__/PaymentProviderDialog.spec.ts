@@ -22,18 +22,22 @@ const messages: Record<string, string> = {
   'admin.settings.payment.airwallexWebhookHint': 'Select payment_intent.succeeded and use the latest stable API version.',
 }
 
-vi.mock('vue-i18n', () => ({
-  useI18n: () => ({
-    t: (key: string, params?: Record<string, string>) => {
-      const message = messages[key] ?? key
-      if (!params) return message
-      return Object.entries(params).reduce(
-        (value, [name, replacement]) => value.replaceAll(`{${name}}`, replacement),
-        message,
-      )
-    },
-  }),
-}))
+vi.mock('vue-i18n', async importOriginal => {
+  const actual = await importOriginal<typeof import('vue-i18n')>()
+  return {
+    ...actual,
+    useI18n: () => ({
+      t: (key: string, params?: Record<string, string>) => {
+        const message = messages[key] ?? key
+        if (!params) return message
+        return Object.entries(params).reduce(
+          (value, [name, replacement]) => value.replaceAll(`{${name}}`, replacement),
+          message,
+        )
+      },
+    }),
+  }
+})
 
 function providerFactory(overrides: Partial<ProviderInstance> = {}): ProviderInstance {
   return {
