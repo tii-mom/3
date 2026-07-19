@@ -1,6 +1,6 @@
 <template>
   <AppLayout>
-    <div class="mx-auto max-w-7xl space-y-6">
+    <div class="business-page-redesign mx-auto max-w-7xl space-y-6">
       <section class="flex flex-col gap-3 border-b border-gray-200 pb-5 sm:flex-row sm:items-end sm:justify-between dark:border-dark-700">
         <div><h1 class="text-xl font-semibold text-gray-950 dark:text-white">{{ t('finance.distribution.title') }}</h1><p class="mt-1 text-sm text-gray-500 dark:text-dark-400">{{ t('finance.distribution.subtitle') }}</p></div>
         <div class="inline-flex h-9 self-start border border-gray-200 bg-gray-50 p-0.5 dark:border-dark-700 dark:bg-dark-800">

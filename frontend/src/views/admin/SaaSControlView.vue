@@ -1,6 +1,6 @@
 <template>
   <AppLayout>
-    <div class="space-y-5">
+    <div class="admin-page-redesign space-y-5">
       <header class="flex flex-col gap-4 border-b border-gray-200 pb-5 lg:flex-row lg:items-end lg:justify-between dark:border-dark-700">
         <div><h1 class="text-xl font-semibold text-gray-950 dark:text-white">{{ t('finance.saas.title') }}</h1><p class="mt-1 text-sm text-gray-500 dark:text-dark-400">Core wholesale gateway · managed isolated instances</p></div>
         <div class="flex items-end gap-2"><label class="text-xs font-medium text-gray-500">TOTP<input v-model="security.totp" class="input mt-1 w-28" maxlength="6" inputmode="numeric" placeholder="000000" /></label><button class="btn btn-secondary btn-sm" @click="toggleSaaS">{{ enabled ? t('common.enabled') : t('common.disabled') }}</button></div>

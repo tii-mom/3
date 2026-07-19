@@ -128,6 +128,16 @@ export default {
       title: '开发者与团队的使用体验',
       subtitle: '全球数千名全栈工程师和开发团队正在使用 3API 驱动他们的日常智能开发流程'
     },
+    business: {
+      title: '同一个核心，承载两种增长方式',
+      subtitle: '个人调用、品牌化 SaaS 和算力合作都由同一套路由、计费与资源控制面支撑。',
+      saasTitle: '把 3API 变成你的品牌',
+      saasDesc: '租户、套餐、订阅、域名、资源分配和合作提现集中在一个控制面，快速上线独立品牌的 AI API 服务。',
+      computeTitle: '算力，也能成为业务网络',
+      computeDesc: '用团队业绩驱动五级佣金，冻结、可用与提现流水清晰分层，合作关系可持续增长。',
+      openPartner: '进入 SaaS 合作伙伴',
+      openCompute: '进入算力公司'
+    },
     // 用户痛点区块
     painPoints: {
       title: '你是否也遇到这些问题？',

@@ -128,6 +128,16 @@ export default {
       title: 'Trusted by Developers and Teams',
       subtitle: 'Thousands of software engineers and machine learning teams use 3API for their everyday agent pipelines'
     },
+    business: {
+      title: 'One core, two paths to grow',
+      subtitle: 'Personal usage, branded SaaS, and compute partnerships run on the same routing, billing, and resource control plane.',
+      saasTitle: 'Turn 3API into your brand',
+      saasDesc: 'Manage tenants, plans, subscriptions, domains, resources, and partner payouts from one control surface for a faster branded AI API launch.',
+      computeTitle: 'Compute becomes a business network',
+      computeDesc: 'Grow through team volume and five-level commissions with clear frozen, available, and payout states.',
+      openPartner: 'Open SaaS Partner',
+      openCompute: 'Open Compute Company'
+    },
     // Pain points section
     painPoints: {
       title: 'Sound Familiar?',

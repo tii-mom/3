@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-slate-50 dark:bg-dark-950 font-sans text-slate-800 dark:text-gray-100 relative overflow-hidden selection:bg-primary-500/20">
+  <div class="home-redesign min-h-screen bg-slate-50 dark:bg-dark-950 font-sans text-slate-800 dark:text-gray-100 relative overflow-hidden selection:bg-primary-500/20">
     <!-- Custom Home Content Branch (Preserved logic) -->
     <div v-if="homeContent" class="fixed inset-0 z-50 bg-dark-950">
       <iframe 
@@ -18,15 +18,11 @@
 
     <!-- Default Home Page Branch -->
     <div v-else class="relative z-10">
-      <!-- Ambient Orbs -->
-      <div class="pointer-events-none fixed inset-0 z-0">
-        <div class="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary-500/[0.03] blur-[120px] animate-pulse-slow"></div>
-        <div class="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] rounded-full bg-accent-500/[0.02] blur-[150px] animate-pulse-slow"></div>
-        <div class="absolute top-[30%] right-[20%] w-[40%] h-[40%] rounded-full bg-primary-500/[0.02] blur-[100px]"></div>
-      </div>
+      <!-- Quiet technical atmosphere -->
+      <div class="home-atmosphere pointer-events-none fixed inset-0 z-0"></div>
 
       <!-- Detached Floating Pill Header/Nav -->
-      <header class="sticky top-6 z-50 max-w-5xl mx-auto px-4">
+      <header class="home-header sticky top-6 z-50 max-w-5xl mx-auto px-4">
         <nav class="flex items-center justify-between px-6 py-3 rounded-full bg-white/70 dark:bg-dark-900/70 backdrop-blur-xl border border-slate-200/50 dark:border-white/[0.08] shadow-glass shadow-primary-500/5 transition-all duration-300">
           <div class="flex items-center gap-3">
             <img v-if="siteLogo" :src="siteLogo" alt="Logo" class="h-8 w-auto rounded-lg" />
@@ -84,12 +80,12 @@
       </header>
 
       <!-- Main Layout -->
-      <main class="max-w-6xl mx-auto px-4 md:px-6 relative z-10 pt-16 pb-32">
+      <main class="home-main max-w-6xl mx-auto px-4 md:px-6 relative z-10 pt-16 pb-32">
         
         <!-- Hero Section -->
-        <section class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center mb-32">
+        <section class="home-hero grid grid-cols-1 lg:grid-cols-12 gap-12 items-center mb-32">
           <!-- Hero Left Content -->
-          <div class="lg:col-span-12 max-w-3xl space-y-8 text-left reveal">
+          <div class="lg:col-span-7 max-w-3xl space-y-8 text-left reveal">
             <!-- Mainland Friendly Pill Badge -->
             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-500/10 border border-primary-500/20 text-xs font-medium text-primary-600 dark:text-primary-400">
               <span class="relative flex h-2 w-2">
@@ -125,6 +121,29 @@
                 <Icon name="book" class="h-5 w-5 text-slate-400 dark:text-gray-400" />
                 <span>{{ t('home.docs') }}</span>
               </a>
+            </div>
+          </div>
+
+          <div class="home-routing-console lg:col-span-5 reveal" aria-label="3API routing control preview">
+            <div class="home-console-head">
+              <div class="flex items-center gap-2"><span class="home-console-dot"></span><span>3API ROUTING CORE</span></div>
+              <span class="home-console-live">LIVE</span>
+            </div>
+            <div class="home-console-body">
+              <div class="home-console-request">
+                <span class="home-eyebrow">REQUEST</span>
+                <strong>responses.create</strong>
+                <div class="home-request-row"><span>model</span><code>gpt-5.6</code></div>
+                <div class="home-request-row"><span>stream</span><code>true</code></div>
+                <div class="home-request-row"><span>billing</span><code>token</code></div>
+                <span class="home-console-trace">trace_92fa18</span>
+              </div>
+              <div class="home-console-routes">
+                <div class="home-route home-route-active"><span class="home-provider-mark">O</span><span>OpenAI 主路由</span><strong>684ms</strong></div>
+                <div class="home-route"><span class="home-provider-mark">A</span><span>Claude 备用路由</span><strong>ready</strong></div>
+                <router-link class="home-route" :to="isAuthenticated ? '/saas-partner' : '/login'"><Icon name="server" /><span>白牌 SaaS 租户</span><strong>12</strong></router-link>
+                <router-link class="home-route" :to="isAuthenticated ? '/distribution' : '/login'"><Icon name="users" /><span>算力公司网络</span><strong>5 层</strong></router-link>
+              </div>
             </div>
           </div>
         </section>
@@ -331,6 +350,49 @@
                 </div>
               </div>
             </div>
+          </div>
+        </section>
+
+        <!-- White-label SaaS + Compute Company experience -->
+        <section class="home-business mb-32">
+          <div class="home-section-intro reveal">
+            <span class="home-eyebrow">BUSINESS SURFACES</span>
+            <h2>{{ t('home.business.title') }}</h2>
+            <p>{{ t('home.business.subtitle') }}</p>
+          </div>
+
+          <div class="home-business-grid">
+            <router-link class="home-business-card home-business-saas reveal" :to="isAuthenticated ? '/saas-partner' : '/login'">
+              <div class="home-business-copy">
+                <span class="home-eyebrow">WHITE-LABEL SAAS</span>
+                <h3>{{ t('home.business.saasTitle') }}</h3>
+                <p>{{ t('home.business.saasDesc') }}</p>
+                <span class="home-business-link">{{ t('home.business.openPartner') }} <Icon name="arrowRight" /></span>
+              </div>
+              <div class="home-tenant-preview" aria-hidden="true">
+                <div class="home-preview-toolbar"><span>BRAND CONTROL</span><span class="home-status-chip">ACTIVE</span></div>
+                <div class="home-preview-grid">
+                  <div class="home-preview-controls"><span>站点名称</span><span>品牌 Logo</span><span>零售倍率</span><span>支付渠道</span><span>自定义域名</span></div>
+                  <div class="home-tenant-screen"><div class="flex items-center justify-between"><strong>NORTHSTACK</strong><span>登录</span></div><div><span class="home-eyebrow">YOUR BRAND, OUR CORE</span><strong>独立品牌的 AI API 服务</strong><small>tenant.example.com</small></div><div class="home-tenant-meta"><span>批发余额 $12,486.20</span><span>Dedicated</span></div></div>
+                </div>
+              </div>
+            </router-link>
+
+            <router-link class="home-business-card home-business-compute reveal delay-100" :to="isAuthenticated ? '/distribution' : '/login'">
+              <div class="home-business-copy">
+                <span class="home-eyebrow">COMPUTE COMPANY</span>
+                <h3>{{ t('home.business.computeTitle') }}</h3>
+                <p>{{ t('home.business.computeDesc') }}</p>
+                <span class="home-business-link">{{ t('home.business.openCompute') }} <Icon name="arrowRight" /></span>
+              </div>
+              <div class="home-network-preview" aria-hidden="true">
+                <div class="home-network-line"></div>
+                <div class="home-network-column"><span>直属伙伴</span><span>直属伙伴</span></div>
+                <div class="home-network-core"><strong>算力公司</strong><span>团队业绩 · 五级佣金</span></div>
+                <div class="home-network-column"><span>终端用户</span><span>终端用户</span></div>
+                <div class="home-tier-rail"><span>T1 基础</span><span>T2 成长</span><span class="is-current">T3 规模</span></div>
+              </div>
+            </router-link>
           </div>
         </section>
 
@@ -783,5 +845,578 @@ onUnmounted(() => {
 .fade-slide-leave-to {
   opacity: 0;
   transform: translateY(-12px) scale(0.98);
+}
+
+/* Precision infrastructure visual language */
+.home-redesign {
+  --home-paper: #f5f4f0;
+  --home-surface: #fffefa;
+  --home-ink: #1b1d20;
+  --home-muted: #6f726f;
+  --home-line: #deddd7;
+  --home-brand: #d85a28;
+  --home-brand-strong: #b9471d;
+  --home-soft: rgba(216, 90, 40, 0.09);
+  background: var(--home-paper) !important;
+  color: var(--home-ink);
+}
+
+.dark .home-redesign {
+  --home-paper: #101214;
+  --home-surface: #181b1e;
+  --home-ink: #f7f4ee;
+  --home-muted: #a5a6a1;
+  --home-line: rgba(255, 255, 255, 0.13);
+  --home-brand: #e26a35;
+  --home-brand-strong: #f0834c;
+  --home-soft: rgba(226, 106, 53, 0.14);
+}
+
+.home-redesign .home-atmosphere {
+  background-image: linear-gradient(rgba(102, 106, 101, 0.075) 1px, transparent 1px), linear-gradient(90deg, rgba(102, 106, 101, 0.075) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: linear-gradient(to bottom, black, transparent 72%);
+  opacity: 0.7;
+}
+
+.dark .home-redesign .home-atmosphere {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  opacity: 0.2;
+}
+
+.home-redesign .home-header nav {
+  border-radius: 8px;
+  border-color: var(--home-line);
+  background: color-mix(in srgb, var(--home-paper) 88%, transparent);
+  box-shadow: 0 14px 40px rgba(28, 30, 31, 0.08);
+}
+
+.home-redesign .home-header nav > div:first-child img {
+  border-radius: 5px;
+}
+
+.home-redesign .home-eyebrow {
+  color: var(--home-brand);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.home-redesign .text-gradient {
+  background: none !important;
+  color: var(--home-brand) !important;
+  -webkit-text-fill-color: currentColor;
+}
+
+.home-redesign .home-hero h1 {
+  max-width: 9ch;
+  letter-spacing: -0.065em;
+  line-height: 0.98;
+  text-wrap: balance;
+}
+
+.home-redesign .home-hero p {
+  max-width: 36rem;
+  color: var(--home-muted);
+}
+
+.home-redesign .home-hero .bg-gradient-primary,
+.home-redesign .home-hero .btn.bg-gradient-primary,
+.home-redesign .home-hero a.bg-gradient-primary {
+  background: var(--home-brand) !important;
+  box-shadow: 0 12px 26px rgba(216, 90, 40, 0.2) !important;
+}
+
+.home-redesign .home-hero .bg-gradient-primary:hover,
+.home-redesign .home-hero .btn.bg-gradient-primary:hover,
+.home-redesign .home-hero a.bg-gradient-primary:hover {
+  background: var(--home-brand-strong) !important;
+}
+
+.home-routing-console {
+  overflow: hidden;
+  min-height: 26rem;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 9px;
+  background: #202326;
+  color: #f4f1ea;
+  box-shadow: 0 28px 70px rgba(22, 24, 26, 0.22);
+}
+
+.home-routing-console::before {
+  content: '';
+  display: block;
+  height: 4px;
+  background: var(--home-brand);
+}
+
+.home-console-head,
+.home-console-body {
+  display: grid;
+}
+
+.home-console-head {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(244, 241, 234, 0.65);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+}
+
+.home-console-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #6ad49d;
+  box-shadow: 0 0 0 3px rgba(106, 212, 157, 0.1);
+}
+
+.home-console-live {
+  color: #6ad49d;
+}
+
+.home-console-body {
+  grid-template-columns: 0.82fr 1.18fr;
+  min-height: 22rem;
+}
+
+.home-console-request,
+.home-console-routes {
+  padding: 1.15rem;
+}
+
+.home-console-request {
+  display: grid;
+  align-content: space-between;
+  gap: 0.8rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.home-console-request strong {
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+
+.home-request-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding-block: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(244, 241, 234, 0.62);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.75rem;
+}
+
+.home-request-row code {
+  color: #f5b48d;
+}
+
+.home-console-trace {
+  color: rgba(244, 241, 234, 0.43);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.7rem;
+}
+
+.home-console-routes {
+  display: grid;
+  align-content: center;
+  gap: 0.65rem;
+}
+
+.home-route {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 2.9rem;
+  padding: 0.6rem 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 5px;
+  color: rgba(244, 241, 234, 0.78);
+  font-size: 0.78rem;
+  text-decoration: none;
+  transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
+}
+
+.home-route:hover {
+  border-color: rgba(226, 106, 53, 0.65);
+  background: rgba(226, 106, 53, 0.09);
+  transform: translateY(-1px);
+}
+
+.home-route strong {
+  color: #f2b18b;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.home-route-active {
+  border-color: var(--home-brand);
+  background: rgba(216, 90, 40, 0.12);
+}
+
+.home-provider-mark {
+  display: grid;
+  width: 1.15rem;
+  height: 1.15rem;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.65rem;
+}
+
+.home-business {
+  position: relative;
+}
+
+.home-section-intro {
+  max-width: 42rem;
+  margin-bottom: 2rem;
+}
+
+.home-section-intro h2 {
+  margin: 0.55rem 0 0.7rem;
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  letter-spacing: -0.05em;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+.home-section-intro p {
+  max-width: 38rem;
+  margin: 0;
+  color: var(--home-muted);
+  line-height: 1.7;
+}
+
+.home-business-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  gap: 0.8rem;
+}
+
+.home-business-card {
+  display: grid;
+  gap: 1.6rem;
+  min-height: 31rem;
+  padding: clamp(1.2rem, 3vw, 2.25rem);
+  overflow: hidden;
+  border: 1px solid var(--home-line);
+  border-radius: 8px;
+  background: var(--home-surface);
+  color: var(--home-ink);
+  text-decoration: none;
+  box-shadow: 0 16px 48px rgba(26, 28, 30, 0.06);
+  transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.home-business-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--home-brand) 42%, var(--home-line));
+  box-shadow: 0 24px 62px rgba(26, 28, 30, 0.11);
+}
+
+.home-business-copy {
+  max-width: 27rem;
+}
+
+.home-business-copy h3 {
+  margin: 0.65rem 0 0.7rem;
+  font-size: clamp(1.45rem, 2.5vw, 2.25rem);
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+}
+
+.home-business-copy p {
+  margin: 0;
+  color: var(--home-muted);
+  line-height: 1.65;
+}
+
+.home-business-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 1.1rem;
+  color: var(--home-brand-strong);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.home-business-link svg {
+  width: 1rem;
+  height: 1rem;
+  transition: transform 180ms ease;
+}
+
+.home-business-card:hover .home-business-link svg {
+  transform: translateX(3px);
+}
+
+.home-tenant-preview {
+  align-self: end;
+  overflow: hidden;
+  border: 1px solid var(--home-line);
+  border-radius: 6px;
+  background: var(--home-paper);
+}
+
+.home-preview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.7rem 0.8rem;
+  border-bottom: 1px solid var(--home-line);
+  color: var(--home-muted);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+}
+
+.home-status-chip {
+  padding: 0.25rem 0.4rem;
+  border-radius: 3px;
+  background: rgba(40, 151, 101, 0.12);
+  color: #258d61;
+}
+
+.home-preview-grid {
+  display: grid;
+  grid-template-columns: 0.58fr 1.42fr;
+  min-height: 14rem;
+}
+
+.home-preview-controls {
+  display: grid;
+  align-content: start;
+  gap: 0.45rem;
+  padding: 0.8rem;
+  border-right: 1px solid var(--home-line);
+}
+
+.home-preview-controls span {
+  padding: 0.45rem;
+  border: 1px solid var(--home-line);
+  border-radius: 4px;
+  color: var(--home-muted);
+  font-size: 0.65rem;
+}
+
+.home-tenant-screen {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 0.75rem;
+  padding: 0.8rem;
+  background: var(--home-paper);
+}
+
+.home-tenant-screen > div:first-child {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.65rem;
+}
+
+.home-tenant-screen > div:nth-child(2) {
+  display: grid;
+  align-content: center;
+  gap: 0.55rem;
+  padding: 1rem;
+  border-radius: 4px;
+  background: var(--home-ink);
+  color: var(--home-paper);
+}
+
+.home-tenant-screen > div:nth-child(2) strong {
+  font-size: 1.1rem;
+  letter-spacing: -0.03em;
+}
+
+.home-tenant-screen > div:nth-child(2) small,
+.home-tenant-meta {
+  color: var(--home-muted);
+  font-size: 0.65rem;
+}
+
+.home-tenant-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.home-business-compute {
+  background: #242628;
+  color: #f5f2ec;
+}
+
+.home-business-compute .home-business-copy p {
+  color: rgba(245, 242, 236, 0.65);
+}
+
+.home-business-compute .home-business-link {
+  color: #f1a477;
+}
+
+.home-network-preview {
+  position: relative;
+  display: grid;
+  grid-template-columns: 0.82fr 1.1fr 0.82fr;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 15rem;
+  padding: 1rem 0;
+}
+
+.home-network-line {
+  position: absolute;
+  top: 50%;
+  right: 7%;
+  left: 7%;
+  height: 1px;
+  background: rgba(226, 106, 53, 0.62);
+}
+
+.home-network-column,
+.home-network-core {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.home-network-column span,
+.home-network-core {
+  padding: 0.7rem 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  background: #2b2e31;
+  color: rgba(245, 242, 236, 0.73);
+  font-size: 0.68rem;
+  text-align: center;
+}
+
+.home-network-core {
+  gap: 0.4rem;
+  padding-block: 1.35rem;
+  border-color: var(--home-brand);
+  background: rgba(216, 90, 40, 0.16);
+}
+
+.home-network-core strong {
+  color: #fff7ed;
+  font-size: 0.95rem;
+}
+
+.home-network-core span {
+  color: #f0aa7e;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.58rem;
+}
+
+.home-tier-rail {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  gap: 0.45rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.home-tier-rail span {
+  padding: 0.25rem 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  color: rgba(245, 242, 236, 0.55);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.58rem;
+}
+
+.home-tier-rail .is-current {
+  border-color: var(--home-brand);
+  color: #f0aa7e;
+}
+
+.home-redesign .card-premium {
+  border-radius: 7px;
+  box-shadow: 0 14px 44px rgba(26, 28, 30, 0.07);
+}
+
+.home-redesign .pointer-events-none.blur-3xl {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .home-redesign .home-hero {
+    gap: 2.5rem;
+  }
+
+  .home-routing-console {
+    min-height: 22rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .home-redesign .home-header {
+    top: 0.75rem;
+  }
+
+  .home-redesign .home-header nav {
+    padding-inline: 0.85rem;
+  }
+
+  .home-redesign .home-main {
+    padding-top: 4rem;
+  }
+
+  .home-redesign .home-hero h1 {
+    font-size: clamp(2.8rem, 15vw, 4.4rem);
+  }
+
+  .home-console-body,
+  .home-preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .home-console-request {
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .home-preview-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-right: 0;
+    border-bottom: 1px solid var(--home-line);
+  }
+
+  .home-business-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .home-business-card {
+    min-height: auto;
+  }
+
+  .home-network-preview {
+    min-height: 13rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-business-card,
+  .home-route,
+  .home-business-link svg {
+    transition: none;
+  }
 }
 </style>

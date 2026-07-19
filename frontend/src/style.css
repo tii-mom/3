@@ -828,3 +828,361 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+
+/* ================================================================
+   3API precision infrastructure skin
+   The component contracts and utility classes remain unchanged; this
+   layer only refines the surfaces, rhythm, and responsive presentation.
+   ================================================================ */
+:root {
+  --ui-paper: #f4f3ef;
+  --ui-surface: #fffefa;
+  --ui-surface-muted: #eeece7;
+  --ui-ink: #1b1d20;
+  --ui-muted: #70736f;
+  --ui-line: #d9d8d2;
+  --ui-brand: #d85a28;
+  --ui-brand-strong: #b9471d;
+  --ui-brand-soft: rgba(216, 90, 40, 0.1);
+  --ui-shadow: 0 18px 50px rgba(31, 33, 35, 0.08);
+}
+
+.dark {
+  --ui-paper: #111315;
+  --ui-surface: #181b1e;
+  --ui-surface-muted: #202428;
+  --ui-ink: #f5f3ed;
+  --ui-muted: #a4a7a2;
+  --ui-line: rgba(255, 255, 255, 0.12);
+  --ui-brand: #e46b36;
+  --ui-brand-strong: #f08049;
+  --ui-brand-soft: rgba(228, 107, 54, 0.15);
+  --ui-shadow: 0 22px 70px rgba(0, 0, 0, 0.24);
+}
+
+.app-shell-redesign {
+  background: var(--ui-paper) !important;
+  color: var(--ui-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.app-shell-grid {
+  z-index: 0;
+  opacity: 0.42;
+  background-image: linear-gradient(rgba(120, 123, 118, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(120, 123, 118, 0.08) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(to bottom, black, transparent 78%);
+}
+
+.dark .app-shell-grid {
+  opacity: 0.2;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+}
+
+.app-main-redesign,
+.app-main-redesign > main {
+  position: relative;
+  z-index: 1;
+}
+
+.app-main-redesign > main {
+  padding: 1.25rem 1.5rem 3rem !important;
+}
+
+.app-sidebar-redesign {
+  background: color-mix(in srgb, var(--ui-surface) 94%, transparent) !important;
+  border-right-color: var(--ui-line) !important;
+  box-shadow: 12px 0 32px rgba(28, 30, 31, 0.035);
+}
+
+.dark .app-sidebar-redesign {
+  background: color-mix(in srgb, var(--ui-surface) 95%, transparent) !important;
+  box-shadow: 12px 0 32px rgba(0, 0, 0, 0.18);
+}
+
+.app-sidebar-redesign .sidebar-header {
+  height: 4.5rem;
+  border-bottom-color: var(--ui-line) !important;
+}
+
+.app-sidebar-redesign .sidebar-logo {
+  border-radius: 7px !important;
+  box-shadow: 0 0 0 1px var(--ui-line), 0 8px 18px rgba(216, 90, 40, 0.12) !important;
+}
+
+.app-sidebar-redesign .sidebar-link {
+  min-height: 2.35rem;
+  border-radius: 5px;
+  color: var(--ui-muted);
+  letter-spacing: 0.005em;
+}
+
+.app-sidebar-redesign .sidebar-link:hover {
+  background: var(--ui-surface-muted) !important;
+  color: var(--ui-ink) !important;
+}
+
+.app-sidebar-redesign .sidebar-link-active {
+  background: var(--ui-brand-soft) !important;
+  color: var(--ui-brand-strong) !important;
+  box-shadow: inset 2px 0 0 var(--ui-brand) !important;
+  border-radius: 0 5px 5px 0;
+}
+
+.app-sidebar-redesign .sidebar-section-title {
+  color: var(--ui-muted);
+  letter-spacing: 0.15em;
+}
+
+.app-header-redesign {
+  background: color-mix(in srgb, var(--ui-paper) 88%, transparent) !important;
+  border-bottom-color: var(--ui-line) !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.dark .app-header-redesign {
+  background: color-mix(in srgb, var(--ui-paper) 92%, transparent) !important;
+}
+
+.app-header-redesign .btn-ghost:hover {
+  background: var(--ui-surface-muted) !important;
+}
+
+.app-shell-redesign h1,
+.app-shell-redesign h2,
+.app-shell-redesign h3 {
+  letter-spacing: -0.02em;
+}
+
+.app-shell-redesign .card,
+.app-shell-redesign .card-premium,
+.app-shell-redesign .card-glass,
+.app-shell-redesign .glass-card {
+  background: var(--ui-surface) !important;
+  border: 1px solid var(--ui-line) !important;
+  border-radius: 7px !important;
+  box-shadow: var(--ui-shadow) !important;
+  backdrop-filter: none;
+}
+
+.app-shell-redesign .card:hover,
+.app-shell-redesign .card-premium:hover,
+.app-shell-redesign .card-hover:hover {
+  border-color: color-mix(in srgb, var(--ui-brand) 35%, var(--ui-line)) !important;
+  transform: translateY(-1px);
+}
+
+.app-shell-redesign .btn {
+  min-height: 2.35rem;
+  border-radius: 5px;
+  letter-spacing: 0.005em;
+}
+
+.app-shell-redesign .btn-primary {
+  background: var(--ui-brand) !important;
+  color: #fffaf5 !important;
+  box-shadow: 0 8px 20px rgba(216, 90, 40, 0.18) !important;
+}
+
+.app-shell-redesign .btn-primary:hover {
+  background: var(--ui-brand-strong) !important;
+  box-shadow: 0 10px 24px rgba(216, 90, 40, 0.25) !important;
+}
+
+.app-shell-redesign .btn-secondary {
+  background: var(--ui-surface) !important;
+  border-color: var(--ui-line) !important;
+  color: var(--ui-ink) !important;
+  box-shadow: none;
+}
+
+.app-shell-redesign .btn-secondary:hover {
+  background: var(--ui-surface-muted) !important;
+  border-color: color-mix(in srgb, var(--ui-brand) 28%, var(--ui-line)) !important;
+}
+
+.app-shell-redesign .btn-ghost {
+  color: var(--ui-muted);
+}
+
+.app-shell-redesign .input,
+.app-shell-redesign select,
+.app-shell-redesign textarea {
+  border-radius: 5px !important;
+  border-color: var(--ui-line) !important;
+  background: var(--ui-surface) !important;
+  color: var(--ui-ink);
+  box-shadow: none !important;
+}
+
+.app-shell-redesign .input:focus,
+.app-shell-redesign select:focus,
+.app-shell-redesign textarea:focus {
+  border-color: var(--ui-brand) !important;
+  box-shadow: 0 0 0 3px var(--ui-brand-soft) !important;
+}
+
+.app-shell-redesign .table-container,
+.app-shell-redesign .table-wrapper {
+  border-color: var(--ui-line);
+  border-radius: 7px;
+}
+
+.app-shell-redesign .table th {
+  background: var(--ui-surface-muted);
+  border-bottom-color: var(--ui-line);
+  color: var(--ui-muted);
+  letter-spacing: 0.08em;
+  font-size: 0.68rem;
+}
+
+.app-shell-redesign .table td {
+  border-bottom-color: color-mix(in srgb, var(--ui-line) 72%, transparent);
+}
+
+.app-shell-redesign .table tbody tr:hover {
+  background: var(--ui-brand-soft);
+}
+
+.app-shell-redesign .tabs {
+  border: 1px solid var(--ui-line);
+  border-radius: 6px;
+  background: var(--ui-surface-muted);
+}
+
+.app-shell-redesign .tab {
+  border-radius: 4px;
+  color: var(--ui-muted);
+}
+
+.app-shell-redesign .tab-active {
+  background: var(--ui-surface);
+  color: var(--ui-ink);
+  box-shadow: inset 0 -2px 0 var(--ui-brand), 0 1px 2px rgba(25, 28, 30, 0.07);
+}
+
+.app-shell-redesign .stat-value,
+.app-shell-redesign .font-mono {
+  font-variant-numeric: tabular-nums;
+}
+
+.app-shell-redesign .stat-icon,
+.app-shell-redesign .stat-icon-primary,
+.app-shell-redesign .stat-icon-success,
+.app-shell-redesign .stat-icon-warning,
+.app-shell-redesign .stat-icon-danger {
+  border-radius: 5px;
+}
+
+.app-shell-redesign .badge {
+  border-radius: 4px;
+}
+
+.app-shell-redesign .page-title {
+  font-size: 1.6rem;
+  letter-spacing: -0.03em;
+}
+
+.app-shell-redesign .page-description {
+  color: var(--ui-muted);
+}
+
+.dashboard-page-redesign,
+.business-page-redesign,
+.admin-page-redesign {
+  max-width: 90rem;
+  margin-inline: auto;
+}
+
+.dashboard-page-redesign > .space-y-6,
+.admin-page-redesign > .space-y-6 {
+  gap: 1rem;
+}
+
+.business-page-redesign > .space-y-6,
+.business-page-redesign > .space-y-5 {
+  gap: 1rem;
+}
+
+.business-page-redesign > section,
+.business-page-redesign > form,
+.admin-page-redesign > section,
+.admin-page-redesign > form,
+.admin-page-redesign > nav > div {
+  border-color: var(--ui-line) !important;
+  border-radius: 7px;
+  background: var(--ui-surface);
+}
+
+.business-page-redesign .bg-white,
+.admin-page-redesign .bg-white {
+  background: var(--ui-surface) !important;
+}
+
+.business-page-redesign .bg-gray-50,
+.admin-page-redesign .bg-gray-50,
+.business-page-redesign .dark\:bg-dark-800,
+.admin-page-redesign .dark\:bg-dark-800 {
+  background: var(--ui-surface-muted) !important;
+}
+
+.business-page-redesign .bg-gray-200,
+.admin-page-redesign .bg-gray-200 {
+  background: var(--ui-line) !important;
+}
+
+.business-page-redesign table,
+.admin-page-redesign table {
+  font-variant-numeric: tabular-nums;
+}
+
+.business-page-redesign th,
+.admin-page-redesign th {
+  color: var(--ui-muted) !important;
+  background: var(--ui-surface-muted) !important;
+  border-bottom-color: var(--ui-line) !important;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.business-page-redesign td,
+.admin-page-redesign td {
+  border-color: color-mix(in srgb, var(--ui-line) 74%, transparent) !important;
+}
+
+.business-page-redesign .border-gray-100,
+.admin-page-redesign .border-gray-100,
+.business-page-redesign .dark\:border-dark-700,
+.admin-page-redesign .dark\:border-dark-700 {
+  border-color: var(--ui-line) !important;
+}
+
+.business-page-redesign .text-emerald-600,
+.admin-page-redesign .text-emerald-600 {
+  color: #2b9568 !important;
+}
+
+@media (max-width: 1023px) {
+  .app-main-redesign > main {
+    padding: 1rem 1rem 2.5rem !important;
+  }
+}
+
+@media (max-width: 639px) {
+  .app-main-redesign > main {
+    padding: 0.85rem 0.75rem 2rem !important;
+  }
+
+  .app-header-redesign > div {
+    height: 3.75rem;
+    padding-inline: 0.75rem;
+  }
+
+  .app-shell-redesign .card,
+  .app-shell-redesign .card-premium,
+  .app-shell-redesign .card-glass,
+  .app-shell-redesign .glass-card {
+    border-radius: 6px !important;
+  }
+}
