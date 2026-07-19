@@ -172,3 +172,15 @@ SELECT status, COUNT(*), MAX(attempts) FROM financial_outbox_events GROUP BY sta
 - 最终回归通过：`go test ./...`、`go test -tags=unit ./internal/service -count=1`、Testcontainers 仓储集成测试、`pnpm typecheck`、`pnpm lint:check`、182 个前端测试文件共 1,237 项测试以及 `pnpm build`。
 - 生产镜像 `3api-financial-gate:upstream-0161` 摘要为 `sha256:452809d6f839b2ab8cf25b9e5d02d2acdfab9f0aed21d7dbee50831addf2154a`，大小 `38,136,988` 字节，内嵌版本 `0.1.161`。应用主进程以 `sub2api` 用户运行，`/health` 同时报 PostgreSQL 和 Redis 为 `ok`。
 - 根 Dockerfile 已移除不必要的远程 Dockerfile frontend 语法声明，避免受限网络环境在业务构建开始前阻塞；Docker Desktop 自带 BuildKit 可直接解析现有 cache mount 指令。
+
+## 11. 生产备份与隔离恢复预检
+
+- 已合并基线提交为 `6c63dbb299326aa9ab076c621b2e5fd7c5439f32`；首个正式候选镜像为 `ghcr.io/tii-mom/3@sha256:9896d780f463915ee265dd51cee748299be8b92a3af581cf73dcb7c128b53c2b`。
+- 后续候选镜像必须包含 `/app/financialgate`，并以新构建产生的 digest 为准。禁止使用 tag 或 `latest` 触发生产预检和部署。
+- 手动运行 GitHub Actions 工作流 `Production Backup and Isolated Restore Preflight`，输入候选 digest 和确认短语 `BACKUP_AND_RESTORE_ONLY`。
+- 预检对生产 PostgreSQL 只执行版本、用户数、迁移数、数据库大小查询和 `pg_dump`。它不会执行迁移、场景夹具、回填、删除或更新。
+- 备份恢复到随机命名的临时 PostgreSQL 18 容器；候选镜像的迁移双跑、功能默认值和十项财务门禁只在该恢复副本执行。
+- 备份文件、SHA-256 和财务门禁 JSON 保存在服务器 `/opt/sub2api-deploy/backups/preflight/`。临时容器和网络自动删除，备份及报告不自动删除。
+- 只有预检成功且人工核对报告后，才允许手动运行生产部署工作流。部署后所有新功能仍保持关闭。
+- 手动部署必须输入同一个已预检 digest 和确认短语 `DEPLOY_PREFLIGHTED_DIGEST`；工作流不会重新构建镜像，避免实际部署物与预检物不一致。
+- 2026-07-19 本地端到端脚本演练通过：对已有 1 个用户、220 个迁移的 PostgreSQL 18.1 验收库只读备份，恢复副本升级到 234 个迁移并通过十项财务门禁；演练同时验证了环境文件权限拒绝和 archive 恢复的 `--no-owner --no-acl` 兼容处理。

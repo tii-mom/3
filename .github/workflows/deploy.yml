@@ -5,6 +5,15 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      image_digest:
+        description: Preflight-approved immutable GHCR digest (sha256:...)
+        required: true
+        type: string
+      confirmation:
+        description: Type DEPLOY_PREFLIGHTED_DIGEST
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -12,6 +21,7 @@ permissions:
 
 jobs:
   build-and-push:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
       image_digest: ${{ steps.build.outputs.digest }}
@@ -87,10 +97,17 @@ jobs:
 
   deploy-to-vps:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
-    needs: build-and-push
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - name: Validate preflight-approved digest and confirmation
+        env:
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          test "$CONFIRMATION" = 'DEPLOY_PREFLIGHTED_DIGEST'
+          printf '%s\n' "$IMAGE_DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'
+
       - name: Configure SSH
         env:
           VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
@@ -105,6 +122,7 @@ jobs:
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
         run: |
           ssh -o BatchMode=yes "$VPS_USER@$VPS_HOST" \
-            "/opt/sub2api-deploy/production-deploy.sh '${{ needs.build-and-push.outputs.image_digest }}'"
+            "/opt/sub2api-deploy/production-deploy.sh '$IMAGE_DIGEST'"

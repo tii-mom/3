@@ -1,0 +1,58 @@
+name: Production Backup and Isolated Restore Preflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_digest:
+        description: Immutable GHCR image digest (sha256:...)
+        required: true
+        type: string
+      confirmation:
+        description: Type BACKUP_AND_RESTORE_ONLY
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-database-preflight
+  cancel-in-progress: false
+
+jobs:
+  backup-and-isolated-restore:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@v6
+
+      - name: Validate immutable digest
+        env:
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          test "$CONFIRMATION" = 'BACKUP_AND_RESTORE_ONLY'
+          printf '%s\n' "$IMAGE_DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'
+
+      - name: Configure SSH
+        env:
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_SSH_HOST_KEY: ${{ secrets.VPS_SSH_HOST_KEY }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$VPS_SSH_HOST_KEY" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+
+      - name: Back up production and validate isolated restore
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+        run: |
+          ssh -o BatchMode=yes "$VPS_USER@$VPS_HOST" \
+            "bash -s -- '$IMAGE_DIGEST' BACKUP_AND_RESTORE_ONLY" \
+            < deploy/production-preflight.sh
