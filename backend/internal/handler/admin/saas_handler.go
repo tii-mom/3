@@ -2,6 +2,7 @@ package admin
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -25,12 +26,18 @@ func (h *SaaSHandler) GetConfig(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	response.Success(c, gin.H{"enabled": enabled})
+	applicationsEnabled, err := h.service.ApplicationEnabled(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"enabled": enabled, "applications_enabled": applicationsEnabled})
 }
 
 type saasConfigRequest struct {
-	Enabled  bool   `json:"enabled"`
-	TOTPCode string `json:"totp_code" binding:"required"`
+	Enabled             *bool  `json:"enabled"`
+	ApplicationsEnabled *bool  `json:"applications_enabled"`
+	TOTPCode            string `json:"totp_code" binding:"required"`
 }
 
 func (h *SaaSHandler) UpdateConfig(c *gin.Context) {
@@ -48,11 +55,79 @@ func (h *SaaSHandler) UpdateConfig(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	if err := h.service.UpdateEnabled(c.Request.Context(), request.Enabled); err != nil {
+	if err := h.service.UpdateFeatureFlags(c.Request.Context(), request.Enabled, request.ApplicationsEnabled); err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
-	response.Success(c, gin.H{"enabled": request.Enabled})
+	enabled, err := h.service.Enabled(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	applicationsEnabled, err := h.service.ApplicationEnabled(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"enabled": enabled, "applications_enabled": applicationsEnabled})
+}
+
+func (h *SaaSHandler) ListApplications(c *gin.Context) {
+	page, pageSize := response.ParsePagination(c)
+	items, total, err := h.service.AdminListApplications(c.Request.Context(), c.Query("status"), page, pageSize)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Paginated(c, items, total, page, pageSize)
+}
+
+type transitionSaaSApplicationRequest struct {
+	Status     string `json:"status" binding:"required"`
+	ReviewNote string `json:"review_note"`
+	Slug       string `json:"slug"`
+	SiteName   string `json:"site_name"`
+	SiteLogo   string `json:"site_logo"`
+	TOTPCode   string `json:"totp_code" binding:"required"`
+}
+
+func (h *SaaSHandler) TransitionApplication(c *gin.Context) {
+	subject, ok := middleware.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "Admin not authenticated")
+		return
+	}
+	applicationID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || applicationID <= 0 {
+		response.BadRequest(c, "Invalid application id")
+		return
+	}
+	var request transitionSaaSApplicationRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if err := h.totp.VerifyCode(c.Request.Context(), subject.UserID, request.TOTPCode); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	if strings.EqualFold(strings.TrimSpace(request.Status), "APPROVED") {
+		result, err := h.service.ApproveApplication(c.Request.Context(), applicationID, subject.UserID, service.ApproveSaaSApplicationInput{
+			Slug: request.Slug, SiteName: request.SiteName, SiteLogo: request.SiteLogo, ReviewNote: request.ReviewNote,
+		})
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+		response.Success(c, result)
+		return
+	}
+	item, err := h.service.ReviewApplication(c.Request.Context(), applicationID, subject.UserID, request.Status, request.ReviewNote)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, item)
 }
 
 type createTenantRequest struct {

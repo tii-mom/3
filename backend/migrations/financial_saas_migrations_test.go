@@ -76,3 +76,13 @@ func TestDistributionProfileRepairBackfillsZeroSafeProfiles(t *testing.T) {
 	require.Contains(t, sql, "INSERT INTO distribution_cash_wallets")
 	require.Contains(t, sql, "ON CONFLICT DO NOTHING")
 }
+
+func TestSaaSApplicationMigrationSeparatesLeadReviewFromTenantCreation(t *testing.T) {
+	sql := normalizedMigration(t, "186_saas_tenant_applications.sql")
+	require.Contains(t, sql, "CREATE TABLE IF NOT EXISTS saas_tenant_applications")
+	require.Contains(t, sql, "status IN ('SUBMITTED', 'CONTACTED', 'APPROVED', 'REJECTED')")
+	require.Contains(t, sql, "WHERE status IN ('SUBMITTED', 'CONTACTED')")
+	require.Contains(t, sql, "tenant_id BIGINT UNIQUE REFERENCES saas_tenants(id)")
+	require.Contains(t, sql, "CREATE TABLE IF NOT EXISTS saas_tenant_application_events")
+	require.Contains(t, sql, "('saas_application_enabled', 'false', NOW())")
+}

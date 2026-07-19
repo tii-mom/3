@@ -139,6 +139,12 @@ func RegisterUserRoutes(
 			partner.POST("/withdrawals", h.Partner.CreateWithdrawal)
 		}
 
+		saasApplication := authenticated.Group("/saas/application")
+		{
+			saasApplication.GET("", h.Partner.ApplicationOverview)
+			saasApplication.POST("", h.Partner.SubmitApplication)
+		}
+
 		tenant := authenticated.Group("/saas/tenant")
 		{
 			tenant.GET("/config", h.Partner.TenantControl)

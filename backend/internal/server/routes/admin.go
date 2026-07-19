@@ -165,6 +165,8 @@ func registerAdminSaaSRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		saas.PUT("/config", h.Admin.SaaS.UpdateConfig)
 		saas.GET("/tenants", h.Admin.SaaS.ListTenants)
 		saas.POST("/tenants", h.Admin.SaaS.CreateTenant)
+		saas.GET("/applications", h.Admin.SaaS.ListApplications)
+		saas.POST("/applications/:id/transition", h.Admin.SaaS.TransitionApplication)
 		saas.POST("/tenants/:id/wholesale-funds", h.Admin.SaaS.FundWholesale)
 		saas.POST("/tenants/:id/domains", h.Admin.SaaS.AddDomain)
 		saas.PUT("/tenants/:id/resource-pool", h.Admin.SaaS.AssignResourcePool)
