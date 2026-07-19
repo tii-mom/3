@@ -257,7 +257,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/vouchers',
     name: 'BalanceVouchers',
-    component: () => import('@/views/user/VouchersView.vue'),
+    redirect: '/redeem',
     meta: { requiresAuth: true, requiresAdmin: false, title: 'Balance Vouchers', titleKey: 'finance.vouchers.title' }
   },
   {

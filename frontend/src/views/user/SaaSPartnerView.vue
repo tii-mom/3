@@ -1,34 +1,47 @@
 <template>
   <AppLayout>
-    <div class="mx-auto max-w-6xl space-y-6">
-      <header class="border-b border-gray-200 pb-5 dark:border-dark-700"><h1 class="text-xl font-semibold text-gray-950 dark:text-white">{{ t('finance.partner.title') }}</h1></header>
-      <section v-if="partner" class="grid gap-px overflow-hidden border border-gray-200 bg-gray-200 sm:grid-cols-4 dark:border-dark-700 dark:bg-dark-700"><div v-for="stat in partnerStats" :key="stat.label" class="bg-white p-5 dark:bg-dark-900"><p class="text-xs text-gray-500">{{ stat.label }}</p><p class="mt-2 text-xl font-semibold">{{ stat.value }}</p></div></section>
-      <section class="grid gap-6 lg:grid-cols-2">
-        <form class="border border-gray-200 p-5 dark:border-dark-700" @submit.prevent="saveAccount"><h2 class="text-base font-semibold">{{ t('finance.distribution.payout') }}</h2><p v-if="payout" class="mt-3 text-sm text-gray-500">{{ payout.real_name_mask }} · {{ payout.account_mask }}</p><div class="mt-4 grid gap-3 sm:grid-cols-2"><input v-model="realName" class="input" :placeholder="t('finance.distribution.realName')" /><input v-model="alipay" class="input" :placeholder="t('finance.distribution.alipay')" /></div><button class="btn btn-secondary mt-4">{{ t('common.save') }}</button></form>
-        <form class="border border-gray-200 p-5 dark:border-dark-700" @submit.prevent="withdraw"><h2 class="text-base font-semibold">{{ t('finance.distribution.withdraw') }}</h2><input v-model="withdrawAmount" class="input mt-4 w-full" inputmode="decimal" placeholder="100.00 CNY" /><button class="btn btn-primary mt-4">{{ t('finance.distribution.submitWithdrawal') }}</button></form>
+    <div class="mx-auto max-w-4xl space-y-6">
+      <header class="border-b border-gray-200 pb-5 dark:border-dark-700">
+        <h1 class="text-xl font-semibold text-gray-950 dark:text-white">
+          {{ t('finance.partner.title') }}
+        </h1>
+        <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">
+          {{ t('finance.partner.subtitle') }}
+        </p>
+      </header>
+
+      <section class="rounded-lg border border-amber-200 bg-amber-50 p-5 text-amber-950 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
+        <h2 class="text-base font-semibold">{{ t('finance.partner.pausedTitle') }}</h2>
+        <p class="mt-2 text-sm leading-6">{{ t('finance.partner.pausedDesc') }}</p>
       </section>
-      <section class="overflow-x-auto border border-gray-200 dark:border-dark-700"><table class="w-full min-w-[720px] text-sm"><thead class="bg-gray-50 text-gray-500 dark:bg-dark-800"><tr><th class="px-4 py-3 text-left">ID</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.withdraw') }}</th><th class="px-4 py-3 text-right">{{ t('finance.vouchers.fee') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.net') }}</th><th class="px-4 py-3 text-left">{{ t('common.status') }}</th><th class="px-4 py-3 text-left">{{ t('finance.admin.reference') }}</th></tr></thead><tbody><tr v-for="item in withdrawals" :key="item.id" class="border-t border-gray-100 dark:border-dark-700"><td class="px-4 py-3">#{{ item.id }}</td><td class="px-4 py-3 text-right">{{ cny(item.amount_cny_minor) }}</td><td class="px-4 py-3 text-right">{{ cny(item.fee_cny_minor) }}</td><td class="px-4 py-3 text-right font-medium">{{ cny(item.amount_cny_minor - item.fee_cny_minor) }}</td><td class="px-4 py-3">{{ item.status }}<p v-if="item.reject_reason" class="mt-1 text-xs text-rose-600">{{ item.reject_reason }}</p></td><td class="px-4 py-3">{{ item.payment_reference || '-' }}</td></tr><tr v-if="withdrawals.length === 0"><td colspan="6" class="px-4 py-8 text-center text-gray-500">{{ t('common.noData') }}</td></tr></tbody></table></section>
-      <form v-if="tenant" class="space-y-5 border border-gray-200 p-5 dark:border-dark-700" @submit.prevent="saveTenant">
-        <div class="flex items-center justify-between"><h2 class="text-base font-semibold">{{ tenant.tenant.name }}</h2><span class="text-sm text-gray-500">${{ tenant.tenant.wholesale_balance_usd }}</span></div>
-        <div class="grid gap-3 sm:grid-cols-2"><input v-model="tenantForm.site_name" class="input" :placeholder="t('finance.partner.siteName')" /><input v-model="tenantForm.site_logo" class="input" placeholder="Logo URL" /><input v-model="tenantForm.retail_multiplier" class="input" inputmode="decimal" :placeholder="t('finance.partner.retailMultiplier')" /><input v-model="tenantForm.payment_provider" class="input" :placeholder="t('finance.partner.paymentProvider')" /></div>
-        <textarea v-model="tenantForm.payment_config" class="input min-h-24 w-full font-mono" :placeholder="t('finance.partner.paymentConfig')"></textarea>
-        <button class="btn btn-primary">{{ t('common.save') }}</button>
-      </form>
-      <form v-if="tenant" class="flex gap-3 border border-gray-200 p-5 dark:border-dark-700" @submit.prevent="bindDomain"><input v-model="domain" class="input flex-1" placeholder="api.example.com" /><button class="btn btn-secondary">{{ t('finance.saas.domain') }}</button></form>
-      <section v-if="verificationToken" class="border border-amber-300 bg-amber-50 p-4 font-mono text-sm dark:border-amber-800 dark:bg-amber-950/30">{{ verificationToken }}</section>
+
+      <section class="grid gap-px overflow-hidden rounded-lg border border-gray-200 bg-gray-200 md:grid-cols-3 dark:border-dark-700 dark:bg-dark-700">
+        <div v-for="item in valueProps" :key="item" class="bg-white p-5 dark:bg-dark-900">
+          <p class="text-sm font-medium text-gray-900 dark:text-white">{{ item }}</p>
+        </div>
+      </section>
+
+      <section v-if="contactInfo" class="rounded-lg border border-gray-200 p-5 text-sm text-gray-600 dark:border-dark-700 dark:text-dark-300">
+        <p>{{ t('finance.partner.contactHint') }}</p>
+        <p class="mt-2 font-medium text-gray-950 dark:text-white">{{ contactInfo }}</p>
+      </section>
     </div>
   </AppLayout>
 </template>
+
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'; import { useI18n } from 'vue-i18n'; import AppLayout from '@/components/layout/AppLayout.vue'; import { addTenantDomain, createPartnerWithdrawal, getPartnerDashboard, getPayoutAccount, getTenantControl, listPartnerWithdrawals, savePayoutAccount, updateTenantControl, type PartnerDashboard, type PayoutAccount, type TenantControl, type Withdrawal } from '@/api/financial'; import { useAppStore } from '@/stores/app'; import { extractApiErrorMessage } from '@/utils/apiError'
-const { t } = useI18n(); const app = useAppStore(); const partner = ref<PartnerDashboard>(); const tenant = ref<TenantControl>(); const withdrawAmount = ref(''); const domain = ref(''); const verificationToken = ref(''); const tenantForm = reactive({ site_name: '', site_logo: '', retail_multiplier: '1', payment_provider: '', payment_config: '', instance_config: '{}' })
-const payout = ref<PayoutAccount>(); const withdrawals = ref<Withdrawal[]>([]); const realName = ref(''); const alipay = ref('')
-const cny = (minor: number) => new Intl.NumberFormat(undefined, { style: 'currency', currency: 'CNY' }).format(minor / 100)
-const partnerStats = computed(() => partner.value ? [{ label: t('common.available'), value: cny(partner.value.available_cny_minor) }, { label: t('common.frozenBalance'), value: cny(partner.value.frozen_cny_minor) }, { label: t('finance.partner.withdrawing'), value: cny(partner.value.withdrawing_cny_minor) }, { label: t('common.total'), value: cny(partner.value.lifetime_earned_cny_minor) }] : [])
-async function load() { try { partner.value = await getPartnerDashboard(); withdrawals.value = await listPartnerWithdrawals(); payout.value = await getPayoutAccount().catch(() => undefined); tenant.value = await getTenantControl().catch(() => undefined); if (tenant.value) Object.assign(tenantForm, { site_name: tenant.value.tenant.site_name, site_logo: tenant.value.tenant.site_logo, retail_multiplier: tenant.value.retail_multiplier, payment_provider: tenant.value.payment_provider, payment_config: '', instance_config: tenant.value.instance_config }) } catch (e) { app.showError(extractApiErrorMessage(e)) } }
-async function withdraw() { try { await createPartnerWithdrawal(Math.round(Number(withdrawAmount.value) * 100)); withdrawAmount.value = ''; await load() } catch (e) { app.showError(extractApiErrorMessage(e)) } }
-async function saveAccount() { try { payout.value = await savePayoutAccount(alipay.value, realName.value); alipay.value = ''; realName.value = ''; app.showSuccess(t('common.saved')) } catch (e) { app.showError(extractApiErrorMessage(e)) } }
-async function saveTenant() { try { tenant.value = await updateTenantControl(tenantForm); tenantForm.payment_config = ''; app.showSuccess(t('common.saved')) } catch (e) { app.showError(extractApiErrorMessage(e)) } }
-async function bindDomain() { try { verificationToken.value = (await addTenantDomain(domain.value)).verification_token; domain.value = '' } catch (e) { app.showError(extractApiErrorMessage(e)) } }
-onMounted(load)
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+import AppLayout from '@/components/layout/AppLayout.vue'
+import { useAppStore } from '@/stores/app'
+
+const { t } = useI18n()
+const appStore = useAppStore()
+
+const valueProps = computed(() => [
+  t('finance.partner.value1'),
+  t('finance.partner.value2'),
+  t('finance.partner.value3'),
+])
+const contactInfo = computed(() => appStore.cachedPublicSettings?.contact_info || '')
 </script>

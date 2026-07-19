@@ -56,7 +56,24 @@ const activeTab = ref('overview'); const dashboard = ref<DistributionDashboard>(
 const tabs = computed(() => [{ id: 'overview', label: t('finance.distribution.overview') }, { id: 'team', label: t('finance.distribution.team') }, { id: 'ledger', label: t('finance.distribution.ledger') }, { id: 'withdraw', label: t('finance.distribution.withdraw') }])
 const stats = computed(() => dashboard.value ? [{ label: t('finance.distribution.teamVolume'), value: cny(dashboard.value.team_volume_cny_minor) }, { label: t('finance.distribution.currentTier'), value: `T${dashboard.value.current_tier}` }, { label: t('common.available'), value: cny(dashboard.value.available_cny_minor) }, { label: t('common.frozenBalance'), value: cny(dashboard.value.frozen_cny_minor) }, ...(dashboard.value.debt_cny_minor > 0 ? [{ label: t('finance.distribution.debt'), value: cny(dashboard.value.debt_cny_minor) }] : [])] : [])
 function cny(minor: number) { return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'CNY' }).format(minor / 100) }
-async function load() { try { dashboard.value = await getDistributionDashboard(); ledger.value = (await getDistributionLedger()).items; withdrawals.value = (await listWithdrawals()).items; payout.value = await getPayoutAccount().catch(() => undefined); await loadTeam() } catch (e) { app.showError(extractApiErrorMessage(e)) } }
+async function load() {
+  try {
+    dashboard.value = await getDistributionDashboard()
+  } catch (e) {
+    app.showError(extractApiErrorMessage(e))
+    return
+  }
+
+  const [ledgerResult, withdrawalsResult, payoutResult] = await Promise.allSettled([
+    getDistributionLedger(),
+    listWithdrawals(),
+    getPayoutAccount(),
+  ])
+  if (ledgerResult.status === 'fulfilled') ledger.value = ledgerResult.value.items
+  if (withdrawalsResult.status === 'fulfilled') withdrawals.value = withdrawalsResult.value.items
+  if (payoutResult.status === 'fulfilled') payout.value = payoutResult.value
+  await loadTeam()
+}
 async function loadTeam(parent?: number) { try { team.value = (await getDistributionTree(parent, search.value)).items; await renderGraph(parent) } catch (e) { app.showError(extractApiErrorMessage(e)) } }
 async function expandNode(node: TeamNode) { if (node.direct_children) await loadTeam(node.user_id) }
 async function renderGraph(parent?: number) { await nextTick(); if (!graphContainer.value) return; graph?.destroy?.(); const G6: any = await import('@antv/g6'); const root = String(parent || auth.user?.id || 'me'); const nodes = [{ id: root, style: { labelText: parent ? `#${parent}` : t('finance.distribution.me') } }, ...team.value.map(node => ({ id: String(node.user_id), style: { labelText: node.username || node.email_masked } }))]; const edges = team.value.map(node => ({ source: root, target: String(node.user_id) })); graph = new G6.Graph({ container: graphContainer.value, data: { nodes, edges }, autoFit: 'view', layout: { type: 'dagre', rankdir: 'LR' }, behaviors: ['drag-canvas', 'zoom-canvas', 'drag-element'], node: { style: { size: 36, fill: '#ffffff', stroke: '#10b981', lineWidth: 2, labelPlacement: 'bottom' } }, edge: { style: { stroke: '#94a3b8' } } }); await graph.render() }

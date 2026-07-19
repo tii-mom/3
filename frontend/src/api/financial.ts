@@ -2,6 +2,25 @@ import { apiClient } from './client'
 
 export interface Paginated<T> { items: T[]; total: number; page: number; page_size: number; pages: number }
 export interface Voucher { id: number; issuer_user_id: number; redeemer_user_id?: number; code_last4: string; face_value: string; fee_amount: string; fee_rate_bps: number; status: string; expires_at: string; created_at: string; code?: string }
+export interface VoucherAvailability {
+  enabled: boolean
+  credit_buckets_enforced: boolean
+  transferable_credit: string
+  non_transferable_credit: string
+  debt: string
+  fee_bps: number
+  minimum_usd: string
+  maximum_usd: string
+  daily_maximum_usd: string
+  daily_used_usd: string
+  daily_remaining_usd: string
+  daily_count: number
+  daily_used_count: number
+  daily_remaining_count: number
+  expiry_days: number
+  step_up_minimum_usd: string
+  maximum_face_value_usd: string
+}
 export interface DistributionTier { tier: number; threshold_cny_minor: number; rates_bps: [number, number, number, number, number] }
 export interface DistributionDashboard { enabled: boolean; team_volume_cny_minor: number; current_tier: number; next_threshold_cny_minor: number; level_counts: Record<number, number>; available_cny_minor: number; frozen_cny_minor: number; withdrawing_cny_minor: number; debt_cny_minor: number; lifetime_earned_cny_minor: number; tiers: DistributionTier[] }
 export interface TeamNode { user_id: number; parent_user_id: number; email_masked: string; username: string; direct_children: number; team_volume_cny_minor: number; current_tier: number }
@@ -14,6 +33,7 @@ export interface TenantControl { tenant: { id: number; name: string; site_name: 
 export async function createVoucher(amount: string, totpCode = ''): Promise<Voucher> { return (await apiClient.post<Voucher>('/user/vouchers', { amount, totp_code: totpCode })).data }
 export async function listVouchers(page = 1): Promise<Paginated<Voucher>> { return (await apiClient.get<Paginated<Voucher>>('/user/vouchers', { params: { page } })).data }
 export async function cancelVoucher(id: number): Promise<Voucher> { return (await apiClient.post<Voucher>(`/user/vouchers/${id}/cancel`)).data }
+export async function getVoucherAvailability(): Promise<VoucherAvailability> { return (await apiClient.get<VoucherAvailability>('/user/vouchers/availability')).data }
 export async function getDistributionDashboard(): Promise<DistributionDashboard> { return (await apiClient.get<DistributionDashboard>('/distribution/dashboard')).data }
 export async function getDistributionTree(parentUserId?: number, search = '', page = 1): Promise<Paginated<TeamNode>> { return (await apiClient.get<Paginated<TeamNode>>('/distribution/tree', { params: { parent_user_id: parentUserId, search, page } })).data }
 export async function getDistributionLedger(page = 1): Promise<Paginated<Commission>> { return (await apiClient.get<Paginated<Commission>>('/distribution/ledger', { params: { page } })).data }
