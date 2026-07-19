@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/base32"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -24,6 +23,7 @@ var (
 	ErrSaaSDomainInvalid     = infraerrors.BadRequest("SAAS_DOMAIN_INVALID", "invalid tenant domain")
 	ErrSaaSDomainNotVerified = infraerrors.Conflict("SAAS_DOMAIN_NOT_VERIFIED", "domain ownership verification failed")
 	ErrSaaSCoreUserRequired  = infraerrors.BadRequest("SAAS_CORE_USER_REQUIRED", "core user is required for wholesale access")
+	ErrSaaSTenantSlugExists  = infraerrors.Conflict("SAAS_TENANT_SLUG_EXISTS", "SaaS tenant slug is already in use")
 )
 
 type SaaSService struct {
@@ -152,30 +152,7 @@ func (s *SaaSService) CreateTenant(ctx context.Context, input CreateSaaSTenantIn
 	if input.CoreUserID <= 0 {
 		return nil, ErrSaaSCoreUserRequired
 	}
-	apiKey, err := randomPrefixedSecret("sk-wholesale-", 24)
-	if err != nil {
-		return nil, err
-	}
-	databasePassword, err := randomPrefixedSecret("db-", 24)
-	if err != nil {
-		return nil, err
-	}
-	if s.encryptor == nil {
-		return nil, infraerrors.ServiceUnavailable("PROVISIONING_ENCRYPTION_UNAVAILABLE", "provisioning encryption is unavailable")
-	}
-	encryptedDatabasePassword, err := s.encryptor.Encrypt(databasePassword)
-	if err != nil {
-		return nil, err
-	}
-	desiredConfig, err := json.Marshal(map[string]any{
-		"isolation": "dedicated_instance", "instance_name": "3api-" + input.Slug,
-		"database_schema":             "tenant_" + strings.ReplaceAll(input.Slug, "-", "_"),
-		"database_password_encrypted": encryptedDatabasePassword,
-		"redis_namespace":             "tenant:" + input.Slug, "object_prefix": "tenants/" + input.Slug,
-		"log_label": "tenant=" + input.Slug,
-		"docker":    map[string]any{"memory": "512m", "cpus": 1},
-		"caddy":     map[string]any{"tls": "dns_verified_only"},
-	})
+	prepared, err := s.prepareSaaSTenantProvisioning(input.Slug)
 	if err != nil {
 		return nil, err
 	}
@@ -184,6 +161,12 @@ func (s *SaaSService) CreateTenant(ctx context.Context, input CreateSaaSTenantIn
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1)`, input.CoreUserID); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, input.Slug); err != nil {
+		return nil, err
+	}
 	var exists bool
 	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL)`, input.CoreUserID).Scan(&exists); err != nil {
 		return nil, err
@@ -191,43 +174,35 @@ func (s *SaaSService) CreateTenant(ctx context.Context, input CreateSaaSTenantIn
 	if !exists {
 		return nil, ErrSaaSCoreUserRequired
 	}
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM saas_tenants WHERE core_user_id = $1 AND id <> 1)`, input.CoreUserID).Scan(&exists); err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, ErrSaaSAlreadyTenant
+	}
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM saas_tenants WHERE slug = $1)`, input.Slug).Scan(&exists); err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, ErrSaaSTenantSlugExists
+	}
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM saas_tenant_applications WHERE user_id = $1)`, input.CoreUserID).Scan(&exists); err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, ErrSaaSApplicationApprovalRequired
+	}
 	if input.SiteName == "" {
 		input.SiteName = input.Name
 	}
-	var tenant SaaSTenant
-	err = tx.QueryRowContext(ctx, `
-INSERT INTO saas_tenants (slug, name, status, site_name, site_logo, core_user_id)
-VALUES ($1, $2, 'active', $3, $4, $5)
-RETURNING id, slug, name, status, site_name, site_logo, COALESCE(primary_domain, ''), core_user_id, created_at`, input.Slug, input.Name, input.SiteName, input.SiteLogo, input.CoreUserID).Scan(&tenant.ID, &tenant.Slug, &tenant.Name, &tenant.Status, &tenant.SiteName, &tenant.SiteLogo, &tenant.PrimaryDomain, &tenant.CoreUserID, &tenant.CreatedAt)
+	tenant, err := s.provisionTenantTx(ctx, tx, input, prepared)
 	if err != nil {
-		return nil, err
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO saas_wholesale_wallets (tenant_id) VALUES ($1)`, tenant.ID); err != nil {
-		return nil, err
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO saas_tenant_configs (tenant_id) VALUES ($1)`, tenant.ID); err != nil {
-		return nil, err
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO api_keys (user_id, key, name, status, key_type, tenant_id, created_at, updated_at) VALUES ($1, $2, $3, 'active', 'tenant_wholesale', $4, NOW(), NOW())`, input.CoreUserID, apiKey, "Wholesale / "+input.Name, tenant.ID); err != nil {
-		return nil, err
-	}
-	if referral := strings.ToUpper(strings.TrimSpace(input.ReferralCode)); referral != "" {
-		_, err = tx.ExecContext(ctx, `
-INSERT INTO saas_partner_referrals (referrer_user_id, referred_tenant_id, referral_code, commission_rate_bps, valid_until)
-SELECT user_id, $1, $2, 1000, NOW() + INTERVAL '12 months' FROM user_affiliates WHERE aff_code = $2
-ON CONFLICT (referred_tenant_id) DO NOTHING`, tenant.ID, referral)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO saas_provisioning_jobs (tenant_id, action, desired_config) VALUES ($1, 'provision', $2::jsonb)`, tenant.ID, string(desiredConfig)); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	tenant.WholesaleUSD = "0.00000000"
-	return &CreateSaaSTenantResult{Tenant: tenant, WholesaleKey: apiKey}, nil
+	return &CreateSaaSTenantResult{Tenant: *tenant, WholesaleKey: prepared.apiKey}, nil
 }
 
 func (s *SaaSService) TenantControl(ctx context.Context, ownerUserID int64) (*TenantControl, error) {

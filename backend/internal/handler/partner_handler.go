@@ -12,6 +12,55 @@ func NewPartnerHandler(saasService *service.SaaSService) *PartnerHandler {
 	return &PartnerHandler{service: saasService}
 }
 
+func (h *PartnerHandler) ApplicationOverview(c *gin.Context) {
+	userID, ok := authenticatedUserID(c)
+	if !ok {
+		return
+	}
+	item, err := h.service.ApplicationOverview(c.Request.Context(), userID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, item)
+}
+
+type submitSaaSApplicationRequest struct {
+	BrandName           string `json:"brand_name" binding:"required"`
+	ContactName         string `json:"contact_name" binding:"required"`
+	ContactChannel      string `json:"contact_channel" binding:"required"`
+	ContactValue        string `json:"contact_value" binding:"required"`
+	DesiredDomain       string `json:"desired_domain"`
+	ExpectedMonthlyUSD  string `json:"expected_monthly_usd"`
+	ExpectedUsers       int    `json:"expected_users"`
+	BusinessDescription string `json:"business_description"`
+	ReferralCode        string `json:"referral_code"`
+}
+
+func (h *PartnerHandler) SubmitApplication(c *gin.Context) {
+	userID, ok := authenticatedUserID(c)
+	if !ok {
+		return
+	}
+	var request submitSaaSApplicationRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	item, err := h.service.SubmitApplication(c.Request.Context(), userID, service.SubmitSaaSApplicationInput{
+		BrandName: request.BrandName, ContactName: request.ContactName,
+		ContactChannel: request.ContactChannel, ContactValue: request.ContactValue,
+		DesiredDomain: request.DesiredDomain, ExpectedMonthlyUSD: request.ExpectedMonthlyUSD,
+		ExpectedUsers: request.ExpectedUsers, BusinessDescription: request.BusinessDescription,
+		ReferralCode: request.ReferralCode,
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Created(c, item)
+}
+
 func (h *PartnerHandler) Dashboard(c *gin.Context) {
 	userID, ok := authenticatedUserID(c)
 	if !ok {
