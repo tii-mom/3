@@ -95,25 +95,28 @@
             </div>
           </div>
 
-          <div class="home-routing-console lg:col-span-5 reveal" aria-label="3API routing control preview">
-            <div class="home-console-head">
-              <div class="flex items-center gap-2"><span class="home-console-dot"></span><span>3API ROUTING CORE</span></div>
-              <span class="home-console-live">LIVE</span>
-            </div>
-            <div class="home-console-body">
-              <div class="home-console-request">
-                <span class="home-eyebrow">REQUEST</span>
-                <strong>responses.create</strong>
-                <div class="home-request-row"><span>model</span><code>gpt-5.6</code></div>
-                <div class="home-request-row"><span>stream</span><code>true</code></div>
-                <div class="home-request-row"><span>billing</span><code>token</code></div>
-                <span class="home-console-trace">trace_92fa18</span>
+          <!-- Concentric Double Bezel Terminal Wrapper -->
+          <div class="rounded-4xl p-1.5 bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200/50 dark:border-white/[0.05] shadow-glass shadow-primary-500/2 reveal lg:col-span-5 flex h-fit">
+            <div class="home-routing-console rounded-[calc(2rem-0.375rem)] bg-white dark:bg-dark-900 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] overflow-hidden w-full flex flex-col" aria-label="3API routing control preview">
+              <div class="home-console-head">
+                <div class="flex items-center gap-2"><span class="home-console-dot"></span><span>3API ROUTING CORE</span></div>
+                <span class="home-console-live">LIVE</span>
               </div>
-              <div class="home-console-routes">
-                <div class="home-route home-route-active"><span class="home-provider-mark">O</span><span>OpenAI 主路由</span><strong>684ms</strong></div>
-                <div class="home-route"><span class="home-provider-mark">A</span><span>Claude 备用路由</span><strong>ready</strong></div>
-                <div class="home-route"><span class="home-provider-mark">G</span><span>Gemini 直连路由</span><strong>ready</strong></div>
-                <router-link class="home-route" :to="isAuthenticated ? '/distribution' : '/login'"><Icon name="users" /><span>算力公司网络</span><strong>5 层</strong></router-link>
+              <div class="home-console-body">
+                <div class="home-console-request">
+                  <span class="home-eyebrow">REQUEST</span>
+                  <strong>responses.create</strong>
+                  <div class="home-request-row"><span>model</span><code>gpt-5.6</code></div>
+                  <div class="home-request-row"><span>stream</span><code>true</code></div>
+                  <div class="home-request-row"><span>billing</span><code>token</code></div>
+                  <span class="home-console-trace">trace_92fa18</span>
+                </div>
+                <div class="home-console-routes">
+                  <div class="home-route home-route-active"><span class="home-provider-mark">O</span><span>OpenAI 主路由</span><strong>684ms</strong></div>
+                  <div class="home-route"><span class="home-provider-mark">A</span><span>Claude 备用路由</span><strong>ready</strong></div>
+                  <div class="home-route"><span class="home-provider-mark">G</span><span>Gemini 直连路由</span><strong>ready</strong></div>
+                  <router-link class="home-route" :to="isAuthenticated ? '/distribution' : '/login'"><Icon name="users" /><span>算力公司网络</span><strong>5 层</strong></router-link>
+                </div>
               </div>
             </div>
           </div>
@@ -928,11 +931,10 @@ onUnmounted(() => {
 .home-routing-console {
   overflow: hidden;
   min-height: 26rem;
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  border-radius: 9px;
-  background: #202326;
-  color: #f4f1ea;
-  box-shadow: 0 28px 70px rgba(22, 24, 26, 0.22);
+  border: 1px solid var(--home-line);
+  background: var(--home-surface);
+  color: var(--home-ink);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.04);
 }
 
 .home-routing-console::before {
@@ -952,23 +954,22 @@ onUnmounted(() => {
   align-items: center;
   gap: 1rem;
   padding: 1rem 1.15rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  color: rgba(244, 241, 234, 0.65);
+  border-bottom: 1px solid var(--home-line);
+  color: var(--home-muted);
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-size: 0.7rem;
-  letter-spacing: 0.05em;
 }
 
 .home-console-dot {
   width: 0.45rem;
   height: 0.45rem;
   border-radius: 999px;
-  background: #6ad49d;
-  box-shadow: 0 0 0 3px rgba(106, 212, 157, 0.1);
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
 }
 
 .home-console-live {
-  color: #6ad49d;
+  color: #10b981;
 }
 
 .home-console-body {
@@ -985,7 +986,7 @@ onUnmounted(() => {
   display: grid;
   align-content: space-between;
   gap: 0.8rem;
-  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  border-right: 1px solid var(--home-line);
 }
 
 .home-console-request strong {
@@ -998,18 +999,20 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 0.65rem;
   padding-block: 0.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  color: rgba(244, 241, 234, 0.62);
+  border-bottom: 1px solid var(--home-line);
+  color: var(--home-muted);
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-size: 0.75rem;
 }
 
 .home-request-row code {
-  color: #f5b48d;
+  color: var(--home-brand);
+  font-weight: 600;
 }
 
 .home-console-trace {
-  color: rgba(244, 241, 234, 0.43);
+  color: var(--home-muted);
+  opacity: 0.6;
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-size: 0.7rem;
 }
@@ -1027,30 +1030,30 @@ onUnmounted(() => {
   gap: 0.65rem;
   min-height: 2.9rem;
   padding: 0.6rem 0.65rem;
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  border-radius: 5px;
-  color: rgba(244, 241, 234, 0.78);
+  border: 1px solid var(--home-line);
+  border-radius: 6px;
+  color: var(--home-ink);
   font-size: 0.78rem;
   text-decoration: none;
   transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
 }
 
 .home-route:hover {
-  border-color: rgba(226, 106, 53, 0.65);
-  background: rgba(226, 106, 53, 0.09);
+  border-color: var(--home-brand);
+  background: var(--home-soft);
   transform: translateY(-1px);
 }
 
 .home-route strong {
-  color: #f2b18b;
+  color: var(--home-brand);
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-size: 0.7rem;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .home-route-active {
   border-color: var(--home-brand);
-  background: rgba(216, 90, 40, 0.12);
+  background: var(--home-soft);
 }
 
 .home-provider-mark {
