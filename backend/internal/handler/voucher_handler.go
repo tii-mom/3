@@ -56,6 +56,20 @@ func (h *VoucherHandler) List(c *gin.Context) {
 	response.Paginated(c, items, total, page, pageSize)
 }
 
+func (h *VoucherHandler) Availability(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+	availability, err := h.service.Availability(c.Request.Context(), subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, availability)
+}
+
 func (h *VoucherHandler) Cancel(c *gin.Context) {
 	subject, ok := middleware2.GetAuthSubjectFromContext(c)
 	if !ok {

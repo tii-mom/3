@@ -117,6 +117,7 @@ func RegisterUserRoutes(
 		{
 			vouchers.POST("", h.Voucher.Create)
 			vouchers.GET("", h.Voucher.List)
+			vouchers.GET("/availability", h.Voucher.Availability)
 			vouchers.POST("/:id/cancel", h.Voucher.Cancel)
 		}
 
