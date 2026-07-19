@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
@@ -457,14 +458,57 @@ func (h *GroupHandler) GetStats(c *gin.Context) {
 		return
 	}
 
-	// Return mock data for now
+	if _, err := h.adminService.GetGroup(c.Request.Context(), groupID); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	const pageSize = 1000
+	var totalAPIKeys int64
+	var activeAPIKeys int64
+	for page := 1; ; page++ {
+		keys, total, err := h.adminService.GetGroupAPIKeys(c.Request.Context(), groupID, page, pageSize)
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+		if page == 1 {
+			totalAPIKeys = total
+		}
+		for i := range keys {
+			if keys[i].Status == service.StatusActive {
+				activeAPIKeys++
+			}
+		}
+		if len(keys) == 0 || int64(page*pageSize) >= totalAPIKeys {
+			break
+		}
+	}
+
+	var totalRequests int64
+	var totalCost float64
+	if h.dashboardService != nil {
+		stats, err := h.dashboardService.GetGroupStatsWithFilters(
+			c.Request.Context(), time.Unix(0, 0), time.Now(), 0, 0, 0, groupID, nil, nil, nil,
+		)
+		if err != nil {
+			response.Error(c, 500, "Failed to get group usage statistics")
+			return
+		}
+		for i := range stats {
+			if stats[i].GroupID == groupID {
+				totalRequests += stats[i].Requests
+				totalCost += stats[i].Cost
+			}
+		}
+	}
+
 	response.Success(c, gin.H{
-		"total_api_keys":  0,
-		"active_api_keys": 0,
-		"total_requests":  0,
-		"total_cost":      0.0,
+		"total_api_keys":  totalAPIKeys,
+		"active_api_keys": activeAPIKeys,
+		"total_requests":  totalRequests,
+		"total_cost":      totalCost,
 	})
-	_ = groupID // TODO: implement actual stats
 }
 
 // GetUsageSummary returns today's and cumulative cost for all groups.

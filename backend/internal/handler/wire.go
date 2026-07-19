@@ -41,6 +41,9 @@ func ProvideAdminHandlers(
 	paymentHandler *admin.PaymentHandler,
 	affiliateHandler *admin.AffiliateHandler,
 	complianceHandler *admin.ComplianceHandler,
+	distributionHandler *admin.DistributionHandler,
+	saasHandler *admin.SaaSHandler,
+	voucherHandler *admin.VoucherHandler,
 ) *AdminHandlers {
 	return &AdminHandlers{
 		Dashboard:              dashboardHandler,
@@ -75,6 +78,9 @@ func ProvideAdminHandlers(
 		Payment:                paymentHandler,
 		Affiliate:              affiliateHandler,
 		Compliance:             complianceHandler,
+		Distribution:           distributionHandler,
+		SaaS:                   saasHandler,
+		Voucher:                voucherHandler,
 	}
 }
 
@@ -104,6 +110,9 @@ func ProvideHandlers(
 	apiKeyHandler *APIKeyHandler,
 	usageHandler *UsageHandler,
 	redeemHandler *RedeemHandler,
+	voucherHandler *VoucherHandler,
+	distributionHandler *DistributionHandler,
+	partnerHandler *PartnerHandler,
 	subscriptionHandler *SubscriptionHandler,
 	announcementHandler *AnnouncementHandler,
 	channelMonitorUserHandler *ChannelMonitorUserHandler,
@@ -125,6 +134,9 @@ func ProvideHandlers(
 		APIKey:           apiKeyHandler,
 		Usage:            usageHandler,
 		Redeem:           redeemHandler,
+		Voucher:          voucherHandler,
+		Distribution:     distributionHandler,
+		Partner:          partnerHandler,
 		Subscription:     subscriptionHandler,
 		Announcement:     announcementHandler,
 		ChannelMonitor:   channelMonitorUserHandler,
@@ -148,6 +160,9 @@ var ProviderSet = wire.NewSet(
 	NewAPIKeyHandler,
 	NewUsageHandler,
 	NewRedeemHandler,
+	NewVoucherHandler,
+	NewDistributionHandler,
+	NewPartnerHandler,
 	NewSubscriptionHandler,
 	NewAnnouncementHandler,
 	NewChannelMonitorUserHandler,
@@ -193,6 +208,9 @@ var ProviderSet = wire.NewSet(
 	admin.NewPaymentHandler,
 	admin.NewAffiliateHandler,
 	admin.NewComplianceHandler,
+	admin.NewDistributionHandler,
+	admin.NewSaaSHandler,
+	admin.NewVoucherHandler,
 
 	// AdminHandlers and Handlers constructors
 	ProvideAdminHandlers,

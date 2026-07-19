@@ -132,6 +132,9 @@ deploy/docker-compose.override.yml
 .gocache/
 vite.config.js
 docs/*
+!docs/FINANCIAL_DISTRIBUTION_SAAS_ROLLOUT_CN.md
+!docs/FINANCIAL_DISTRIBUTION_SAAS_CHANGESET_CN.md
+!docs/SAAS_PILOT_ROLLOUT_CHECKLIST_CN.md
 !docs/PAYMENT.md
 !docs/PAYMENT_CN.md
 !docs/ADMIN_PAYMENT_INTEGRATION_API.md
@@ -139,7 +142,9 @@ docs/*
 !docs/legal/*.md
 .serena/
 .codex/
+.playwright-cli/
 frontend/coverage/
+frontend/audit.json
 aicodex
 output/
 .wrangler/

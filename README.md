@@ -203,13 +203,18 @@ Community projects that extend or integrate with Sub2API:
 
 ## Nginx Reverse Proxy Note
 
-When using Nginx as a reverse proxy for Sub2API (or CRS) with Codex CLI, add the following to the `http` block in your Nginx configuration:
+When using Nginx as a reverse proxy for Sub2API (or CRS) with Codex CLI, add the following to your Nginx configuration:
 
 ```nginx
+# http or server: keep underscore headers (sticky sessions)
 underscores_in_headers on;
+
+# server: Codex /responses bodies exceed the default 1m without this → 413
+client_max_body_size 256m;
 ```
 
-Nginx drops headers containing underscores by default (e.g. `session_id`), which breaks sticky session routing in multi-account setups.
+- Nginx drops headers containing underscores by default (e.g. `session_id`), which breaks sticky session routing in multi-account setups.
+- Without `client_max_body_size`, long Codex sessions often get `413 Request Entity Too Large` (nginx HTML body). See `deploy/nginx-sub2api.conf` and `docs/GO_LIVE.md`.
 
 ---
 

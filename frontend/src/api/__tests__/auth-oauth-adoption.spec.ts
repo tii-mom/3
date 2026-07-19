@@ -13,6 +13,7 @@ describe('oauth adoption auth api', () => {
     post.mockReset()
     post.mockResolvedValue({ data: {} })
     localStorage.clear()
+    sessionStorage.clear()
     document.cookie = 'oauth_bind_access_token=; Max-Age=0; path=/'
   })
 
@@ -214,7 +215,8 @@ describe('oauth adoption auth api', () => {
   })
 
   it('requests an HttpOnly oauth bind cookie before redirect binding', async () => {
-    localStorage.setItem('auth_token', 'access-token-value')
+    const { setSessionAccessToken } = await import('@/api/authSession')
+    setSessionAccessToken('access-token-value')
     const { prepareOAuthBindAccessTokenCookie } = await import('@/api/auth')
 
     await prepareOAuthBindAccessTokenCookie()

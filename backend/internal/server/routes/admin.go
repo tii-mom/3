@@ -22,6 +22,9 @@ func RegisterAdminRoutes(
 	{
 		// 部署与运营合规确认
 		registerAdminComplianceRoutes(admin, h)
+		registerAdminDistributionRoutes(admin, h)
+		registerAdminSaaSRoutes(admin, h)
+		registerAdminVoucherRoutes(admin, h)
 
 		// 仪表盘
 		registerDashboardRoutes(admin, h)
@@ -106,6 +109,58 @@ func RegisterAdminRoutes(
 
 		// 邀请返利（专属用户管理）
 		registerAffiliateRoutes(admin, h)
+	}
+}
+
+func registerAdminVoucherRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	vouchers := admin.Group("/vouchers")
+	{
+		vouchers.GET("/config", h.Admin.Voucher.GetConfig)
+		vouchers.PUT("/config", h.Admin.Voucher.UpdateConfig)
+		vouchers.GET("", h.Admin.Voucher.List)
+		vouchers.POST("/:id/risk-lock", h.Admin.Voucher.SetRiskLock)
+	}
+}
+
+func registerAdminSaaSRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	saas := admin.Group("/saas")
+	{
+		saas.GET("/config", h.Admin.SaaS.GetConfig)
+		saas.PUT("/config", h.Admin.SaaS.UpdateConfig)
+		saas.GET("/tenants", h.Admin.SaaS.ListTenants)
+		saas.POST("/tenants", h.Admin.SaaS.CreateTenant)
+		saas.POST("/tenants/:id/wholesale-funds", h.Admin.SaaS.FundWholesale)
+		saas.POST("/tenants/:id/domains", h.Admin.SaaS.AddDomain)
+		saas.PUT("/tenants/:id/resource-pool", h.Admin.SaaS.AssignResourcePool)
+		saas.POST("/domains/:domain_id/verify", h.Admin.SaaS.VerifyDomain)
+		saas.GET("/domains", h.Admin.SaaS.ListDomains)
+		saas.GET("/plans", h.Admin.SaaS.ListPlans)
+		saas.POST("/plans", h.Admin.SaaS.CreatePlan)
+		saas.GET("/subscriptions", h.Admin.SaaS.ListSubscriptions)
+		saas.POST("/subscriptions/paid", h.Admin.SaaS.RecordPaidSubscription)
+		saas.GET("/resource-pools", h.Admin.SaaS.ListResourceAllocations)
+		saas.GET("/partner-withdrawals", h.Admin.SaaS.ListPartnerWithdrawals)
+		saas.POST("/partner-withdrawals/:id/transition", h.Admin.SaaS.TransitionPartnerWithdrawal)
+		saas.POST("/partner-withdrawals/:id/payout-details", h.Admin.SaaS.PartnerPayoutDetails)
+		saas.GET("/provisioning-jobs", h.Admin.SaaS.ListProvisioningJobs)
+	}
+}
+
+func registerAdminDistributionRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	distribution := admin.Group("/distribution")
+	{
+		distribution.GET("/financial-runtime", h.Admin.Distribution.GetFinancialRuntimeConfig)
+		distribution.PUT("/financial-runtime", h.Admin.Distribution.UpdateFinancialRuntimeConfig)
+		distribution.GET("/config", h.Admin.Distribution.GetConfig)
+		distribution.PUT("/config", h.Admin.Distribution.UpdateConfig)
+		distribution.POST("/config/versions", h.Admin.Distribution.CreatePolicyVersion)
+		distribution.GET("/withdrawals", h.Admin.Distribution.ListWithdrawals)
+		distribution.GET("/commissions", h.Admin.Distribution.ListCommissions)
+		distribution.GET("/recharge-events", h.Admin.Distribution.ListRechargeEvents)
+		distribution.POST("/recharge-events/:id/reverse", h.Admin.Distribution.ReverseRecharge)
+		distribution.GET("/relations", h.Admin.Distribution.ListRelations)
+		distribution.POST("/withdrawals/:id/transition", h.Admin.Distribution.TransitionWithdrawal)
+		distribution.POST("/withdrawals/:id/payout-details", h.Admin.Distribution.PayoutDetails)
 	}
 }
 

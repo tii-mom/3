@@ -11,6 +11,7 @@ import (
 
 var ErrUsageBillingRequestIDRequired = errors.New("usage billing request_id is required")
 var ErrUsageBillingRequestConflict = errors.New("usage billing request fingerprint conflict")
+var ErrTenantWholesaleBalanceInsufficient = errors.New("tenant wholesale balance insufficient")
 
 // UsageBillingCommand describes one billable request that must be applied at most once.
 type UsageBillingCommand struct {
@@ -20,6 +21,7 @@ type UsageBillingCommand struct {
 	RequestPayloadHash string
 
 	UserID              int64
+	WholesaleTenantID   *int64
 	AccountID           int64
 	SubscriptionID      *int64
 	AccountType         string
@@ -35,6 +37,7 @@ type UsageBillingCommand struct {
 	MediaType           string
 
 	BalanceCost         float64
+	WholesaleCost       float64
 	SubscriptionCost    float64
 	APIKeyQuotaCost     float64
 	APIKeyRateLimitCost float64
@@ -56,10 +59,11 @@ func buildUsageBillingFingerprint(c *UsageBillingCommand) string {
 		return ""
 	}
 	raw := fmt.Sprintf(
-		"%d|%d|%d|%s|%s|%s|%s|%d|%d|%d|%d|%d|%d|%s|%d|%0.10f|%0.10f|%0.10f|%0.10f|%0.10f",
+		"%d|%d|%d|%d|%s|%s|%s|%s|%d|%d|%d|%d|%d|%d|%s|%d|%0.10f|%0.10f|%0.10f|%0.10f|%0.10f|%0.10f",
 		c.UserID,
 		c.AccountID,
 		c.APIKeyID,
+		valueOrZero(c.WholesaleTenantID),
 		strings.TrimSpace(c.AccountType),
 		strings.TrimSpace(c.Model),
 		strings.TrimSpace(c.ServiceTier),
@@ -73,6 +77,7 @@ func buildUsageBillingFingerprint(c *UsageBillingCommand) string {
 		strings.TrimSpace(c.MediaType),
 		valueOrZero(c.SubscriptionID),
 		c.BalanceCost,
+		c.WholesaleCost,
 		c.SubscriptionCost,
 		c.APIKeyQuotaCost,
 		c.APIKeyRateLimitCost,
@@ -114,7 +119,8 @@ type AccountQuotaState struct {
 type UsageBillingApplyResult struct {
 	Applied              bool
 	APIKeyQuotaExhausted bool
-	NewBalance           *float64           // post-deduction balance (nil = no balance deduction)
+	NewBalance           *float64 // post-deduction balance (nil = no balance deduction)
+	NewWholesaleBalance  *float64
 	BalanceOverdrafted   bool               // true when the sufficient-balance guard missed and debt was still recorded
 	QuotaState           *AccountQuotaState // post-increment quota state (nil = no quota increment)
 }

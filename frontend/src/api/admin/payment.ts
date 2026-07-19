@@ -53,14 +53,6 @@ export interface UpdatePaymentConfigRequest {
   help_text?: string
 }
 
-export interface RefundResult {
-  success: boolean
-  warning?: string
-  require_force?: boolean
-  balance_deducted?: number
-  subscription_days_deducted?: number
-}
-
 export const adminPaymentAPI = {
   // ==================== Config ====================
 
@@ -113,16 +105,6 @@ export const adminPaymentAPI = {
   /** Retry recharge for a failed order */
   retryRecharge(id: number) {
     return apiClient.post(`/admin/payment/orders/${id}/retry`)
-  },
-
-  /** Process a refund */
-  refundOrder(id: number, data: { amount: number; reason: string; deduct_balance?: boolean; force?: boolean }) {
-    return apiClient.post<RefundResult>(`/admin/payment/orders/${id}/refund`, data)
-  },
-
-  /** Query and finalize a pending refund */
-  queryRefund(id: number) {
-    return apiClient.post<RefundResult>(`/admin/payment/orders/${id}/refund/query`)
   },
 
   // ==================== Channels ====================

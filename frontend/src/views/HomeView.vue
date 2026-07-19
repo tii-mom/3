@@ -4,12 +4,14 @@
     <div v-if="homeContent" class="fixed inset-0 z-50 bg-dark-950">
       <iframe 
         v-if="isHomeContentUrl" 
-        :src="homeContent.trim()" 
+        :src="homeContentUrl"
+        sandbox="allow-scripts allow-forms allow-popups"
+        referrerpolicy="no-referrer"
         class="w-full h-full border-0"
       ></iframe>
       <div 
         v-else 
-        v-html="homeContent" 
+        v-html="sanitizedHomeContent"
         class="w-full h-full overflow-auto p-6"
       ></div>
     </div>
@@ -621,6 +623,7 @@ import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { sanitizeUrl } from '@/utils/url'
 import { useTheme } from '@/composables/useTheme'
+import DOMPurify from 'dompurify'
 
 const { t } = useI18n()
 
@@ -651,8 +654,19 @@ const homeContent = computed(() => appStore.cachedPublicSettings?.home_content |
 
 const isHomeContentUrl = computed(() => {
   const content = homeContent.value.trim()
-  return content.startsWith('http://') || content.startsWith('https://')
+  return content.startsWith('https://') || (!import.meta.env.PROD && content.startsWith('http://'))
 })
+
+const homeContentUrl = computed(() => {
+  if (!isHomeContentUrl.value) return ''
+  return sanitizeUrl(homeContent.value.trim())
+})
+
+const sanitizedHomeContent = computed(() => DOMPurify.sanitize(homeContent.value, {
+  USE_PROFILES: { html: true },
+  FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'link', 'meta'],
+  FORBID_ATTR: ['style', 'srcdoc']
+}))
 
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const isAdmin = computed(() => authStore.isAdmin)

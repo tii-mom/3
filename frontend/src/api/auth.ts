@@ -15,6 +15,15 @@ import type {
   TotpLoginResponse,
   TotpLogin2FARequest
 } from '@/types'
+import {
+  clearSessionAuth,
+  fetchBrowserCSRFToken,
+  getSessionAccessToken,
+  getSessionCSRFToken,
+  refreshBrowserSession,
+  setSessionAccessToken,
+  setSessionCSRFToken
+} from './authSession'
 
 /**
  * Login response type - can be either full auth or 2FA required
@@ -37,14 +46,15 @@ export function isTotp2FARequired(response: LoginResponse): response is TotpLogi
  * Store authentication token in localStorage
  */
 export function setAuthToken(token: string): void {
-  localStorage.setItem('auth_token', token)
+  setSessionAccessToken(token)
+  localStorage.removeItem('auth_token')
 }
 
 /**
  * Store refresh token in localStorage
  */
 export function setRefreshToken(token: string): void {
-  localStorage.setItem('refresh_token', token)
+  sessionStorage.setItem('refresh_token', token)
 }
 
 /**
@@ -53,28 +63,28 @@ export function setRefreshToken(token: string): void {
  */
 export function setTokenExpiresAt(expiresIn: number): void {
   const expiresAt = Date.now() + expiresIn * 1000
-  localStorage.setItem('token_expires_at', String(expiresAt))
+  sessionStorage.setItem('token_expires_at', String(expiresAt))
 }
 
 /**
  * Get authentication token from localStorage
  */
 export function getAuthToken(): string | null {
-  return localStorage.getItem('auth_token')
+  return getSessionAccessToken()
 }
 
 /**
  * Get refresh token from localStorage
  */
 export function getRefreshToken(): string | null {
-  return localStorage.getItem('refresh_token')
+  return sessionStorage.getItem('refresh_token') || localStorage.getItem('refresh_token')
 }
 
 /**
  * Get token expiration timestamp from localStorage
  */
 export function getTokenExpiresAt(): number | null {
-  const value = localStorage.getItem('token_expires_at')
+  const value = sessionStorage.getItem('token_expires_at') || localStorage.getItem('token_expires_at')
   return value ? parseInt(value, 10) : null
 }
 
@@ -86,6 +96,9 @@ export function clearAuthToken(): void {
   localStorage.removeItem('refresh_token')
   localStorage.removeItem('auth_user')
   localStorage.removeItem('token_expires_at')
+  sessionStorage.removeItem('refresh_token')
+  sessionStorage.removeItem('token_expires_at')
+  clearSessionAuth()
 }
 
 /**
@@ -105,6 +118,7 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
     if (data.expires_in) {
       setTokenExpiresAt(data.expires_in)
     }
+    setSessionCSRFToken(data.csrf_token || null)
     localStorage.setItem('auth_user', JSON.stringify(data.user))
   }
 
@@ -127,6 +141,7 @@ export async function login2FA(request: TotpLogin2FARequest): Promise<AuthRespon
   if (data.expires_in) {
     setTokenExpiresAt(data.expires_in)
   }
+  setSessionCSRFToken(data.csrf_token || null)
   localStorage.setItem('auth_user', JSON.stringify(data.user))
 
   return data
@@ -148,6 +163,7 @@ export async function register(userData: RegisterRequest): Promise<AuthResponse>
   if (data.expires_in) {
     setTokenExpiresAt(data.expires_in)
   }
+  setSessionCSRFToken(data.csrf_token || null)
   localStorage.setItem('auth_user', JSON.stringify(data.user))
 
   return data
@@ -168,14 +184,19 @@ export async function getCurrentUser() {
  */
 export async function logout(): Promise<void> {
   const refreshToken = getRefreshToken()
+  let csrfToken = getSessionCSRFToken()
 
-  // Try to revoke the refresh token on the server
-  if (refreshToken) {
+  try {
     try {
-      await apiClient.post('/auth/logout', { refresh_token: refreshToken })
+      csrfToken = await fetchBrowserCSRFToken()
     } catch {
-      // Ignore errors - we still want to clear local state
+      // Legacy sessions may have only a JSON refresh token and no cookie yet.
     }
+    await apiClient.post('/auth/logout', refreshToken ? { refresh_token: refreshToken } : {}, {
+      headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : undefined
+    })
+  } catch {
+    // Ignore errors - we still want to clear local state
   }
 
   clearAuthToken()
@@ -186,7 +207,8 @@ export async function logout(): Promise<void> {
  */
 export interface RefreshTokenResponse {
   access_token: string
-  refresh_token: string
+  refresh_token?: string
+  csrf_token?: string
   expires_in: number
   token_type: string
 }
@@ -196,6 +218,7 @@ export interface OAuthTokenResponse {
   refresh_token?: string
   expires_in?: number
   token_type?: string
+  csrf_token?: string
 }
 
 export interface PendingOAuthBindLoginResponse extends Partial<OAuthTokenResponse> {
@@ -284,6 +307,9 @@ export function persistOAuthTokenContext(tokens: Partial<OAuthTokenResponse>): v
   if (tokens.expires_in) {
     setTokenExpiresAt(tokens.expires_in)
   }
+  if (tokens.csrf_token) {
+    setSessionCSRFToken(tokens.csrf_token)
+  }
 }
 
 export async function prepareOAuthBindAccessTokenCookie(): Promise<void> {
@@ -298,21 +324,7 @@ export async function prepareOAuthBindAccessTokenCookie(): Promise<void> {
  * @returns New token pair
  */
 export async function refreshToken(): Promise<RefreshTokenResponse> {
-  const currentRefreshToken = getRefreshToken()
-  if (!currentRefreshToken) {
-    throw new Error('No refresh token available')
-  }
-
-  const { data } = await apiClient.post<RefreshTokenResponse>('/auth/refresh', {
-    refresh_token: currentRefreshToken
-  })
-
-  // Update tokens in localStorage
-  setAuthToken(data.access_token)
-  setRefreshToken(data.refresh_token)
-  setTokenExpiresAt(data.expires_in)
-
-  return data
+  return refreshBrowserSession()
 }
 
 /**

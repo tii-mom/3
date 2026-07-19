@@ -41,11 +41,17 @@ func (r *apiKeyRepository) activeQuery() *dbent.APIKeyQuery {
 }
 
 func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) error {
+	keyType := strings.TrimSpace(key.KeyType)
+	if keyType == "" {
+		keyType = "user"
+	}
 	builder := r.client.APIKey.Create().
 		SetUserID(key.UserID).
 		SetKey(key.Key).
 		SetName(key.Name).
 		SetStatus(key.Status).
+		SetKeyType(keyType).
+		SetNillableTenantID(key.TenantID).
 		SetNillableGroupID(key.GroupID).
 		SetNillableLastUsedAt(key.LastUsedAt).
 		SetQuota(key.Quota).
@@ -84,7 +90,11 @@ func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIK
 		}
 		return nil, err
 	}
-	return apiKeyEntityToService(m), nil
+	out := apiKeyEntityToService(m)
+	if err := r.populateWholesaleBalance(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // GetKeyAndOwnerID 根据 API Key ID 获取其 key 与所有者（用户）ID。
@@ -122,7 +132,31 @@ func (r *apiKeyRepository) GetByKey(ctx context.Context, key string) (*service.A
 		}
 		return nil, err
 	}
-	return apiKeyEntityToService(m), nil
+	out := apiKeyEntityToService(m)
+	if err := r.populateWholesaleBalance(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *apiKeyRepository) populateWholesaleBalance(ctx context.Context, key *service.APIKey) error {
+	if key == nil || key.KeyType != "tenant_wholesale" || key.TenantID == nil {
+		return nil
+	}
+	rows, err := r.sql.QueryContext(ctx, `
+SELECT COALESCE(w.balance_usd, 0)::double precision,
+       (t.status = 'active' AND COALESCE((SELECT value = 'true' FROM settings WHERE key = 'saas_control_plane_enabled'), FALSE))
+FROM saas_tenants t
+LEFT JOIN saas_wholesale_wallets w ON w.tenant_id = t.id
+WHERE t.id = $1`, *key.TenantID)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+	if rows.Next() {
+		return rows.Scan(&key.WholesaleBalance, &key.WholesaleEnabled)
+	}
+	return rows.Err()
 }
 
 func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*service.APIKey, error) {
@@ -134,6 +168,8 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 			apikey.FieldGroupID,
 			apikey.FieldName,
 			apikey.FieldStatus,
+			apikey.FieldKeyType,
+			apikey.FieldTenantID,
 			apikey.FieldIPWhitelist,
 			apikey.FieldIPBlacklist,
 			apikey.FieldQuota,
@@ -216,7 +252,11 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 		}
 		return nil, err
 	}
-	return apiKeyEntityToService(m), nil
+	out := apiKeyEntityToService(m)
+	if err := r.populateWholesaleBalance(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey) error {
@@ -842,6 +882,8 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 		Key:           m.Key,
 		Name:          m.Name,
 		Status:        m.Status,
+		KeyType:       m.KeyType,
+		TenantID:      m.TenantID,
 		IPWhitelist:   m.IPWhitelist,
 		IPBlacklist:   m.IPBlacklist,
 		LastUsedAt:    m.LastUsedAt,

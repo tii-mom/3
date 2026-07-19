@@ -2107,6 +2107,9 @@ func extractQuotaResetSeconds(err error) int {
 }
 
 func billingErrorDetails(err error) (status int, code, message string, retryAfter int) {
+	if errors.Is(err, service.ErrTenantWholesaleBalanceInsufficient) {
+		return http.StatusForbidden, "tenant_wholesale_balance_insufficient", "Tenant wholesale balance is insufficient", 0
+	}
 	if errors.Is(err, service.ErrBillingServiceUnavailable) {
 		msg := pkgerrors.Message(err)
 		if msg == "" {

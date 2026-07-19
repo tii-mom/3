@@ -108,6 +108,38 @@ func RegisterUserRoutes(
 			redeem.GET("/history", h.Redeem.GetHistory)
 		}
 
+		vouchers := authenticated.Group("/user/vouchers")
+		{
+			vouchers.POST("", h.Voucher.Create)
+			vouchers.GET("", h.Voucher.List)
+			vouchers.POST("/:id/cancel", h.Voucher.Cancel)
+		}
+
+		distribution := authenticated.Group("/distribution")
+		{
+			distribution.GET("/dashboard", h.Distribution.Dashboard)
+			distribution.GET("/tree", h.Distribution.Tree)
+			distribution.GET("/ledger", h.Distribution.Ledger)
+			distribution.GET("/payout-account", h.Distribution.GetPayoutAccount)
+			distribution.PUT("/payout-account", h.Distribution.SavePayoutAccount)
+			distribution.GET("/withdrawals", h.Distribution.ListWithdrawals)
+			distribution.POST("/withdrawals", h.Distribution.CreateWithdrawal)
+		}
+
+		partner := authenticated.Group("/saas/partner")
+		{
+			partner.GET("/dashboard", h.Partner.Dashboard)
+			partner.GET("/withdrawals", h.Partner.ListWithdrawals)
+			partner.POST("/withdrawals", h.Partner.CreateWithdrawal)
+		}
+
+		tenant := authenticated.Group("/saas/tenant")
+		{
+			tenant.GET("/config", h.Partner.TenantControl)
+			tenant.PUT("/config", h.Partner.UpdateTenantControl)
+			tenant.POST("/domains", h.Partner.AddTenantDomain)
+		}
+
 		// 用户订阅
 		subscriptions := authenticated.Group("/subscriptions")
 		{

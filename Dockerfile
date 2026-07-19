@@ -23,14 +23,14 @@ ARG NPM_CONFIG_REGISTRY
 
 WORKDIR /app/frontend
 
-# Install pnpm (pinned to v9 to match CI and keep builds reproducible)
-RUN corepack enable && corepack prepare pnpm@9 --activate
+# Install the same pnpm version used by CI and packageManager metadata.
+RUN corepack enable && corepack prepare pnpm@11.9.0 --activate
 
 # Install dependencies first (better caching)
-COPY frontend/package.json frontend/pnpm-lock.yaml ./
+COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=sub2api-pnpm-store,target=/root/.local/share/pnpm/store \
     if [ -n "${NPM_CONFIG_REGISTRY}" ]; then pnpm config set registry "${NPM_CONFIG_REGISTRY}"; fi && \
-    pnpm install --no-frozen-lockfile --prefer-offline
+    pnpm install --frozen-lockfile --prefer-offline
 
 # Copy frontend source and build.
 # LegalDocumentView.vue (admin-compliance gate) build-time imports
@@ -39,9 +39,10 @@ RUN --mount=type=cache,id=sub2api-pnpm-store,target=/root/.local/share/pnpm/stor
 # Copy only that subtree to keep the build dependency minimal.
 COPY frontend/ ./
 COPY docs/legal/ /app/docs/legal/
-# pnpm-workspace.yaml uses v11 allowBuilds format; pnpm@9 misreads it as workspace root
-# Skip vue-tsc type-checking in Docker (dev concern only) to avoid OOM on low-memory servers
-RUN rm -f pnpm-workspace.yaml && NODE_OPTIONS="--max-old-space-size=1024" npx vite build
+# Skip vue-tsc type-checking in Docker (dev concern only). The current bundle
+# needs more than 1 GiB while Rollup renders chunks; this affects only CI/build
+# hosts and does not increase the final runtime container's memory footprint.
+RUN NODE_OPTIONS="--max-old-space-size=2048" pnpm exec vite build
 
 # -----------------------------------------------------------------------------
 # Stage 2: Backend Builder

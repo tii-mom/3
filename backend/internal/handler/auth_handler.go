@@ -2,6 +2,8 @@ package handler
 
 import (
 	"context"
+	"errors"
+	"io"
 	"log/slog"
 	"strings"
 	"sync"
@@ -80,7 +82,8 @@ type LoginRequest struct {
 type AuthResponse struct {
 	AccessToken  string    `json:"access_token"`
 	RefreshToken string    `json:"refresh_token,omitempty"` // 新增：Refresh Token
-	ExpiresIn    int       `json:"expires_in,omitempty"`    // 新增：Access Token有效期（秒）
+	CSRFToken    string    `json:"csrf_token,omitempty"`
+	ExpiresIn    int       `json:"expires_in,omitempty"` // 新增：Access Token有效期（秒）
 	TokenType    string    `json:"token_type"`
 	User         *dto.User `json:"user"`
 }
@@ -106,6 +109,10 @@ func (h *AuthHandler) respondWithTokenPair(c *gin.Context, user *service.User) {
 	tokenPair, err := h.authService.GenerateTokenPair(c.Request.Context(), user, "")
 	if err != nil {
 		slog.Error("failed to generate token pair", "error", err, "user_id", user.ID)
+		if cookieAuthRequested(c) {
+			response.InternalError(c, "Failed to create browser session")
+			return
+		}
 		// 回退到只返回Access Token
 		token, tokenErr := h.authService.GenerateToken(user)
 		if tokenErr != nil {
@@ -119,13 +126,23 @@ func (h *AuthHandler) respondWithTokenPair(c *gin.Context, user *service.User) {
 		})
 		return
 	}
-	response.Success(c, AuthResponse{
+	result := AuthResponse{
 		AccessToken:  tokenPair.AccessToken,
 		RefreshToken: tokenPair.RefreshToken,
 		ExpiresIn:    tokenPair.ExpiresIn,
 		TokenType:    "Bearer",
 		User:         dto.UserFromService(user),
-	})
+	}
+	if cookieAuthRequested(c) {
+		csrfToken, cookieErr := h.setBrowserAuthCookies(c, tokenPair.RefreshToken)
+		if cookieErr != nil {
+			response.InternalError(c, "Failed to create browser session")
+			return
+		}
+		result.RefreshToken = ""
+		result.CSRFToken = csrfToken
+	}
+	response.Success(c, result)
 }
 
 func (h *AuthHandler) ensureBackendModeAllowsUser(ctx context.Context, user *service.User) error {
@@ -648,13 +665,14 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 
 // RefreshTokenRequest 刷新Token请求
 type RefreshTokenRequest struct {
-	RefreshToken string `json:"refresh_token" binding:"required"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 // RefreshTokenResponse 刷新Token响应
 type RefreshTokenResponse struct {
 	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
+	RefreshToken string `json:"refresh_token,omitempty"`
+	CSRFToken    string `json:"csrf_token,omitempty"`
 	ExpiresIn    int    `json:"expires_in"` // Access Token有效期（秒）
 	TokenType    string `json:"token_type"`
 }
@@ -663,12 +681,28 @@ type RefreshTokenResponse struct {
 // POST /api/v1/auth/refresh
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	var req RefreshTokenRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
 
-	result, err := h.authService.RefreshTokenPair(c.Request.Context(), req.RefreshToken)
+	cookieMode := cookieAuthRequested(c)
+	refreshToken := strings.TrimSpace(req.RefreshToken)
+	if cookieMode {
+		if cookieToken, cookieErr := browserRefreshToken(c); cookieErr == nil {
+			if err := validateBrowserCSRF(c); err != nil {
+				response.ErrorFrom(c, err)
+				return
+			}
+			refreshToken = cookieToken
+		}
+	}
+	if refreshToken == "" {
+		response.ErrorFrom(c, service.ErrRefreshTokenInvalid)
+		return
+	}
+
+	result, err := h.authService.RefreshTokenPair(c.Request.Context(), refreshToken)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -680,12 +714,36 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, RefreshTokenResponse{
+	resp := RefreshTokenResponse{
 		AccessToken:  result.AccessToken,
 		RefreshToken: result.RefreshToken,
 		ExpiresIn:    result.ExpiresIn,
 		TokenType:    "Bearer",
-	})
+	}
+	if cookieMode {
+		csrfToken, cookieErr := h.setBrowserAuthCookies(c, result.RefreshToken)
+		if cookieErr != nil {
+			response.InternalError(c, "Failed to refresh browser session")
+			return
+		}
+		resp.RefreshToken = ""
+		resp.CSRFToken = csrfToken
+	}
+	response.Success(c, resp)
+}
+
+// GetBrowserCSRF returns the CSRF token paired with an existing browser session.
+func (h *AuthHandler) GetBrowserCSRF(c *gin.Context) {
+	if _, err := browserRefreshToken(c); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	csrfToken, err := c.Cookie(csrfTokenCookie)
+	if err != nil || strings.TrimSpace(csrfToken) == "" {
+		response.ErrorFrom(c, infraerrors.Unauthorized("CSRF_INVALID", "browser session is incomplete"))
+		return
+	}
+	response.Success(c, gin.H{"csrf_token": csrfToken})
 }
 
 // LogoutRequest 登出请求
@@ -705,13 +763,21 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	// 允许空请求体（向后兼容）
 	_ = c.ShouldBindJSON(&req)
 
-	// 如果提供了Refresh Token，撤销它
-	if req.RefreshToken != "" {
-		if err := h.authService.RevokeRefreshToken(c.Request.Context(), req.RefreshToken); err != nil {
+	refreshToken := strings.TrimSpace(req.RefreshToken)
+	if cookieToken, err := browserRefreshToken(c); err == nil {
+		if csrfErr := validateBrowserCSRF(c); csrfErr != nil {
+			response.ErrorFrom(c, csrfErr)
+			return
+		}
+		refreshToken = cookieToken
+	}
+	if refreshToken != "" {
+		if err := h.authService.RevokeRefreshToken(c.Request.Context(), refreshToken); err != nil {
 			slog.Debug("failed to revoke refresh token", "error", err)
 			// 不影响登出流程
 		}
 	}
+	h.clearBrowserAuthCookies(c)
 	h.consumePendingOAuthSessionOnLogout(c)
 	clearOAuthLogoutCookies(c)
 

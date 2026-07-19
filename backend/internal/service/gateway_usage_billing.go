@@ -257,7 +257,12 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 		cmd.SubscriptionID = &p.Subscription.ID
 		cmd.SubscriptionCost = p.Cost.ActualCost
 	} else if p.Cost.ActualCost > 0 {
-		cmd.BalanceCost = p.Cost.ActualCost
+		if p.APIKey.KeyType == "tenant_wholesale" && p.APIKey.TenantID != nil {
+			cmd.WholesaleTenantID = p.APIKey.TenantID
+			cmd.WholesaleCost = p.Cost.ActualCost
+		} else {
+			cmd.BalanceCost = p.Cost.ActualCost
+		}
 	}
 
 	if p.shouldDeductAPIKeyQuota() {
@@ -317,7 +322,7 @@ func finalizePostUsageBilling(ctx context.Context, p *postUsageBillingParams, de
 		if p.Cost.ActualCost > 0 && p.User != nil && p.APIKey != nil && p.APIKey.GroupID != nil {
 			deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, *p.APIKey.GroupID, p.Cost.ActualCost)
 		}
-	} else if p.Cost.ActualCost > 0 && p.User != nil {
+	} else if p.Cost.ActualCost > 0 && p.User != nil && p.APIKey.KeyType != "tenant_wholesale" {
 		syncBalanceCacheAfterDeduction(ctx, p, deps, result)
 	}
 

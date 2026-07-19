@@ -165,9 +165,8 @@ func (s *OpenAIQuotaService) QueryUsage(ctx context.Context, accountID int64) (*
 	}
 	if !resp.IsSuccessState() {
 		status := resp.StatusCode
-		body := truncate(resp.String(), 240)
-		slog.Warn("openai_quota_query_failed", "account_id", accountID, "status", status, "body", body)
-		return nil, infraerrors.Newf(mapUpstreamStatus(status), "OPENAI_QUOTA_UPSTREAM_ERROR", "upstream returned %d: %s", status, body)
+		slog.Warn("openai_quota_query_failed", "account_id", accountID, "status", status, "body_len", len(resp.Bytes()))
+		return nil, infraerrors.Newf(mapUpstreamStatus(status), "OPENAI_QUOTA_UPSTREAM_ERROR", "upstream returned %d", status)
 	}
 
 	payload.FetchedAt = time.Now().Unix()
@@ -254,9 +253,8 @@ func (s *OpenAIQuotaService) ResetCredit(ctx context.Context, accountID int64) (
 	}
 	if !resp.IsSuccessState() {
 		status := resp.StatusCode
-		body := truncate(resp.String(), 240)
-		slog.Warn("openai_quota_reset_failed", "account_id", accountID, "status", status, "body", body)
-		return nil, infraerrors.Newf(mapUpstreamStatus(status), "OPENAI_QUOTA_RESET_UPSTREAM_ERROR", "upstream returned %d: %s", status, body)
+		slog.Warn("openai_quota_reset_failed", "account_id", accountID, "status", status, "body_len", len(resp.Bytes()))
+		return nil, infraerrors.Newf(mapUpstreamStatus(status), "OPENAI_QUOTA_RESET_UPSTREAM_ERROR", "upstream returned %d", status)
 	}
 
 	slog.Info("openai_quota_reset_success",

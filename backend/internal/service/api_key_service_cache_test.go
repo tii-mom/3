@@ -277,6 +277,45 @@ func TestAPIKeyService_SnapshotRoundTrip_PreservesMessagesDispatchModelConfig(t 
 	require.Equal(t, apiKey.Group.MessagesDispatchModelConfig, roundTrip.Group.MessagesDispatchModelConfig)
 }
 
+func TestAPIKeyService_SnapshotRoundTrip_PreservesWholesaleIdentity(t *testing.T) {
+	svc := NewAPIKeyService(nil, nil, nil, nil, nil, nil, &config.Config{})
+	tenantID := int64(23)
+	apiKey := &APIKey{
+		ID: 1, UserID: 2, Key: "sk-wholesale-test", Name: "Wholesale", Status: StatusActive,
+		KeyType: "tenant_wholesale", TenantID: &tenantID, WholesaleBalance: 42.5, WholesaleEnabled: true,
+		User: &User{ID: 2, Status: StatusActive, Role: RoleUser, Balance: 0, Concurrency: 3},
+	}
+
+	roundTrip := svc.snapshotToAPIKey(apiKey.Key, svc.snapshotFromAPIKey(context.Background(), apiKey))
+	require.Equal(t, "tenant_wholesale", roundTrip.KeyType)
+	require.Equal(t, tenantID, *roundTrip.TenantID)
+	require.Equal(t, 42.5, roundTrip.WholesaleBalance)
+	require.True(t, roundTrip.WholesaleEnabled)
+}
+
+func TestAPIKeyService_GetByKey_DoesNotCacheWholesaleBalance(t *testing.T) {
+	cache := &authCacheStub{}
+	var repoCalls int32
+	tenantID := int64(23)
+	repo := &authRepoStub{getByKeyForAuth: func(context.Context, string) (*APIKey, error) {
+		atomic.AddInt32(&repoCalls, 1)
+		return &APIKey{
+			ID: 1, UserID: 2, Status: StatusActive, KeyType: "tenant_wholesale", TenantID: &tenantID,
+			WholesaleBalance: 10, WholesaleEnabled: true,
+			User: &User{ID: 2, Status: StatusActive, Role: RoleUser, Concurrency: 3},
+		}, nil
+	}}
+	cache.getAuthCache = func(context.Context, string) (*APIKeyAuthCacheEntry, error) { return nil, redis.Nil }
+	svc := NewAPIKeyService(repo, nil, nil, nil, nil, cache, &config.Config{APIKeyAuth: config.APIKeyAuthCacheConfig{L2TTLSeconds: 60}})
+
+	_, err := svc.GetByKey(context.Background(), "sk-wholesale-test")
+	require.NoError(t, err)
+	_, err = svc.GetByKey(context.Background(), "sk-wholesale-test")
+	require.NoError(t, err)
+	require.Equal(t, int32(2), atomic.LoadInt32(&repoCalls))
+	require.Empty(t, cache.setAuthKeys)
+}
+
 func TestAPIKeyService_GetByKey_IgnoresLegacyAuthCacheSnapshotWithoutMessagesDispatchConfig(t *testing.T) {
 	cache := &authCacheStub{}
 	var repoCalls int32

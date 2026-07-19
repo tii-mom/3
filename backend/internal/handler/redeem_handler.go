@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"strings"
+
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -11,13 +13,15 @@ import (
 
 // RedeemHandler handles redeem code-related requests
 type RedeemHandler struct {
-	redeemService *service.RedeemService
+	redeemService  *service.RedeemService
+	voucherService *service.VoucherService
 }
 
 // NewRedeemHandler creates a new RedeemHandler
-func NewRedeemHandler(redeemService *service.RedeemService) *RedeemHandler {
+func NewRedeemHandler(redeemService *service.RedeemService, voucherService *service.VoucherService) *RedeemHandler {
 	return &RedeemHandler{
-		redeemService: redeemService,
+		redeemService:  redeemService,
+		voucherService: voucherService,
 	}
 }
 
@@ -47,6 +51,15 @@ func (h *RedeemHandler) Redeem(c *gin.Context) {
 	var req RedeemRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(req.Code)), "VCH-") {
+		result, err := h.voucherService.Redeem(c.Request.Context(), subject.UserID, req.Code)
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+		response.Success(c, result)
 		return
 	}
 

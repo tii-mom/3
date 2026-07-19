@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/creditctx"
 
 	entsql "entgo.io/ent/dialect/sql"
 )
@@ -78,7 +79,8 @@ ON CONFLICT (user_id, provider_type, grant_reason) DO NOTHING`,
 	}
 
 	if providerDefaults.Balance != 0 {
-		if err := client.User.UpdateOneID(userID).AddBalance(providerDefaults.Balance).Exec(ctx); err != nil {
+		creditCtx := creditctx.WithMetadata(ctx, creditctx.Metadata{EntryType: "provider_first_bind_grant", SourceType: "auth_provider", SourceID: strings.TrimSpace(providerType), IdempotencyKey: fmt.Sprintf("provider-first-bind:%d:%s", userID, strings.TrimSpace(providerType))})
+		if err := s.userRepo.UpdateBalance(creditCtx, userID, providerDefaults.Balance); err != nil {
 			return fmt.Errorf("apply first bind balance default: %w", err)
 		}
 	}

@@ -255,6 +255,24 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/vouchers',
+    name: 'BalanceVouchers',
+    component: () => import('@/views/user/VouchersView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: false, title: 'Balance Vouchers', titleKey: 'finance.vouchers.title' }
+  },
+  {
+    path: '/distribution',
+    name: 'Distribution',
+    component: () => import('@/views/user/DistributionView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: false, title: 'Compute Company', titleKey: 'finance.distribution.title' }
+  },
+  {
+    path: '/saas-partner',
+    name: 'SaaSPartner',
+    component: () => import('@/views/user/SaaSPartnerView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: false, title: 'SaaS Partner', titleKey: 'finance.partner.title' }
+  },
+  {
     path: '/available-channels',
     name: 'UserAvailableChannels',
     component: () => import('@/views/user/AvailableChannelsView.vue'),
@@ -627,6 +645,18 @@ const routes: RouteRecordRaw[] = [
       descriptionKey: 'admin.affiliates.transfersDescription'
     }
   },
+  {
+    path: '/admin/finance',
+    name: 'AdminFinance',
+    component: () => import('@/views/admin/FinanceOperationsView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, title: 'Finance Operations', titleKey: 'finance.admin.title' }
+  },
+  {
+    path: '/admin/saas',
+    name: 'AdminSaaS',
+    component: () => import('@/views/admin/SaaSControlView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, title: 'SaaS Control', titleKey: 'finance.saas.title' }
+  },
 
 
   // ==================== Payment Admin Routes ====================
@@ -737,11 +767,11 @@ router.beforeEach(async (to, _from, next) => {
 
   const authStore = useAuthStore()
 
-  // Restore auth state from localStorage on first navigation (page refresh)
-  if (!authInitialized) {
-    authStore.checkAuth()
-    authInitialized = true
-  }
+	// Restore auth state from localStorage on first navigation (page refresh)
+	if (!authInitialized) {
+		await authStore.checkAuth()
+		authInitialized = true
+	}
 
   // Set page title
   const appStore = useAppStore()

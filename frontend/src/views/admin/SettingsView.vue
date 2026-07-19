@@ -10507,12 +10507,9 @@ async function handleSaveProvider(payload: Partial<ProviderInstance>) {
 
 async function handleToggleField(
   provider: ProviderInstance,
-  field: "enabled" | "refund_enabled" | "allow_user_refund",
+  field: "enabled",
 ) {
-  let newValue: boolean;
-  if (field === "enabled") newValue = !provider.enabled;
-  else if (field === "refund_enabled") newValue = !provider.refund_enabled;
-  else newValue = !provider.allow_user_refund;
+  const newValue = !provider.enabled;
 
   if (field === "enabled" && newValue) {
     const conflict = findProviderEnablementConflict({
@@ -10528,13 +10525,8 @@ async function handleToggleField(
     }
   }
 
-  const payload: Record<string, boolean> = { [field]: newValue };
-  // Cascade: turning off refund_enabled also turns off allow_user_refund
-  if (field === "refund_enabled" && !newValue) {
-    payload.allow_user_refund = false;
-  }
   try {
-    await adminAPI.payment.updateProvider(provider.id, payload);
+    await adminAPI.payment.updateProvider(provider.id, { enabled: newValue });
     await loadProviders();
   } catch (err: unknown) {
     appStore.showError(extractI18nErrorMessage(err, t, "payment.errors", t("common.error")));

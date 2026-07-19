@@ -21,6 +21,8 @@ vi.mock('@/api', () => ({
     getCurrentUser: vi.fn().mockResolvedValue({ data: {} }),
     register: vi.fn(),
     refreshToken: vi.fn(),
+    setAuthToken: vi.fn(),
+    clearAuthToken: vi.fn(),
   },
   isTotp2FARequired: (response: any) => response?.requires_2fa === true,
 }))

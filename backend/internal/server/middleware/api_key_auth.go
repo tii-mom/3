@@ -128,6 +128,10 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		}
 		ctx := context.WithValue(c.Request.Context(), ctxkey.UserID, apiKey.User.ID)
 		c.Request = c.Request.WithContext(ctx)
+		if apiKey.KeyType == "tenant_wholesale" && !apiKey.WholesaleEnabled {
+			AbortWithError(c, 403, "SAAS_CONTROL_PLANE_DISABLED", "Tenant wholesale access is disabled")
+			return
+		}
 
 		// ── 4. SimpleMode → early return ─────────────────────────────
 
@@ -150,7 +154,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		skipBilling := c.Request.URL.Path == "/v1/usage"
 
 		var subscription *service.UserSubscription
-		isSubscriptionType := apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
+		isSubscriptionType := apiKey.KeyType != "tenant_wholesale" && apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
 
 		if isSubscriptionType && subscriptionService != nil {
 			sub, subErr := subscriptionService.GetActiveSubscription(
@@ -218,7 +222,11 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 				}
 			} else {
 				// 非订阅模式 或 订阅模式但 subscriptionService 未注入：回退到余额检查
-				if apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) {
+				if apiKey.KeyType == "tenant_wholesale" && apiKey.WholesaleBalance <= 0 {
+					AbortWithError(c, 403, "TENANT_WHOLESALE_BALANCE_INSUFFICIENT", "Tenant wholesale balance is insufficient")
+					return
+				}
+				if apiKey.KeyType != "tenant_wholesale" && apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) {
 					AbortWithError(c, 403, "INSUFFICIENT_BALANCE", "Insufficient account balance")
 					return
 				}

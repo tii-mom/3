@@ -338,7 +338,7 @@ func (r *proxyRepository) CountAccountsByProxyID(ctx context.Context, proxyID in
 
 func (r *proxyRepository) ListAccountSummariesByProxyID(ctx context.Context, proxyID int64) ([]service.ProxyAccountSummary, error) {
 	rows, err := r.sql.QueryContext(ctx, `
-		SELECT id, name, platform, type, notes
+		SELECT id, name, platform, type, status, notes
 		FROM accounts
 		WHERE proxy_id = $1 AND deleted_at IS NULL
 		ORDER BY id DESC
@@ -355,9 +355,10 @@ func (r *proxyRepository) ListAccountSummariesByProxyID(ctx context.Context, pro
 			name     string
 			platform string
 			accType  string
+			status   string
 			notes    sql.NullString
 		)
-		if err := rows.Scan(&id, &name, &platform, &accType, &notes); err != nil {
+		if err := rows.Scan(&id, &name, &platform, &accType, &status, &notes); err != nil {
 			return nil, err
 		}
 		var notesPtr *string
@@ -369,6 +370,7 @@ func (r *proxyRepository) ListAccountSummariesByProxyID(ctx context.Context, pro
 			Name:     name,
 			Platform: platform,
 			Type:     accType,
+			Status:   status,
 			Notes:    notesPtr,
 		})
 	}
@@ -376,6 +378,58 @@ func (r *proxyRepository) ListAccountSummariesByProxyID(ctx context.Context, pro
 		return nil, err
 	}
 	return out, nil
+}
+
+func (r *proxyRepository) GetStats(ctx context.Context, proxyID int64) (*service.ProxyStats, error) {
+	const query = `
+		WITH proxy_accounts AS (
+			SELECT id, status
+			FROM accounts
+			WHERE proxy_id = $1 AND deleted_at IS NULL
+		),
+		success_stats AS (
+			SELECT
+				COUNT(*) AS request_count,
+				COALESCE(SUM(ul.duration_ms) FILTER (WHERE ul.duration_ms IS NOT NULL), 0) AS duration_sum,
+				COUNT(ul.duration_ms) AS duration_count
+			FROM usage_logs ul
+			JOIN proxy_accounts pa ON pa.id = ul.account_id
+		),
+		error_stats AS (
+			SELECT COUNT(*) AS request_count
+			FROM ops_error_logs e
+			JOIN proxy_accounts pa ON pa.id = e.account_id
+			WHERE COALESCE(e.status_code, 0) >= 400
+		)
+		SELECT
+			(SELECT COUNT(*) FROM proxy_accounts) AS total_accounts,
+			(SELECT COUNT(*) FROM proxy_accounts WHERE status = $2) AS active_accounts,
+			s.request_count + e.request_count AS total_requests,
+			CASE
+				WHEN s.request_count + e.request_count = 0 THEN 0
+				ELSE s.request_count::double precision * 100 / (s.request_count + e.request_count)
+			END AS success_rate,
+			CASE
+				WHEN s.duration_count = 0 THEN 0
+				ELSE s.duration_sum::double precision / s.duration_count
+			END AS average_latency
+		FROM success_stats s CROSS JOIN error_stats e`
+
+	stats := &service.ProxyStats{}
+	if err := scanSingleRow(
+		ctx,
+		r.sql,
+		query,
+		[]any{proxyID, service.StatusActive},
+		&stats.TotalAccounts,
+		&stats.ActiveAccounts,
+		&stats.TotalRequests,
+		&stats.SuccessRate,
+		&stats.AverageLatency,
+	); err != nil {
+		return nil, err
+	}
+	return stats, nil
 }
 
 // GetAccountCountsForProxies returns a map of proxy ID to account count for all proxies

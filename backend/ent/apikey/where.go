@@ -95,6 +95,16 @@ func Status(v string) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldStatus, v))
 }
 
+// KeyType applies equality check predicate on the "key_type" field. It's identical to KeyTypeEQ.
+func KeyType(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldKeyType, v))
+}
+
+// TenantID applies equality check predicate on the "tenant_id" field. It's identical to TenantIDEQ.
+func TenantID(v int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldTenantID, v))
+}
+
 // LastUsedAt applies equality check predicate on the "last_used_at" field. It's identical to LastUsedAtEQ.
 func LastUsedAt(v time.Time) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldLastUsedAt, v))
@@ -533,6 +543,121 @@ func StatusEqualFold(v string) predicate.APIKey {
 // StatusContainsFold applies the ContainsFold predicate on the "status" field.
 func StatusContainsFold(v string) predicate.APIKey {
 	return predicate.APIKey(sql.FieldContainsFold(FieldStatus, v))
+}
+
+// KeyTypeEQ applies the EQ predicate on the "key_type" field.
+func KeyTypeEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldKeyType, v))
+}
+
+// KeyTypeNEQ applies the NEQ predicate on the "key_type" field.
+func KeyTypeNEQ(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldKeyType, v))
+}
+
+// KeyTypeIn applies the In predicate on the "key_type" field.
+func KeyTypeIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldKeyType, vs...))
+}
+
+// KeyTypeNotIn applies the NotIn predicate on the "key_type" field.
+func KeyTypeNotIn(vs ...string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldKeyType, vs...))
+}
+
+// KeyTypeGT applies the GT predicate on the "key_type" field.
+func KeyTypeGT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldKeyType, v))
+}
+
+// KeyTypeGTE applies the GTE predicate on the "key_type" field.
+func KeyTypeGTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldKeyType, v))
+}
+
+// KeyTypeLT applies the LT predicate on the "key_type" field.
+func KeyTypeLT(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldKeyType, v))
+}
+
+// KeyTypeLTE applies the LTE predicate on the "key_type" field.
+func KeyTypeLTE(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldKeyType, v))
+}
+
+// KeyTypeContains applies the Contains predicate on the "key_type" field.
+func KeyTypeContains(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContains(FieldKeyType, v))
+}
+
+// KeyTypeHasPrefix applies the HasPrefix predicate on the "key_type" field.
+func KeyTypeHasPrefix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasPrefix(FieldKeyType, v))
+}
+
+// KeyTypeHasSuffix applies the HasSuffix predicate on the "key_type" field.
+func KeyTypeHasSuffix(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldHasSuffix(FieldKeyType, v))
+}
+
+// KeyTypeEqualFold applies the EqualFold predicate on the "key_type" field.
+func KeyTypeEqualFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEqualFold(FieldKeyType, v))
+}
+
+// KeyTypeContainsFold applies the ContainsFold predicate on the "key_type" field.
+func KeyTypeContainsFold(v string) predicate.APIKey {
+	return predicate.APIKey(sql.FieldContainsFold(FieldKeyType, v))
+}
+
+// TenantIDEQ applies the EQ predicate on the "tenant_id" field.
+func TenantIDEQ(v int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldTenantID, v))
+}
+
+// TenantIDNEQ applies the NEQ predicate on the "tenant_id" field.
+func TenantIDNEQ(v int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldTenantID, v))
+}
+
+// TenantIDIn applies the In predicate on the "tenant_id" field.
+func TenantIDIn(vs ...int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldTenantID, vs...))
+}
+
+// TenantIDNotIn applies the NotIn predicate on the "tenant_id" field.
+func TenantIDNotIn(vs ...int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldTenantID, vs...))
+}
+
+// TenantIDGT applies the GT predicate on the "tenant_id" field.
+func TenantIDGT(v int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldTenantID, v))
+}
+
+// TenantIDGTE applies the GTE predicate on the "tenant_id" field.
+func TenantIDGTE(v int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldTenantID, v))
+}
+
+// TenantIDLT applies the LT predicate on the "tenant_id" field.
+func TenantIDLT(v int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldTenantID, v))
+}
+
+// TenantIDLTE applies the LTE predicate on the "tenant_id" field.
+func TenantIDLTE(v int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldTenantID, v))
+}
+
+// TenantIDIsNil applies the IsNil predicate on the "tenant_id" field.
+func TenantIDIsNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldIsNull(FieldTenantID))
+}
+
+// TenantIDNotNil applies the NotNil predicate on the "tenant_id" field.
+func TenantIDNotNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotNull(FieldTenantID))
 }
 
 // LastUsedAtEQ applies the EQ predicate on the "last_used_at" field.

@@ -44,6 +44,7 @@ func RegisterAuthRoutes(
 		auth.POST("/refresh", rateLimiter.LimitWithOptions("refresh-token", 30, time.Minute, middleware.RateLimitOptions{
 			FailureMode: middleware.RateLimitFailClose,
 		}), h.Auth.RefreshToken)
+		auth.GET("/csrf", rateLimiter.Limit("browser-csrf", 60, time.Minute), h.Auth.GetBrowserCSRF)
 		// 登出接口（公开，允许未认证用户调用以撤销Refresh Token）
 		auth.POST("/logout", h.Auth.Logout)
 		// 优惠码验证接口添加速率限制：每分钟最多 10 次（Redis 故障时 fail-close）

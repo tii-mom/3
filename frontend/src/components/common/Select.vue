@@ -1,53 +1,55 @@
 <template>
   <div class="relative" ref="containerRef">
-    <button
-      ref="triggerRef"
-      type="button"
-      @click="toggle"
-      :disabled="disabled"
-      :aria-expanded="isOpen"
-      :aria-haspopup="true"
-      aria-label="Select option"
+    <div
       :class="[
         'select-trigger',
         isOpen && 'select-trigger-open',
         error && 'select-trigger-error',
         disabled && 'select-trigger-disabled'
       ]"
-      @keydown.down.prevent="onTriggerKeyDown"
-      @keydown.up.prevent="onTriggerKeyDown"
     >
-      <span class="select-value">
-        <slot name="selected" :option="selectedOption">
-          {{ selectedLabel }}
-        </slot>
-      </span>
-      <span
+      <button
+        ref="triggerRef"
+        type="button"
+        class="select-main"
+        :disabled="disabled"
+        :aria-expanded="isOpen"
+        aria-haspopup="listbox"
+        :aria-controls="dropdownId"
+        :aria-activedescendant="activeDescendantId"
+        @click="toggle"
+        @keydown="onTriggerKeyDown"
+      >
+        <span class="select-value">
+          <slot name="selected" :option="selectedOption">
+            {{ selectedLabel }}
+          </slot>
+        </span>
+        <span class="select-icon" aria-hidden="true">
+          <Icon
+            name="chevronDown"
+            size="md"
+            :class="['transition-transform duration-200', isOpen && 'rotate-180']"
+          />
+        </span>
+      </button>
+      <button
         v-if="clearable && hasValue && !disabled"
+        type="button"
         class="select-clear"
-        role="button"
-        tabindex="-1"
-        aria-label="Clear selection"
-        @click.stop="clearSelection"
-        @mousedown.stop
-        @keydown.enter.stop.prevent="clearSelection"
+        :aria-label="t('admin.accounts.bulkActions.clear')"
+        @click="clearSelection"
       >
         <Icon name="x" size="sm" />
-      </span>
-      <span class="select-icon">
-        <Icon
-          name="chevronDown"
-          size="md"
-          :class="['transition-transform duration-200', isOpen && 'rotate-180']"
-        />
-      </span>
-    </button>
+      </button>
+    </div>
 
     <!-- Teleport dropdown to body to escape stacking context -->
     <Teleport to="body">
       <Transition name="select-dropdown">
         <div
           v-if="isOpen"
+          :id="dropdownId"
           ref="dropdownRef"
           class="select-dropdown-portal"
           :class="[instanceId]"
@@ -65,6 +67,7 @@
               v-model="searchQuery"
               type="text"
               :placeholder="searchPlaceholderText"
+              :aria-label="searchPlaceholderText"
               class="select-search-input"
               @click.stop
             />
@@ -75,10 +78,11 @@
             <div
               v-for="(option, index) in filteredOptions"
               :key="`${typeof getOptionValue(option)}:${String(getOptionValue(option) ?? '')}`"
-              role="option"
-              :aria-selected="isSelected(option)"
-              :aria-disabled="isOptionDisabled(option)"
-              @click.stop="!isOptionDisabled(option) && selectOption(option)"
+              :id="optionId(index)"
+              :role="isGroupHeaderOption(option) ? 'presentation' : 'option'"
+              :aria-selected="isGroupHeaderOption(option) ? undefined : isSelected(option)"
+              :aria-disabled="isGroupHeaderOption(option) ? undefined : isOptionDisabled(option)"
+              @click.stop="!isOptionUnavailable(option) && selectOption(option)"
               @mouseenter="handleOptionMouseEnter(option, index)"
               :class="[
                 'select-option',
@@ -126,6 +130,7 @@ const { t } = useI18n()
 
 // Instance ID for unique click-outside detection
 const instanceId = `select-${Math.random().toString(36).substring(2, 9)}`
+const dropdownId = `${instanceId}-listbox`
 
 export interface SelectOption {
   value: string | number | boolean | null
@@ -238,6 +243,9 @@ const isGroupHeaderOption = (option: any): boolean => {
   return false
 }
 
+const isOptionUnavailable = (option: any): boolean =>
+  isOptionDisabled(option) || isGroupHeaderOption(option)
+
 const selectedOption = computed(() => {
   return props.options.find((opt) => getOptionValue(opt) === props.modelValue) || null
 })
@@ -282,12 +290,17 @@ const isSelected = (option: any): boolean => {
   return getOptionValue(option) === props.modelValue
 }
 
+const optionId = (index: number) => `${instanceId}-option-${index}`
+const activeDescendantId = computed(() =>
+  isOpen.value && focusedIndex.value >= 0 ? optionId(focusedIndex.value) : undefined
+)
+
 const findNextEnabledIndex = (startIndex: number): number => {
   const opts = filteredOptions.value
   if (opts.length === 0) return -1
   for (let offset = 0; offset < opts.length; offset++) {
     const idx = (startIndex + offset) % opts.length
-    if (!isOptionDisabled(opts[idx])) return idx
+    if (!isOptionUnavailable(opts[idx])) return idx
   }
   return -1
 }
@@ -297,13 +310,13 @@ const findPrevEnabledIndex = (startIndex: number): number => {
   if (opts.length === 0) return -1
   for (let offset = 0; offset < opts.length; offset++) {
     const idx = (startIndex - offset + opts.length) % opts.length
-    if (!isOptionDisabled(opts[idx])) return idx
+    if (!isOptionUnavailable(opts[idx])) return idx
   }
   return -1
 }
 
 const handleOptionMouseEnter = (option: any, index: number) => {
-  if (isOptionDisabled(option) || isGroupHeaderOption(option)) return
+  if (isOptionUnavailable(option)) return
   focusedIndex.value = index
 }
 
@@ -346,7 +359,7 @@ watch(isOpen, (open) => {
     } else {
       const selectedIdx = filteredOptions.value.findIndex(isSelected)
       const initialIdx = selectedIdx >= 0 ? selectedIdx : 0
-      focusedIndex.value = isOptionDisabled(filteredOptions.value[initialIdx])
+      focusedIndex.value = isOptionUnavailable(filteredOptions.value[initialIdx])
         ? findNextEnabledIndex(initialIdx + 1)
         : initialIdx
     }
@@ -380,10 +393,50 @@ const clearSelection = () => {
 }
 
 // Keyboards
-const onTriggerKeyDown = () => {
-  if (!isOpen.value) {
-    isOpen.value = true
+const selectFocusedOption = () => {
+  if (focusedIndex.value < 0 || focusedIndex.value >= filteredOptions.value.length) return
+  const option = filteredOptions.value[focusedIndex.value]
+  if (!isOptionUnavailable(option)) selectOption(option)
+}
+
+const onTriggerKeyDown = (event: KeyboardEvent) => {
+  switch (event.key) {
+    case 'ArrowDown':
+      event.preventDefault()
+      if (!isOpen.value) isOpen.value = true
+      else focusedIndex.value = findNextEnabledIndex(focusedIndex.value + 1)
+      break
+    case 'ArrowUp':
+      event.preventDefault()
+      if (!isOpen.value) isOpen.value = true
+      else focusedIndex.value = findPrevEnabledIndex(focusedIndex.value - 1)
+      break
+    case 'Enter':
+    case ' ':
+      event.preventDefault()
+      if (!isOpen.value) isOpen.value = true
+      else selectFocusedOption()
+      break
+    case 'Home':
+      if (!isOpen.value) return
+      event.preventDefault()
+      focusedIndex.value = findNextEnabledIndex(0)
+      break
+    case 'End':
+      if (!isOpen.value) return
+      event.preventDefault()
+      focusedIndex.value = findPrevEnabledIndex(filteredOptions.value.length - 1)
+      break
+    case 'Escape':
+      if (!isOpen.value) return
+      event.preventDefault()
+      isOpen.value = false
+      break
+    case 'Tab':
+      isOpen.value = false
+      break
   }
+  if (focusedIndex.value >= 0) scrollToFocused()
 }
 
 const onDropdownKeyDown = (e: KeyboardEvent) => {
@@ -401,8 +454,7 @@ const onDropdownKeyDown = (e: KeyboardEvent) => {
     case 'Enter':
       e.preventDefault()
       if (focusedIndex.value >= 0 && focusedIndex.value < filteredOptions.value.length) {
-        const opt = filteredOptions.value[focusedIndex.value]
-        if (!isOptionDisabled(opt)) selectOption(opt)
+        selectFocusedOption()
       }
       break
     case 'Escape':
@@ -461,9 +513,13 @@ onUnmounted(() => {
   @apply border border-gray-200 dark:border-dark-600;
   @apply text-gray-900 dark:text-gray-100;
   @apply transition-all duration-200;
-  @apply focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30;
+  @apply focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-500/30;
   @apply hover:border-gray-300 dark:hover:border-dark-500;
   @apply cursor-pointer;
+}
+
+.select-main {
+  @apply flex min-w-0 flex-1 items-center gap-2 bg-transparent text-inherit focus:outline-none;
 }
 
 .select-trigger-open {
@@ -490,6 +546,7 @@ onUnmounted(() => {
   @apply flex flex-shrink-0 cursor-pointer items-center justify-center;
   @apply rounded text-gray-400 transition-colors;
   @apply hover:text-gray-600 dark:hover:text-gray-200;
+  @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40;
 }
 </style>
 

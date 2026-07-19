@@ -62,7 +62,7 @@ func (s *PaymentConfigService) ListProviderInstancesWithConfig(ctx context.Conte
 		resp := ProviderInstanceResponse{
 			ID: int64(inst.ID), ProviderKey: inst.ProviderKey, Name: inst.Name,
 			SupportedTypes: splitTypes(inst.SupportedTypes), Limits: inst.Limits,
-			Enabled: inst.Enabled, RefundEnabled: inst.RefundEnabled, AllowUserRefund: inst.AllowUserRefund,
+			Enabled: inst.Enabled, RefundEnabled: false, AllowUserRefund: false,
 			SortOrder: inst.SortOrder, PaymentMode: inst.PaymentMode,
 		}
 		resp.Config, err = s.decryptAndMaskConfig(inst.ProviderKey, inst.Config)
@@ -182,6 +182,9 @@ var validProviderKeys = map[string]bool{
 }
 
 func (s *PaymentConfigService) CreateProviderInstance(ctx context.Context, req CreateProviderInstanceRequest) (*dbent.PaymentProviderInstance, error) {
+	if req.RefundEnabled || req.AllowUserRefund {
+		return nil, infraerrors.Forbidden("REFUNDS_DISABLED", "refunds are disabled on this platform")
+	}
 	typesStr := joinTypes(req.SupportedTypes)
 	if err := validateProviderRequest(req.ProviderKey, req.Name, typesStr); err != nil {
 		return nil, err
@@ -203,12 +206,11 @@ func (s *PaymentConfigService) CreateProviderInstance(ctx context.Context, req C
 	if err != nil {
 		return nil, err
 	}
-	allowUserRefund := req.AllowUserRefund && req.RefundEnabled
 	return s.entClient.PaymentProviderInstance.Create().
 		SetProviderKey(req.ProviderKey).SetName(req.Name).SetConfig(enc).
 		SetSupportedTypes(typesStr).SetEnabled(req.Enabled).SetPaymentMode(req.PaymentMode).
-		SetSortOrder(req.SortOrder).SetLimits(req.Limits).SetRefundEnabled(req.RefundEnabled).
-		SetAllowUserRefund(allowUserRefund).
+		SetSortOrder(req.SortOrder).SetLimits(req.Limits).SetRefundEnabled(false).
+		SetAllowUserRefund(false).
 		Save(ctx)
 }
 
@@ -288,6 +290,9 @@ func easyPayCustomMethodTypeConflictsWithBuiltin(methodType string) bool {
 // NOTE: This function exceeds 30 lines due to per-field nil-check patch update
 // boilerplate and pending-order safety checks.
 func (s *PaymentConfigService) UpdateProviderInstance(ctx context.Context, id int64, req UpdateProviderInstanceRequest) (*dbent.PaymentProviderInstance, error) {
+	if (req.RefundEnabled != nil && *req.RefundEnabled) || (req.AllowUserRefund != nil && *req.AllowUserRefund) {
+		return nil, infraerrors.Forbidden("REFUNDS_DISABLED", "refunds are disabled on this platform")
+	}
 	current, err := s.entClient.PaymentProviderInstance.Get(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("load provider instance: %w", err)
@@ -420,29 +425,8 @@ func (s *PaymentConfigService) UpdateProviderInstance(ctx context.Context, id in
 	if req.Limits != nil {
 		u.SetLimits(*req.Limits)
 	}
-	if req.RefundEnabled != nil {
-		u.SetRefundEnabled(*req.RefundEnabled)
-		// Cascade: turning off refund_enabled also disables allow_user_refund
-		if !*req.RefundEnabled {
-			u.SetAllowUserRefund(false)
-		}
-	}
-	if req.AllowUserRefund != nil {
-		// Only allow enabling when refund_enabled is (or will be) true
-		if *req.AllowUserRefund {
-			refundEnabled := false
-			if req.RefundEnabled != nil {
-				refundEnabled = *req.RefundEnabled
-			} else {
-				refundEnabled = current.RefundEnabled
-			}
-			if refundEnabled {
-				u.SetAllowUserRefund(true)
-			}
-		} else {
-			u.SetAllowUserRefund(false)
-		}
-	}
+	u.SetRefundEnabled(false)
+	u.SetAllowUserRefund(false)
 	if req.PaymentMode != nil {
 		u.SetPaymentMode(*req.PaymentMode)
 	}
@@ -451,19 +435,7 @@ func (s *PaymentConfigService) UpdateProviderInstance(ctx context.Context, id in
 
 // GetUserRefundEligibleInstanceIDs returns provider instance IDs that allow user refund.
 func (s *PaymentConfigService) GetUserRefundEligibleInstanceIDs(ctx context.Context) ([]string, error) {
-	instances, err := s.entClient.PaymentProviderInstance.Query().
-		Where(
-			paymentproviderinstance.RefundEnabledEQ(true),
-			paymentproviderinstance.AllowUserRefundEQ(true),
-		).Select(paymentproviderinstance.FieldID).All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	ids := make([]string, 0, len(instances))
-	for _, inst := range instances {
-		ids = append(ids, strconv.FormatInt(int64(inst.ID), 10))
-	}
-	return ids, nil
+	return []string{}, nil
 }
 
 func (s *PaymentConfigService) mergeConfig(ctx context.Context, id int64, newConfig map[string]string) (map[string]string, error) {

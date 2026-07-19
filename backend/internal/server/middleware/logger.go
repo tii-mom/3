@@ -6,6 +6,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/requestmetrics"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -18,12 +19,16 @@ func Logger() gin.HandlerFunc {
 
 		// 请求路径
 		path := c.Request.URL.Path
+		if path != "/health" && path != "/health/live" && path != "/health/ready" && path != "/setup/status" && path != "/api/v1/admin/dashboard/realtime" {
+			finish := requestmetrics.Begin()
+			defer finish()
+		}
 
 		// 处理请求
 		c.Next()
 
 		// 跳过健康检查等高频探针路径的日志
-		if path == "/health" || path == "/setup/status" {
+		if path == "/health" || path == "/health/live" || path == "/health/ready" || path == "/setup/status" {
 			return
 		}
 

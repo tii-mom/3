@@ -39,7 +39,8 @@ describe('API Client', () => {
     })
 
     it('自动附加 Authorization 头', async () => {
-      localStorage.setItem('auth_token', 'my-jwt-token')
+      const { setSessionAccessToken } = await import('@/api/authSession')
+      setSessionAccessToken('my-jwt-token')
 
       // 拦截实际请求
       const adapter = vi.fn().mockResolvedValue({

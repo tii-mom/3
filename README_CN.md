@@ -207,13 +207,18 @@ Sub2API 是一个 AI API 网关平台，用于分发和管理 AI 产品订阅的
 
 ## Nginx 反向代理注意事项
 
-通过 Nginx 反向代理 Sub2API（或 CRS 服务）并搭配 Codex CLI 使用时，需要在 Nginx 配置的 `http` 块中添加：
+通过 Nginx 反向代理 Sub2API（或 CRS 服务）并搭配 Codex CLI 使用时，需要在 Nginx 配置中添加：
 
 ```nginx
+# http 或 server 块：保留 session_id 等下划线头（粘性会话）
 underscores_in_headers on;
+
+# server 块：Codex /responses 长上下文会超过默认 1m，否则返回 413
+client_max_body_size 256m;
 ```
 
-Nginx 默认会丢弃名称中含下划线的请求头（如 `session_id`），这会导致多账号环境下的粘性会话功能失效。
+- Nginx 默认会丢弃名称中含下划线的请求头（如 `session_id`），这会导致多账号环境下的粘性会话功能失效。
+- 未设置 `client_max_body_size` 时，长会话常见 `413 Request Entity Too Large`（响应体为 nginx HTML）。生产示例见 `deploy/nginx-sub2api.conf`，上线手册见 `docs/GO_LIVE.md`。
 
 ---
 

@@ -10,9 +10,11 @@ import (
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
-	"github.com/Wei-Shaw/sub2api/ent/user"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/creditctx"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/creditledger"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/lib/pq"
+	"github.com/shopspring/decimal"
 )
 
 const (
@@ -68,7 +70,14 @@ func (r *affiliateRepository) EnsureUserAffiliate(ctx context.Context, userID in
 		return nil, service.ErrUserNotFound
 	}
 	client := clientFromContext(ctx, r.client)
-	return ensureUserAffiliateWithClient(ctx, client, userID)
+	summary, err := ensureUserAffiliateWithClient(ctx, client, userID)
+	if err != nil {
+		return nil, err
+	}
+	if err := ensureDistributionIdentity(ctx, client, userID); err != nil && !isDistributionSchemaUnavailable(err) {
+		return nil, err
+	}
+	return summary, nil
 }
 
 func (r *affiliateRepository) GetAffiliateByCode(ctx context.Context, code string) (*service.AffiliateSummary, error) {
@@ -105,6 +114,9 @@ func (r *affiliateRepository) BindInviter(ctx context.Context, userID, inviterID
 		); err != nil {
 			return fmt.Errorf("increment inviter aff_count: %w", err)
 		}
+		if err := bindDistributionRelation(txCtx, txClient, userID, inviterID); err != nil {
+			return err
+		}
 		bound = true
 		return nil
 	})
@@ -112,6 +124,60 @@ func (r *affiliateRepository) BindInviter(ctx context.Context, userID, inviterID
 		return false, err
 	}
 	return bound, nil
+}
+
+func bindDistributionRelation(ctx context.Context, client affiliateQueryExecer, userID, inviterID int64) error {
+	_, err := client.ExecContext(ctx, `
+WITH programs AS (
+    SELECT id, tenant_id FROM distribution_programs WHERE code = 'compute_company'
+), members AS (
+    INSERT INTO distribution_members (program_id, tenant_id, user_id)
+    SELECT p.id, p.tenant_id, u.id
+    FROM programs p CROSS JOIN (VALUES ($1::bigint), ($2::bigint)) AS u(id)
+    ON CONFLICT DO NOTHING
+), self_relations AS (
+    INSERT INTO distribution_relations (program_id, tenant_id, ancestor_user_id, descendant_user_id, depth)
+    SELECT p.id, p.tenant_id, u.id, u.id, 0
+    FROM programs p CROSS JOIN (VALUES ($1::bigint), ($2::bigint)) AS u(id)
+    ON CONFLICT DO NOTHING
+)
+INSERT INTO distribution_relations (program_id, tenant_id, ancestor_user_id, descendant_user_id, depth)
+SELECT p.id, p.tenant_id, r.ancestor_user_id, $1, r.depth + 1
+FROM programs p
+JOIN distribution_relations r ON r.program_id = p.id AND r.descendant_user_id = $2
+WHERE r.depth < 5 AND r.ancestor_user_id <> $1
+ON CONFLICT DO NOTHING`, userID, inviterID)
+	if err != nil {
+		return fmt.Errorf("bind distribution relation: %w", err)
+	}
+	return nil
+}
+
+func ensureDistributionIdentity(ctx context.Context, client affiliateQueryExecer, userID int64) error {
+	_, err := client.ExecContext(ctx, `
+WITH programs AS (
+    SELECT id, tenant_id FROM distribution_programs WHERE code = 'compute_company'
+), members AS (
+    INSERT INTO distribution_members (program_id, tenant_id, user_id)
+    SELECT id, tenant_id, $1 FROM programs
+    ON CONFLICT DO NOTHING
+)
+INSERT INTO distribution_relations (program_id, tenant_id, ancestor_user_id, descendant_user_id, depth)
+SELECT id, tenant_id, $1, $1, 0 FROM programs
+ON CONFLICT DO NOTHING`, userID)
+	if err != nil {
+		return fmt.Errorf("ensure distribution identity: %w", err)
+	}
+	return nil
+}
+
+func isDistributionSchemaUnavailable(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "no such table: distribution_programs") ||
+		strings.Contains(message, `relation "distribution_programs" does not exist`)
 }
 
 func (r *affiliateRepository) AccrueQuota(ctx context.Context, inviterID, inviteeUserID int64, amount float64, freezeHours int, sourceOrderID *int64) (bool, error) {
@@ -286,22 +352,14 @@ FROM cleared`, userID)
 			return service.ErrAffiliateQuotaEmpty
 		}
 
-		affected, err := txClient.User.Update().
-			Where(user.IDEQ(userID)).
-			AddBalance(transferred).
-			AddTotalRecharged(transferred).
-			Save(txCtx)
+		creditAccount, _, err := creditledger.Apply(txCtx, txClient, userID, decimal.NewFromFloat(transferred), creditctx.Metadata{
+			EntryType:  "legacy_affiliate_transfer",
+			SourceType: "legacy_affiliate_quota",
+		}, false)
 		if err != nil {
 			return fmt.Errorf("credit user balance by affiliate quota: %w", err)
 		}
-		if affected == 0 {
-			return service.ErrUserNotFound
-		}
-
-		newBalance, err = queryUserBalance(txCtx, txClient, userID)
-		if err != nil {
-			return err
-		}
+		newBalance, _ = creditAccount.Balance().Float64()
 
 		snapshot, err := queryAffiliateTransferSnapshot(txCtx, txClient, userID)
 		if err != nil {

@@ -1253,7 +1253,7 @@ func verifyNotifyCode(ctx context.Context, cache EmailCache, email, code string)
 			return ErrInvalidVerifyCode
 		}
 		if err := cache.SetNotifyVerifyCode(ctx, email, data, remaining); err != nil {
-			slog.Error("failed to update notify verify code attempts", "email", email, "error", err)
+			slog.Error("failed to update notify verify code attempts", "recipient_hash", notificationEmailHash(email), "error", err)
 		}
 		if data.Attempts >= maxVerifyCodeAttempts {
 			return ErrVerifyCodeMaxAttempts

@@ -38,6 +38,9 @@ type AdminHandlers struct {
 	Payment                *admin.PaymentHandler
 	Affiliate              *admin.AffiliateHandler
 	Compliance             *admin.ComplianceHandler
+	Distribution           *admin.DistributionHandler
+	SaaS                   *admin.SaaSHandler
+	Voucher                *admin.VoucherHandler
 }
 
 // Handlers contains all HTTP handlers
@@ -47,6 +50,9 @@ type Handlers struct {
 	APIKey           *APIKeyHandler
 	Usage            *UsageHandler
 	Redeem           *RedeemHandler
+	Voucher          *VoucherHandler
+	Distribution     *DistributionHandler
+	Partner          *PartnerHandler
 	Subscription     *SubscriptionHandler
 	Announcement     *AnnouncementHandler
 	ChannelMonitor   *ChannelMonitorUserHandler

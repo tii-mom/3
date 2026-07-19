@@ -113,6 +113,34 @@ func (_c *APIKeyCreate) SetNillableStatus(v *string) *APIKeyCreate {
 	return _c
 }
 
+// SetKeyType sets the "key_type" field.
+func (_c *APIKeyCreate) SetKeyType(v string) *APIKeyCreate {
+	_c.mutation.SetKeyType(v)
+	return _c
+}
+
+// SetNillableKeyType sets the "key_type" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableKeyType(v *string) *APIKeyCreate {
+	if v != nil {
+		_c.SetKeyType(*v)
+	}
+	return _c
+}
+
+// SetTenantID sets the "tenant_id" field.
+func (_c *APIKeyCreate) SetTenantID(v int64) *APIKeyCreate {
+	_c.mutation.SetTenantID(v)
+	return _c
+}
+
+// SetNillableTenantID sets the "tenant_id" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableTenantID(v *int64) *APIKeyCreate {
+	if v != nil {
+		_c.SetTenantID(*v)
+	}
+	return _c
+}
+
 // SetLastUsedAt sets the "last_used_at" field.
 func (_c *APIKeyCreate) SetLastUsedAt(v time.Time) *APIKeyCreate {
 	_c.mutation.SetLastUsedAt(v)
@@ -387,6 +415,10 @@ func (_c *APIKeyCreate) defaults() error {
 		v := apikey.DefaultStatus
 		_c.mutation.SetStatus(v)
 	}
+	if _, ok := _c.mutation.KeyType(); !ok {
+		v := apikey.DefaultKeyType
+		_c.mutation.SetKeyType(v)
+	}
 	if _, ok := _c.mutation.Quota(); !ok {
 		v := apikey.DefaultQuota
 		_c.mutation.SetQuota(v)
@@ -455,6 +487,14 @@ func (_c *APIKeyCreate) check() error {
 	if v, ok := _c.mutation.Status(); ok {
 		if err := apikey.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "APIKey.status": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.KeyType(); !ok {
+		return &ValidationError{Name: "key_type", err: errors.New(`ent: missing required field "APIKey.key_type"`)}
+	}
+	if v, ok := _c.mutation.KeyType(); ok {
+		if err := apikey.KeyTypeValidator(v); err != nil {
+			return &ValidationError{Name: "key_type", err: fmt.Errorf(`ent: validator failed for field "APIKey.key_type": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.Quota(); !ok {
@@ -534,6 +574,14 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)
 		_node.Status = value
+	}
+	if value, ok := _c.mutation.KeyType(); ok {
+		_spec.SetField(apikey.FieldKeyType, field.TypeString, value)
+		_node.KeyType = value
+	}
+	if value, ok := _c.mutation.TenantID(); ok {
+		_spec.SetField(apikey.FieldTenantID, field.TypeInt64, value)
+		_node.TenantID = &value
 	}
 	if value, ok := _c.mutation.LastUsedAt(); ok {
 		_spec.SetField(apikey.FieldLastUsedAt, field.TypeTime, value)
@@ -790,6 +838,42 @@ func (u *APIKeyUpsert) SetStatus(v string) *APIKeyUpsert {
 // UpdateStatus sets the "status" field to the value that was provided on create.
 func (u *APIKeyUpsert) UpdateStatus() *APIKeyUpsert {
 	u.SetExcluded(apikey.FieldStatus)
+	return u
+}
+
+// SetKeyType sets the "key_type" field.
+func (u *APIKeyUpsert) SetKeyType(v string) *APIKeyUpsert {
+	u.Set(apikey.FieldKeyType, v)
+	return u
+}
+
+// UpdateKeyType sets the "key_type" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateKeyType() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldKeyType)
+	return u
+}
+
+// SetTenantID sets the "tenant_id" field.
+func (u *APIKeyUpsert) SetTenantID(v int64) *APIKeyUpsert {
+	u.Set(apikey.FieldTenantID, v)
+	return u
+}
+
+// UpdateTenantID sets the "tenant_id" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateTenantID() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldTenantID)
+	return u
+}
+
+// AddTenantID adds v to the "tenant_id" field.
+func (u *APIKeyUpsert) AddTenantID(v int64) *APIKeyUpsert {
+	u.Add(apikey.FieldTenantID, v)
+	return u
+}
+
+// ClearTenantID clears the value of the "tenant_id" field.
+func (u *APIKeyUpsert) ClearTenantID() *APIKeyUpsert {
+	u.SetNull(apikey.FieldTenantID)
 	return u
 }
 
@@ -1217,6 +1301,48 @@ func (u *APIKeyUpsertOne) SetStatus(v string) *APIKeyUpsertOne {
 func (u *APIKeyUpsertOne) UpdateStatus() *APIKeyUpsertOne {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateStatus()
+	})
+}
+
+// SetKeyType sets the "key_type" field.
+func (u *APIKeyUpsertOne) SetKeyType(v string) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetKeyType(v)
+	})
+}
+
+// UpdateKeyType sets the "key_type" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateKeyType() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateKeyType()
+	})
+}
+
+// SetTenantID sets the "tenant_id" field.
+func (u *APIKeyUpsertOne) SetTenantID(v int64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetTenantID(v)
+	})
+}
+
+// AddTenantID adds v to the "tenant_id" field.
+func (u *APIKeyUpsertOne) AddTenantID(v int64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddTenantID(v)
+	})
+}
+
+// UpdateTenantID sets the "tenant_id" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateTenantID() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateTenantID()
+	})
+}
+
+// ClearTenantID clears the value of the "tenant_id" field.
+func (u *APIKeyUpsertOne) ClearTenantID() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.ClearTenantID()
 	})
 }
 
@@ -1855,6 +1981,48 @@ func (u *APIKeyUpsertBulk) SetStatus(v string) *APIKeyUpsertBulk {
 func (u *APIKeyUpsertBulk) UpdateStatus() *APIKeyUpsertBulk {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateStatus()
+	})
+}
+
+// SetKeyType sets the "key_type" field.
+func (u *APIKeyUpsertBulk) SetKeyType(v string) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetKeyType(v)
+	})
+}
+
+// UpdateKeyType sets the "key_type" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateKeyType() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateKeyType()
+	})
+}
+
+// SetTenantID sets the "tenant_id" field.
+func (u *APIKeyUpsertBulk) SetTenantID(v int64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetTenantID(v)
+	})
+}
+
+// AddTenantID adds v to the "tenant_id" field.
+func (u *APIKeyUpsertBulk) AddTenantID(v int64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddTenantID(v)
+	})
+}
+
+// UpdateTenantID sets the "tenant_id" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateTenantID() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateTenantID()
+	})
+}
+
+// ClearTenantID clears the value of the "tenant_id" field.
+func (u *APIKeyUpsertBulk) ClearTenantID() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.ClearTenantID()
 	})
 }
 

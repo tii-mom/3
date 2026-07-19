@@ -26,3 +26,13 @@ func TestAffiliateRecordQueriesUseLedgerAuditFields(t *testing.T) {
 	require.NotContains(t, content, "parseAffiliateRebateAmount")
 	require.NotContains(t, content, `"current_balance": "u.balance"`)
 }
+
+func TestDistributionSchemaUnavailableDetection(t *testing.T) {
+	require.True(t, isDistributionSchemaUnavailable(assertiveError(`relation "distribution_programs" does not exist`)))
+	require.True(t, isDistributionSchemaUnavailable(assertiveError("no such table: distribution_programs")))
+	require.False(t, isDistributionSchemaUnavailable(assertiveError("permission denied for table distribution_programs")))
+}
+
+type assertiveError string
+
+func (e assertiveError) Error() string { return string(e) }

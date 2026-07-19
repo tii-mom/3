@@ -201,13 +201,18 @@ Sub2API を拡張・統合するコミュニティプロジェクト:
 
 ## Nginx リバースプロキシに関する注意
 
-Sub2API（または CRS）を Nginx でリバースプロキシし、Codex CLI と組み合わせて使用する場合、Nginx の `http` ブロックに以下の設定を追加してください:
+Sub2API（または CRS）を Nginx でリバースプロキシし、Codex CLI と組み合わせて使用する場合、Nginx に以下を追加してください:
 
 ```nginx
+# http または server: アンダースコア付きヘッダーを保持（スティッキーセッション）
 underscores_in_headers on;
+
+# server: Codex /responses の長いコンテキストはデフォルト 1m を超え 413 になる
+client_max_body_size 256m;
 ```
 
-Nginx はデフォルトでアンダースコアを含むヘッダー（例: `session_id`）を破棄するため、マルチアカウント構成でのスティッキーセッションルーティングに支障をきたします。
+- Nginx はデフォルトでアンダースコアを含むヘッダー（例: `session_id`）を破棄するため、マルチアカウント構成でのスティッキーセッションルーティングに支障をきたします。
+- `client_max_body_size` 未設定だと長セッションで `413 Request Entity Too Large`（nginx の HTML）が出やすいです。本番例は `deploy/nginx-sub2api.conf`、運用は `docs/GO_LIVE.md`。
 
 ---
 

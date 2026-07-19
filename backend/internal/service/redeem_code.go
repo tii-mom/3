@@ -25,6 +25,15 @@ type RedeemCode struct {
 	Group *Group
 }
 
+type RedeemCodeStats struct {
+	TotalCodes            int64            `json:"total_codes"`
+	ActiveCodes           int64            `json:"active_codes"`
+	UsedCodes             int64            `json:"used_codes"`
+	ExpiredCodes          int64            `json:"expired_codes"`
+	TotalValueDistributed float64          `json:"total_value_distributed"`
+	ByType                map[string]int64 `json:"by_type"`
+}
+
 func (r *RedeemCode) IsUsed() bool {
 	return r.Status == StatusUsed
 }

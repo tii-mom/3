@@ -178,6 +178,21 @@ func (s *DashboardService) GetGroupUsageSummary(ctx context.Context, todayStart 
 	return results, nil
 }
 
+func (s *DashboardService) GetRealtimeMetrics(ctx context.Context) (*usagestats.RealtimeMetrics, error) {
+	repo, ok := s.usageRepo.(interface {
+		GetRealtimeMetrics(context.Context, time.Time, time.Time) (*usagestats.RealtimeMetrics, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("real-time metrics are unavailable")
+	}
+	end := time.Now()
+	metrics, err := repo.GetRealtimeMetrics(ctx, end.Add(-time.Minute), end)
+	if err != nil {
+		return nil, fmt.Errorf("get real-time metrics: %w", err)
+	}
+	return metrics, nil
+}
+
 func (s *DashboardService) getCachedDashboardStats(ctx context.Context) (*usagestats.DashboardStats, bool, error) {
 	data, err := s.cache.GetDashboardStats(ctx)
 	if err != nil {

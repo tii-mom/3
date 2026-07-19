@@ -407,38 +407,12 @@ type RefundRequestBody struct {
 // RequestRefund submits a refund request for a completed order.
 // POST /api/v1/payment/orders/:id/refund-request
 func (h *PaymentHandler) RequestRefund(c *gin.Context) {
-	subject, ok := requireAuth(c)
-	if !ok {
-		return
-	}
-
-	orderID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "Invalid order ID")
-		return
-	}
-
-	var req RefundRequestBody
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "Invalid request: "+err.Error())
-		return
-	}
-
-	if err := h.paymentService.RequestRefund(c.Request.Context(), orderID, subject.UserID, req.Reason); err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-	response.Success(c, gin.H{"message": "refund requested"})
+	response.ErrorFrom(c, infraerrors.Forbidden("REFUNDS_DISABLED", "refunds are disabled on this platform"))
 }
 
 // GetRefundEligibleProviders returns provider instance IDs that allow user refund.
 func (h *PaymentHandler) GetRefundEligibleProviders(c *gin.Context) {
-	ids, err := h.configService.GetUserRefundEligibleInstanceIDs(c.Request.Context())
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-	response.Success(c, gin.H{"provider_instance_ids": ids})
+	response.ErrorFrom(c, infraerrors.Forbidden("REFUNDS_DISABLED", "refunds are disabled on this platform"))
 }
 
 // VerifyOrderRequest is the request body for verifying a payment order.

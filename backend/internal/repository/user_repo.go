@@ -20,9 +20,12 @@ import (
 	dbuser "github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/ent/userallowedgroup"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/creditctx"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/creditledger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/lib/pq"
+	"github.com/shopspring/decimal"
 
 	entsql "entgo.io/ent/dialect/sql"
 )
@@ -106,6 +109,9 @@ func (r *userRepository) Create(ctx context.Context, userIn *service.User) error
 		return err
 	}
 	if err := ensureEmailAuthIdentityWithClient(txCtx, txClient, created.ID, created.Email, "user_repo_create"); err != nil {
+		return err
+	}
+	if err := creditledger.InitializeNewAccount(txCtx, txClient, created.ID, decimal.NewFromFloat(userIn.Balance)); err != nil && !creditledger.IsSchemaUnavailable(err) {
 		return err
 	}
 
@@ -737,70 +743,48 @@ func (r *userRepository) filterUsersByAttributes(ctx context.Context, attrs map[
 }
 
 func (r *userRepository) UpdateBalance(ctx context.Context, id int64, amount float64) error {
-	client := clientFromContext(ctx, r.client)
-	update := client.User.Update().Where(dbuser.IDEQ(id)).AddBalance(amount)
-	// Track cumulative recharge amount for percentage-based notifications
-	if amount > 0 {
-		update = update.AddTotalRecharged(amount)
-	}
-	n, err := update.Save(ctx)
-	if err != nil {
-		return translatePersistenceError(err, service.ErrUserNotFound, nil)
-	}
-	if n == 0 {
-		return service.ErrUserNotFound
-	}
-	return nil
+	return r.applyCreditAdjustment(ctx, id, decimal.NewFromFloat(amount), creditctx.FromContext(ctx), false)
 }
 
 func (r *userRepository) ApplyRedeemBalanceAdjustment(ctx context.Context, id int64, delta float64) error {
-	const updateSQL = `
-		UPDATE users
-		SET balance = GREATEST(balance + $1, 0), updated_at = NOW()
-		WHERE id = $2 AND deleted_at IS NULL
-	`
-	client := clientFromContext(ctx, r.client)
-	result, err := client.ExecContext(ctx, updateSQL, delta, id)
-	if err != nil {
-		return err
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if affected == 0 {
-		return service.ErrUserNotFound
-	}
-	return nil
+	return r.applyCreditAdjustment(ctx, id, decimal.NewFromFloat(delta), creditctx.FromContext(ctx), true)
 }
 
 // DeductBalance 扣除用户余额
 // 透支策略：允许余额变为负数，确保当前请求能够完成
 // 中间件会阻止余额 <= 0 的用户发起后续请求
 func (r *userRepository) DeductBalance(ctx context.Context, id int64, amount float64) error {
-	client := clientFromContext(ctx, r.client)
-	n, err := client.User.Update().
-		Where(dbuser.IDEQ(id), dbuser.BalanceGTE(amount)).
-		AddBalance(-amount).
-		Save(ctx)
-	if err != nil {
-		return err
+	metadata := creditctx.FromContext(ctx)
+	if metadata.EntryType == "balance_adjustment" {
+		metadata.EntryType = "usage_debit"
 	}
-	if n > 0 {
-		return nil
+	if metadata.SourceType == "legacy_balance_update" {
+		metadata.SourceType = "api_usage"
 	}
+	return r.applyCreditAdjustment(ctx, id, decimal.NewFromFloat(amount).Neg(), metadata, false)
+}
 
-	n, err = client.User.Update().
-		Where(dbuser.IDEQ(id)).
-		AddBalance(-amount).
-		Save(ctx)
+func (r *userRepository) applyCreditAdjustment(ctx context.Context, userID int64, amount decimal.Decimal, metadata creditctx.Metadata, floorAtZero bool) error {
+	apply := func(applyCtx context.Context, client *dbent.Client) error {
+		_, _, err := creditledger.Apply(applyCtx, client, userID, amount, metadata, floorAtZero)
+		if errors.Is(err, creditledger.ErrUserNotFound) {
+			return service.ErrUserNotFound
+		}
+		return err
+	}
+	if tx := dbent.TxFromContext(ctx); tx != nil {
+		return apply(ctx, tx.Client())
+	}
+	tx, err := r.client.Tx(ctx)
 	if err != nil {
 		return err
 	}
-	if n == 0 {
-		return service.ErrUserNotFound
+	defer func() { _ = tx.Rollback() }()
+	txCtx := dbent.NewTxContext(ctx, tx)
+	if err := apply(txCtx, tx.Client()); err != nil {
+		return err
 	}
-	return nil
+	return tx.Commit()
 }
 
 func (r *userRepository) UpdateConcurrency(ctx context.Context, id int64, amount int) error {

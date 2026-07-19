@@ -11,6 +11,28 @@ HEALTH_TIMEOUT=${HEALTH_TIMEOUT:-120}
 
 cd "$DEPLOY_DIR"
 
+validate_env_permissions() {
+  if [[ ! -f .env || -L .env ]]; then
+    printf 'Refusing deployment: %s/.env must be a regular, non-symlink file.\n' "$DEPLOY_DIR" >&2
+    exit 1
+  fi
+
+  local mode owner current_uid
+  mode=$(stat -c '%a' .env)
+  owner=$(stat -c '%u' .env)
+  current_uid=$(id -u)
+  if (( (8#$mode & 8#077) != 0 )); then
+    printf 'Refusing deployment: .env permissions are %s; require 600 or stricter.\n' "$mode" >&2
+    exit 1
+  fi
+  if [[ "$current_uid" != "0" && "$owner" != "$current_uid" ]]; then
+    printf 'Refusing deployment: .env must be owned by the deployment user.\n' >&2
+    exit 1
+  fi
+}
+
+validate_env_permissions
+
 persist_image() {
   local image=$1
   if grep -q '^SUB2API_IMAGE=' .env; then
