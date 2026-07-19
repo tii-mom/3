@@ -26,71 +26,21 @@
         <div class="absolute top-[40%] right-[30%] w-[35vw] h-[35vw] rounded-full bg-primary-500/3 dark:bg-primary-500/[0.01] blur-[100px] animate-orb-float-3"></div>
       </div>
 
-      <!-- Detached Floating Pill Header/Nav -->
-      <header class="home-header sticky top-6 z-50 max-w-5xl mx-auto px-4">
-        <nav class="flex items-center justify-between px-6 py-3 rounded-full bg-white/70 dark:bg-dark-900/70 backdrop-blur-xl border border-slate-200/50 dark:border-white/[0.08] shadow-glass shadow-primary-500/5 transition-all duration-300">
-          <div class="flex items-center gap-3">
-            <img v-if="siteLogo" :src="siteLogo" alt="Logo" class="h-8 w-auto rounded-lg" />
-            <span class="text-xl font-bold tracking-tight text-slate-900 dark:text-white">{{ siteName }}</span>
-          </div>
 
-          <div class="flex items-center gap-4">
-            <LocaleSwitcher />
-            
-            <a 
-              v-if="docUrl" 
-              :href="docUrl" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              class="hidden sm:flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900 dark:text-gray-300 dark:hover:text-white transition-colors"
-            >
-              <Icon name="book" class="h-4.5 w-4.5" />
-              <span>{{ t('home.viewDocs') }}</span>
-            </a>
-
-            <!-- Theme Toggle -->
-            <button 
-              @click="toggleTheme" 
-              class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/[0.06] text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white transition-all duration-200"
-              :title="isDark ? t('home.switchToLight') : t('home.switchToDark')"
-              :aria-label="isDark ? t('home.switchToLight') : t('home.switchToDark')"
-            >
-              <Icon :name="isDark ? 'sun' : 'moon'" class="h-5 w-5 animate-scale-in" />
-            </button>
-
-            <!-- Login / Dashboard CTAs -->
-            <div class="flex items-center gap-2">
-              <template v-if="isAuthenticated">
-                <router-link 
-                  :to="dashboardPath" 
-                  class="flex items-center gap-2 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200/85 dark:bg-white/[0.08] dark:hover:bg-white/[0.12] dark:border-white/[0.08] px-4 py-1.5 text-sm font-medium text-slate-800 dark:text-white transition-all active:scale-[0.98]"
-                >
-                  <div class="h-5 w-5 rounded-full bg-primary-500 text-white flex items-center justify-center text-xs font-bold font-mono">
-                    {{ userInitial }}
-                  </div>
-                  <span class="hidden md:inline">{{ t('home.dashboard') }}</span>
-                </router-link>
-              </template>
-              <template v-else>
-                <router-link 
-                  to="/login" 
-                  class="rounded-full bg-gradient-primary px-5 py-1.5 text-sm font-semibold text-white shadow-glow hover:opacity-95 active:scale-[0.98] transition-all"
-                >
-                  {{ t('home.login') }}
-                </router-link>
-              </template>
-            </div>
-          </div>
-        </nav>
-      </header>
 
       <!-- Main Layout -->
       <main class="home-main max-w-6xl mx-auto px-4 md:px-6 relative z-10 pt-16 pb-32">
         
         <!-- Hero Section -->
-        <section class="home-hero grid grid-cols-1 lg:grid-cols-12 gap-12 items-center mb-32">
+        <section class="home-hero grid grid-cols-1 lg:grid-cols-12 gap-12 items-center mb-24">
           <!-- Hero Left Content -->
           <div class="lg:col-span-7 max-w-3xl space-y-8 text-left reveal">
+            <!-- Brand Logo & Name directly in Hero -->
+            <div class="flex items-center gap-3 mb-6">
+              <img v-if="siteLogo" :src="siteLogo" alt="Logo" class="h-8 w-auto rounded-lg" />
+              <span class="text-xl font-black text-slate-900 dark:text-white">{{ siteName }}</span>
+            </div>
+
             <!-- Mainland Friendly Pill Badge -->
             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-500/10 border border-primary-500/20 text-xs font-medium text-primary-600 dark:text-primary-400">
               <span class="relative flex h-2 w-2">
@@ -129,6 +79,19 @@
                 <Icon name="book" class="h-5 w-5 text-slate-400 dark:text-gray-400" />
                 <span>{{ t('home.docs') }}</span>
               </a>
+
+              <!-- Integrated Lang & Theme controls -->
+              <div class="flex items-center gap-2 p-1.5 rounded-full bg-slate-100/50 dark:bg-white/[0.04] border border-slate-200/50 dark:border-white/[0.06] shadow-sm">
+                <LocaleSwitcher />
+                <div class="h-4 w-px bg-slate-200 dark:bg-white/[0.08]"></div>
+                <button 
+                  @click="toggleTheme" 
+                  class="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-white/[0.06] text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white transition-all duration-200"
+                  :title="isDark ? t('home.switchToLight') : t('home.switchToDark')"
+                >
+                  <Icon :name="isDark ? 'sun' : 'moon'" class="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -330,81 +293,7 @@
           </div>
         </section>
 
-        <!-- Bento Grid Features Section -->
-        <section class="mb-32">
-          <div class="text-center max-w-2xl mx-auto mb-10 reveal">
-            <h2 class="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">{{ t('home.bento.title') }}</h2>
-            <p class="text-slate-600 dark:text-gray-400 mt-4 text-base">{{ t('home.bento.subtitle') }}</p>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <!-- Col span 2 feature: Unified Gateway -->
-            <div class="md:col-span-2 rounded-4xl p-1.5 bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200/50 dark:border-white/[0.05] shadow-glass shadow-primary-500/2 reveal flex">
-              <div class="rounded-[calc(2rem-0.375rem)] bg-white dark:bg-dark-900/80 p-8 md:p-12 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] flex flex-col justify-between w-full min-h-[320px] relative overflow-hidden">
-                <div class="absolute -right-12 -bottom-12 w-64 h-64 rounded-full bg-primary-500/[0.02] blur-3xl pointer-events-none"></div>
-                <div>
-                  <div class="inline-flex p-3 rounded-2xl bg-primary-500/10 border border-primary-500/20 text-primary-500 mb-6">
-                    <Icon name="server" class="h-6 w-6" />
-                  </div>
-                  <h3 class="text-2xl font-black text-slate-900 dark:text-white mb-4">
-                    {{ t('home.bento.mobileTitle') }}
-                  </h3>
-                  <p class="text-slate-600 dark:text-gray-400 text-sm max-w-xl leading-relaxed font-sans">
-                    {{ t('home.bento.mobileDesc') }}
-                  </p>
-                </div>
-              </div>
-            </div>
 
-            <!-- Col span 1 feature: Multi Account Protection (Mesh Gradient visual variety) -->
-            <div class="rounded-4xl p-1.5 bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200/50 dark:border-white/[0.05] shadow-glass shadow-primary-500/2 reveal delay-100 flex">
-              <div class="rounded-[calc(2rem-0.375rem)] bg-gradient-to-br from-primary-500/5 via-[#080a10]/50 to-[#ff7d24]/5 dark:bg-dark-900/80 p-8 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] flex flex-col justify-between w-full min-h-[320px] relative overflow-hidden">
-                <div class="absolute -right-12 -top-12 w-48 h-48 rounded-full bg-[#ff7d24]/10 blur-3xl pointer-events-none"></div>
-                <div>
-                  <div class="inline-flex p-3 rounded-2xl bg-primary-500/10 border border-primary-500/20 text-primary-500 mb-6">
-                    <Icon name="shield" class="h-6 w-6" />
-                  </div>
-                  <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-4">
-                    {{ t('home.bento.modelsTitle') }}
-                  </h3>
-                  <p class="text-slate-600 dark:text-gray-400 text-sm leading-relaxed font-sans">
-                    {{ t('home.bento.modelsDesc') }}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <!-- Full-width feature: Quota billing -->
-            <div class="md:col-span-3 rounded-4xl p-1.5 bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200/50 dark:border-white/[0.05] shadow-glass shadow-primary-500/2 reveal flex">
-              <div class="rounded-[calc(2rem-0.375rem)] bg-white dark:bg-dark-900/80 p-8 md:p-12 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] flex flex-col md:flex-row items-start md:items-center justify-between gap-8 w-full">
-                <div class="max-w-xl text-left">
-                  <div class="inline-flex p-3 rounded-2xl bg-primary-500/10 border border-primary-500/20 text-primary-500 mb-6">
-                    <Icon name="chart" class="h-6 w-6" />
-                  </div>
-                  <h3 class="text-2xl font-black text-slate-900 dark:text-white mb-4">
-                    {{ t('home.bento.toolsTitle') }}
-                  </h3>
-                  <p class="text-slate-600 dark:text-gray-400 text-sm leading-relaxed font-sans">
-                    {{ t('home.bento.toolsDesc') }}
-                  </p>
-                </div>
-                
-                <div class="h-px w-full md:h-12 md:w-px bg-slate-200 dark:bg-white/[0.06]"></div>
-                
-                <!-- Features mini-stats mockup -->
-                <div class="flex items-center gap-8 font-mono">
-                  <div class="text-left">
-                    <p class="text-[10px] text-gray-500 uppercase tracking-wider mb-1">{{ t('home.stats.responseTime') }}</p>
-                    <p class="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">120ms</p>
-                  </div>
-                  <div class="text-left">
-                    <p class="text-[10px] text-gray-500 uppercase tracking-wider mb-1">{{ t('home.stats.uptime') }}</p>
-                    <p class="text-2xl font-bold text-emerald-500 dark:text-emerald-400 tracking-tight">99.99%</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
 
         <!-- Compute Company & 5-Level Distribution Network -->
         <section class="home-business mb-32 reveal">
@@ -805,11 +694,7 @@ const sanitizedHomeContent = computed(() => DOMPurify.sanitize(homeContent.value
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const isAdmin = computed(() => authStore.isAdmin)
 const dashboardPath = computed(() => isAdmin.value ? '/admin/dashboard' : '/dashboard')
-const userInitial = computed(() => {
-  const user = authStore.user
-  if (!user || !user.email) return ''
-  return user.email.charAt(0).toUpperCase()
-})
+
 
 const activeCodexTask = ref('website')
 const codexTasks = [
