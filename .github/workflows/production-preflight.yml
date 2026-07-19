@@ -54,5 +54,5 @@ jobs:
           IMAGE_DIGEST: ${{ inputs.image_digest }}
         run: |
           ssh -o BatchMode=yes "$VPS_USER@$VPS_HOST" \
-            "bash -s -- '$IMAGE_DIGEST' BACKUP_AND_RESTORE_ONLY" \
+            "chmod 600 /opt/sub2api-deploy/.env && bash -s -- '$IMAGE_DIGEST' BACKUP_AND_RESTORE_ONLY" \
             < deploy/production-preflight.sh
