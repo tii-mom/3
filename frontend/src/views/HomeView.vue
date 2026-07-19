@@ -19,7 +19,12 @@
     <!-- Default Home Page Branch -->
     <div v-else class="relative z-10">
       <!-- Quiet technical atmosphere -->
-      <div class="home-atmosphere pointer-events-none fixed inset-0 z-0"></div>
+      <div class="home-atmosphere pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <!-- Floating Ambient Glow Orbs -->
+        <div class="absolute top-[10%] left-[20%] w-[45vw] h-[45vw] rounded-full bg-primary-500/5 dark:bg-primary-500/[0.03] blur-[120px] animate-orb-float-1"></div>
+        <div class="absolute bottom-[20%] right-[10%] w-[50vw] h-[50vw] rounded-full bg-[#3b82f6]/5 dark:bg-[#3b82f6]/[0.02] blur-[140px] animate-orb-float-2"></div>
+        <div class="absolute top-[40%] right-[30%] w-[35vw] h-[35vw] rounded-full bg-primary-500/3 dark:bg-primary-500/[0.01] blur-[100px] animate-orb-float-3"></div>
+      </div>
 
       <!-- Detached Floating Pill Header/Nav -->
       <header class="home-header sticky top-6 z-50 max-w-5xl mx-auto px-4">
@@ -95,8 +100,11 @@
               <span>{{ t('home.badge.vpnFree') }}</span>
             </div>
 
-            <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.1]">
-              <span class="text-gradient">{{ siteName }}</span>.
+            <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-7.5xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.15]">
+              <span class="text-gradient">{{ siteName }}</span>
+              <span class="block text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-800 dark:text-gray-200 mt-4 leading-normal">
+                {{ t('home.heroSubtitle') }}
+              </span>
             </h1>
 
             <p class="text-lg text-slate-600 dark:text-gray-400 max-w-lg leading-relaxed font-sans">
@@ -892,15 +900,47 @@ onUnmounted(() => {
 }
 
 .home-redesign .home-atmosphere {
-  background-image: linear-gradient(rgba(102, 106, 101, 0.075) 1px, transparent 1px), linear-gradient(90deg, rgba(102, 106, 101, 0.075) 1px, transparent 1px);
+  background-image: linear-gradient(rgba(102, 106, 101, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(102, 106, 101, 0.05) 1px, transparent 1px);
   background-size: 34px 34px;
-  mask-image: linear-gradient(to bottom, black, transparent 72%);
-  opacity: 0.7;
+  mask-image: linear-gradient(to bottom, black, transparent 85%);
+  opacity: 0.8;
+  animation: gridMove 25s linear infinite;
 }
 
 .dark .home-redesign .home-atmosphere {
-  background-image: linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
-  opacity: 0.2;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  opacity: 0.3;
+}
+
+@keyframes gridMove {
+  0% { background-position: 0 0; }
+  100% { background-position: 34px 34px; }
+}
+
+@keyframes orbFloat1 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(40px, -60px) scale(1.08); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+@keyframes orbFloat2 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-50px, 40px) scale(0.92); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+@keyframes orbFloat3 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(30px, 30px) scale(1.05); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+.animate-orb-float-1 {
+  animation: orbFloat1 25s infinite ease-in-out;
+}
+.animate-orb-float-2 {
+  animation: orbFloat2 30s infinite ease-in-out;
+}
+.animate-orb-float-3 {
+  animation: orbFloat3 22s infinite ease-in-out;
 }
 
 .home-redesign .home-header nav {
