@@ -170,22 +170,30 @@
           <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
             <!-- Step 1 Card -->
             <div class="md:col-span-2 rounded-4xl p-1.5 bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200/50 dark:border-white/[0.05] shadow-glass shadow-primary-500/2 reveal flex">
-              <div class="rounded-[calc(2rem-0.375rem)] bg-white dark:bg-dark-900/80 p-6 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] flex flex-col justify-between w-full">
-                <div>
-                  <div class="flex items-center justify-between mb-6">
-                    <span class="h-10 w-10 rounded-2xl bg-primary-500/10 border border-primary-500/20 flex items-center justify-center text-primary-500 font-bold font-mono">1</span>
-                    <div class="p-2 rounded-xl bg-slate-100 dark:bg-white/[0.04] border border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-gray-300">
-                      <Icon name="download" class="h-5 w-5" />
+              <div class="rounded-[calc(2rem-0.375rem)] bg-white dark:bg-dark-900/80 p-6 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] grid grid-cols-1 md:grid-cols-12 gap-6 w-full">
+                <!-- Step 1 Left Column -->
+                <div class="md:col-span-6 flex flex-col justify-between h-full">
+                  <div>
+                    <div class="flex items-center justify-between mb-6">
+                      <span class="h-10 w-10 rounded-2xl bg-primary-500/10 border border-primary-500/20 flex items-center justify-center text-primary-500 font-bold font-mono">1</span>
+                      <div class="p-2 rounded-xl bg-slate-100 dark:bg-white/[0.04] border border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-gray-300 md:hidden">
+                        <Icon name="download" class="h-5 w-5" />
+                      </div>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-2">{{ t('home.onboarding.step1Title') }}</h3>
+                    <p class="text-sm text-slate-600 dark:text-gray-400 leading-relaxed">
+                      {{ t('home.onboarding.step1Desc') }}
+                    </p>
+                  </div>
+                  <div class="hidden md:block mt-6">
+                    <div class="inline-flex p-3 rounded-2xl bg-primary-500/10 border border-primary-500/20 text-primary-500">
+                      <Icon name="download" class="h-6 w-6" />
                     </div>
                   </div>
-                  <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-2">{{ t('home.onboarding.step1Title') }}</h3>
-                  <p class="text-sm text-slate-600 dark:text-gray-400 leading-relaxed mb-6">
-                    {{ t('home.onboarding.step1Desc') }}
-                  </p>
                 </div>
 
-                <!-- Dedicated client download buttons -->
-                <div class="space-y-2 mt-auto">
+                <!-- Step 1 Right Column (Client Downloads) -->
+                <div class="md:col-span-6 space-y-2 flex flex-col justify-center h-full">
                   <a 
                     href="https://pub-e818eceec7614e3084a8a2ad38b6e3f1.r2.dev/Codex-x64.msix" 
                     aria-label="Download OpenAI Codex Client for Windows"
@@ -224,35 +232,56 @@
                     </div>
                   </div>
                   <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-2">{{ t('home.onboarding.step2Title') }}</h3>
-                  <p class="text-sm text-slate-600 dark:text-gray-400 leading-relaxed mb-6">
+                  <p class="text-sm text-slate-600 dark:text-gray-400 leading-relaxed mb-4">
                     {{ t('home.onboarding.step2Desc') }}
                   </p>
+                  
+                  <!-- Tab switcher for mockup options -->
+                  <div class="flex space-x-1 rounded-lg bg-slate-100 dark:bg-white/[0.04] border border-slate-200/50 dark:border-white/[0.08] p-1 mb-4 text-[10px] font-mono">
+                    <button 
+                      type="button" 
+                      class="flex-1 rounded py-1.5 transition-all text-center" 
+                      :class="step2Tab === 'api' ? 'bg-white dark:bg-dark-800 text-slate-900 dark:text-white shadow-sm font-bold' : 'text-slate-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-white'"
+                      @click="step2Tab = 'api'"
+                    >
+                      API Config
+                    </button>
+                    <button 
+                      type="button" 
+                      class="flex-1 rounded py-1.5 transition-all text-center" 
+                      :class="step2Tab === 'ccs' ? 'bg-white dark:bg-dark-800 text-slate-900 dark:text-white shadow-sm font-bold' : 'text-slate-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-white'"
+                      @click="step2Tab = 'ccs'"
+                    >
+                      CC Switch
+                    </button>
+                  </div>
                 </div>
 
-                <div class="mt-4 rounded-xl border border-slate-200/80 dark:border-white/[0.06] bg-dark-950 p-4 text-left font-mono text-[11px] leading-relaxed text-gray-300 space-y-1">
-                  <div>
-                    <span class="text-primary-400">{{ t('home.terminal.comment') }}</span>
+                <div class="mt-auto">
+                  <div v-if="step2Tab === 'api'" class="rounded-xl border border-slate-200/80 dark:border-white/[0.06] bg-dark-950 p-4 text-left font-mono text-[11px] leading-relaxed text-gray-300 space-y-1">
+                    <div>
+                      <span class="text-primary-400">{{ t('home.terminal.comment') }}</span>
+                    </div>
+                    <div>
+                      <span class="text-gray-500">API_URL=</span><span class="text-emerald-400">"https://api.3api.shop/v1"</span>
+                    </div>
+                    <div>
+                      <span class="text-gray-500">API_KEY=</span><span class="text-emerald-400">"sk-your-3api-token"</span>
+                    </div>
                   </div>
-                  <div>
-                    <span class="text-gray-500">API_URL=</span><span class="text-emerald-400">"https://api.3api.shop/v1"</span>
-                  </div>
-                  <div>
-                    <span class="text-gray-500">API_KEY=</span><span class="text-emerald-400">"sk-your-3api-token"</span>
-                  </div>
-                </div>
-                <div class="mt-4 rounded-2xl border border-white/[0.06] bg-[#0d0e14] p-4 text-left">
-                  <div class="flex items-center justify-between border-b border-white/[0.06] pb-3 mb-3">
-                    <div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-primary-500"></span><span class="font-mono text-[11px] text-gray-400">api.3api.shop</span></div>
-                    <span class="rounded-full bg-primary-500/10 px-2 py-1 text-[10px] font-semibold text-primary-400">{{ t('home.ccswitch.consoleTitle') }}</span>
-                  </div>
-                  <div class="space-y-2 text-[11px]">
-                    <div class="flex items-center justify-between border-b border-white/[0.04] pb-2"><span class="text-gray-500">{{ t('home.ccswitch.keyName') }}</span><span class="font-mono text-white">3API_Production_Key</span></div>
-                    <div class="flex items-center justify-between"><span class="text-gray-500">{{ t('home.ccswitch.keyVal') }}</span><span class="font-mono text-primary-400">sk-proj-3api-****************</span></div>
-                  </div>
-                  <div class="mt-4 rounded-xl border border-primary-500/20 bg-primary-500/[0.04] p-3">
-                    <div class="flex items-center justify-between"><span class="text-xs font-semibold text-white">{{ t('home.ccswitch.clientTitle') }}</span><span class="text-[10px] text-primary-400">{{ isCcsImported ? t('home.ccswitch.enabled') : t('home.ccswitch.waitImport') }}</span></div>
-                    <div class="mt-3 space-y-2 text-[10px] text-gray-500"><div class="flex justify-between"><span>Anthropic Proxy</span><span class="text-primary-400">{{ isCcsImported ? t('home.ccswitch.enabled') : t('home.ccswitch.enable') }}</span></div><div class="flex justify-between"><span>OpenRouter Proxy</span><span>{{ t('home.ccswitch.enable') }}</span></div></div>
-                    <a href="https://ccswitch.lovable.app/" target="_blank" rel="noopener noreferrer" class="group mt-3 flex items-center justify-center gap-2 border-t border-white/[0.06] pt-3 text-xs font-semibold text-primary-400 transition-colors hover:text-primary-300"><Icon name="download" class="h-4 w-4 transition-transform group-hover:translate-y-0.5" />{{ t('home.ccswitch.clientDownload') }}<span class="text-[10px] opacity-70">{{ t('home.ccswitch.externalDownload') }}</span></a>
+                  <div v-else class="rounded-2xl border border-white/[0.06] bg-[#0d0e14] p-4 text-left">
+                    <div class="flex items-center justify-between border-b border-white/[0.06] pb-3 mb-3">
+                      <div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-primary-500"></span><span class="font-mono text-[11px] text-gray-400">api.3api.shop</span></div>
+                      <span class="rounded-full bg-primary-500/10 px-2 py-1 text-[10px] font-semibold text-primary-400">{{ t('home.ccswitch.consoleTitle') }}</span>
+                    </div>
+                    <div class="space-y-2 text-[11px]">
+                      <div class="flex items-center justify-between border-b border-white/[0.04] pb-2"><span class="text-gray-500">{{ t('home.ccswitch.keyName') }}</span><span class="font-mono text-white">3API_Production_Key</span></div>
+                      <div class="flex items-center justify-between"><span class="text-gray-500">{{ t('home.ccswitch.keyVal') }}</span><span class="font-mono text-primary-400">sk-proj-3api-***</span></div>
+                    </div>
+                    <div class="mt-4 rounded-xl border border-primary-500/20 bg-primary-500/[0.04] p-3">
+                      <div class="flex items-center justify-between"><span class="text-xs font-semibold text-white">{{ t('home.ccswitch.clientTitle') }}</span><span class="text-[10px] text-primary-400">{{ isCcsImported ? t('home.ccswitch.enabled') : t('home.ccswitch.waitImport') }}</span></div>
+                      <a href="https://ccswitch.lovable.app/" target="_blank" rel="noopener noreferrer" class="group mt-3 flex items-center justify-center gap-2 border-t border-white/[0.06] pt-3 text-xs font-semibold text-primary-400 transition-colors hover:text-primary-300"><Icon name="download" class="h-4 w-4 transition-transform group-hover:translate-y-0.5" /><span class="truncate">CC Switch {{ t('home.ccswitch.clientDownload') }}</span></a>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -269,13 +298,29 @@
                     </div>
                   </div>
                   <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-2">{{ t('home.onboarding.step3Title') }}</h3>
-                  <p class="text-sm text-slate-600 dark:text-gray-400 leading-relaxed mb-6">
+                  <p class="text-sm text-slate-600 dark:text-gray-400 leading-relaxed">
                     {{ t('home.onboarding.step3Desc') }}
                   </p>
                 </div>
 
-                <!-- Compatible logos list -->
-                <div class="grid grid-cols-3 gap-2 mt-auto text-center text-[10px] font-semibold text-slate-700 dark:text-gray-300 font-mono">
+                <!-- Middle integration list to align height -->
+                <div class="my-6 space-y-2.5">
+                  <div class="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200/50 bg-slate-50/50 dark:border-white/[0.04] dark:bg-white/[0.02]">
+                    <div class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+                    <span class="text-xs font-semibold text-slate-700 dark:text-gray-350 font-sans">Cursor / VS Code</span>
+                  </div>
+                  <div class="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200/50 bg-slate-50/50 dark:border-white/[0.04] dark:bg-white/[0.02]">
+                    <div class="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+                    <span class="text-xs font-semibold text-slate-700 dark:text-gray-350 font-sans">Obsidian / Lobe Chat</span>
+                  </div>
+                  <div class="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200/50 bg-slate-50/50 dark:border-white/[0.04] dark:bg-white/[0.02]">
+                    <div class="w-2.5 h-2.5 rounded-full bg-primary-500"></div>
+                    <span class="text-xs font-semibold text-slate-700 dark:text-gray-350 font-sans">Chatbox / Next Web</span>
+                  </div>
+                </div>
+
+                <!-- Compatible platforms list -->
+                <div class="grid grid-cols-3 gap-2 text-center text-[10px] font-semibold text-slate-700 dark:text-gray-300 font-mono mt-auto">
                   <div class="py-2.5 rounded-lg border border-slate-200 bg-slate-50/50 dark:border-white/[0.03] dark:bg-white/[0.01]">{{ t('home.platform.mobile') }}</div>
                   <div class="py-2.5 rounded-lg border border-slate-200 bg-slate-50/50 dark:border-white/[0.03] dark:bg-white/[0.01]">{{ t('home.platform.web') }}</div>
                   <div class="py-2.5 rounded-lg border border-slate-200 bg-slate-50/50 dark:border-white/[0.03] dark:bg-white/[0.01]">{{ t('home.platform.desktop') }}</div>
@@ -774,6 +819,7 @@ const codexTasks = [
 ]
 const activeTask = computed(() => codexTasks.find((task) => task.id === activeCodexTask.value) || codexTasks[0])
 let codexTaskTimer: ReturnType<typeof setInterval> | undefined
+const step2Tab = ref('api')
 
 const reviewsList = [
   { avatar: 'AR', name: 'Alex Rivera', role: 'Senior AI Infrastructure Lead', text: '3API is game changing. Subscription endpoints convert directly to native keys, maintaining session state perfectly. Pairing with CC Switch took less than 20 seconds.' },
