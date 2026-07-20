@@ -134,7 +134,7 @@ export default {
       saasTitle: '把 3API 变成你的品牌',
       saasDesc: '租户、套餐、订阅、域名、资源分配和合作提现集中在一个控制面，快速上线独立品牌的 AI API 服务。',
       computeTitle: '算力，也能成为业务网络',
-      computeDesc: '用团队业绩驱动五级佣金，冻结、可用与提现流水清晰分层，合作关系可持续增长。',
+      computeDesc: '用团队业绩驱动部门绩效提成，冻结、可用与提现流水清晰分层，合作关系可持续增长。',
       openPartner: '进入 SaaS 合作伙伴',
       openCompute: '进入算力公司'
     },

@@ -133,9 +133,9 @@ export default {
       subtitle: 'Personal usage, branded SaaS, and compute partnerships run on the same routing, billing, and resource control plane.',
       saasTitle: 'Turn 3API into your brand',
       saasDesc: 'Manage tenants, plans, subscriptions, domains, resources, and partner payouts from one control surface for a faster branded AI API launch.',
-      computeTitle: 'Compute becomes a business network',
-      computeDesc: 'Grow through team volume and five-level commissions with clear frozen, available, and payout states.',
-      openPartner: 'Open SaaS Partner',
+      computeTitle: 'Compute can also form an operational network',
+      computeDesc: 'Grow through team volume and department performance with clear frozen, available, and payout states.',
+      openPartner: 'Enter SaaS Partner',
       openCompute: 'Open Compute Company'
     },
     // Pain points section

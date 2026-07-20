@@ -109,7 +109,7 @@
                   <div class="home-route home-route-active"><span class="home-provider-mark">O</span><span>OpenAI 主路由</span><strong>684ms</strong></div>
                   <div class="home-route"><span class="home-provider-mark">A</span><span>Claude 备用路由</span><strong>ready</strong></div>
                   <div class="home-route"><span class="home-provider-mark">G</span><span>Gemini 直连路由</span><strong>ready</strong></div>
-                  <router-link class="home-route" :to="isAuthenticated ? '/distribution' : '/login'"><Icon name="users" /><span>算力公司网络</span><strong>5 层</strong></router-link>
+                  <router-link class="home-route" :to="isAuthenticated ? '/distribution' : '/login'"><Icon name="users" /><span>算力公司网络</span><strong>5 部门</strong></router-link>
                 </div>
               </div>
             </div>
@@ -335,7 +335,7 @@
 
                     <div class="px-6 py-4 border border-primary-500/30 bg-primary-500/5 rounded text-center shrink-0">
                       <strong class="block text-sm text-slate-900 dark:text-white font-bold">算力公司</strong>
-                      <span class="text-[10px] text-primary-500 font-mono">团队业绩 · 五级佣金</span>
+                      <span class="text-[10px] text-primary-500 font-mono">团队业绩 · 部门绩效</span>
                     </div>
 
                     <div class="flex-1 h-px bg-primary-500/30 relative flex items-center justify-between">

@@ -94,7 +94,7 @@ SELECT status, COUNT(*), MAX(attempts) FROM financial_outbox_events GROUP BY sta
 2. 在额度桶影子模式观察至少 24 小时，每小时对比 `users.balance` 与额度桶，并确认 `financial_reconciliation_issues` 没有开放问题。
 3. 管理后台通过 TOTP 启用 `credit_bucket_enforce_enabled`，验证非可转让优先、可转让其次、债务最后，观察至少 24 小时。
 4. 对内部测试用户启用兑换码，完整走创建、风控锁定、解锁、兑换、撤销和到期退款。
-5. 启用算力公司但保持 `stack_with_legacy=false`，用五层测试关系验证跨档订单和 7 天冻结。
+5. 启用算力公司但保持 `stack_with_legacy=false`，用五部门测试架构验证跨档订单和 7 天冻结。
 6. 启用 SaaS 控制面，只创建试点租户；域名 TXT 校验成功后再配置 TLS 和流量。
 7. 逐租户验证批发余额耗尽返回 `TENANT_WHOLESALE_BALANCE_INSUFFICIENT`，总开关关闭返回 `SAAS_CONTROL_PLANE_DISABLED`。
 
@@ -107,7 +107,7 @@ SELECT status, COUNT(*), MAX(attempts) FROM financial_outbox_events GROUP BY sta
 - 兑换所得进入不可转让额度，不增加 `total_recharged`，不触发任何返利。
 - 撤销和到期原事务退回面值与手续费；并发操作只有一个状态转换成功。
 
-### 五级分销与提现
+### 算力公司部门组织与提现
 
 - 邀请关系无环且永久锁定，层级固定、不压缩。
 - 团队业绩仅包含余额充值的人民币实付本金，支付附加费不计入。
@@ -116,7 +116,7 @@ SELECT status, COUNT(*), MAX(attempts) FROM financial_outbox_events GROUP BY sta
 - 提现只来自现金佣金钱包，状态仅允许 `SUBMITTED -> APPROVED -> PAID` 或 `REJECTED`。
 - 管理员查看完整支付宝信息和改变提现状态必须通过 TOTP。
 - 支付拒付只通过充值事件的“拒付冲正”执行；必须填写原因并通过 TOTP，重复提交返回同一冲正记录。
-- 冲正后撤回充值本金、首充赠额、五层业绩、新五级佣金及同订单的旧邀请返利；已提现佣金形成债务，后续佣金解冻时优先偿还。
+- 冲正后撤回充值本金、首充赠额、部门业绩、新部门绩效及同订单的旧邀请返利；已提现佣金形成债务，后续佣金解冻时优先偿还。
 
 ### 白牌 SaaS
 

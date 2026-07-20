@@ -25,7 +25,7 @@
                   <tr>
                     <th class="px-4 py-3 text-left">{{ t('finance.distribution.tier') }}</th>
                     <th class="px-4 py-3 text-right">{{ t('finance.distribution.threshold') }}</th>
-                    <th v-for="level in 5" :key="level" class="px-4 py-3 text-right">L{{ level }}</th>
+                    <th v-for="(dept, level) in departments" :key="level" class="px-4 py-3 text-right">{{ dept }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -42,7 +42,7 @@
             <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('finance.distribution.levels') }}</h2>
             <div class="mt-4 space-y-3">
               <div v-for="level in 5" :key="level" class="flex items-center justify-between border-b border-gray-100 pb-3 last:border-0 dark:border-dark-700">
-                <span class="text-sm text-gray-500">L{{ level }}</span>
+                <span class="text-sm text-gray-500">{{ departments[level - 1] }}</span>
                 <strong class="text-gray-900 dark:text-white font-mono">{{ dashboard.level_counts[level] || 0 }}</strong>
               </div>
             </div>
@@ -82,7 +82,7 @@
             <tbody>
               <tr v-for="item in ledger" :key="item.id" class="border-t border-gray-100 dark:border-dark-700">
                 <td class="px-4 py-3 font-mono">#{{ item.source_order_id }}</td>
-                <td class="px-4 py-3 text-right font-mono">L{{ item.depth }}</td>
+                <td class="px-4 py-3 text-right font-mono">{{ departments[item.depth - 1] || item.depth }}</td>
                 <td class="px-4 py-3 text-right font-mono">{{ item.rate_bps / 100 }}%</td>
                 <td class="px-4 py-3 text-right font-mono font-medium text-emerald-600">{{ cny(item.amount_cny_minor) }}</td>
                 <td class="px-4 py-3">{{ item.status }}</td>
@@ -155,6 +155,7 @@ import { useAuthStore } from '@/stores/auth'
 import { extractApiErrorMessage } from '@/utils/apiError'
 
 const { t } = useI18n(); const app = useAppStore(); const auth = useAuthStore()
+const departments = ['核心算力部', '渠道拓展部', '应用接入部', '生态合作部', '基础支撑部']
 const activeTab = ref('overview'); const dashboard = ref<DistributionDashboard>(); const team = ref<TeamNode[]>([]); const ledger = ref<Commission[]>([]); const withdrawals = ref<Withdrawal[]>([]); const payout = ref<PayoutAccount>(); const search = ref(''); const graphContainer = ref<HTMLElement>(); const realName = ref(''); const alipay = ref(''); const withdrawAmount = ref(''); let graph: any
 const tabs = computed(() => [{ id: 'overview', label: t('finance.distribution.overview') }, { id: 'team', label: t('finance.distribution.team') }, { id: 'ledger', label: t('finance.distribution.ledger') }, { id: 'withdraw', label: t('finance.distribution.withdraw') }])
 const stats = computed(() => dashboard.value ? [{ label: t('finance.distribution.teamVolume'), value: cny(dashboard.value.team_volume_cny_minor) }, { label: t('finance.distribution.currentTier'), value: `T${dashboard.value.current_tier}` }, { label: t('common.available'), value: cny(dashboard.value.available_cny_minor) }, { label: t('common.frozenBalance'), value: cny(dashboard.value.frozen_cny_minor) }, ...(dashboard.value.debt_cny_minor > 0 ? [{ label: t('finance.distribution.debt'), value: cny(dashboard.value.debt_cny_minor) }] : [])] : [])
