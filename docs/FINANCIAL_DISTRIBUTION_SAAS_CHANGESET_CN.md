@@ -13,7 +13,7 @@
 2. 用户额度兑换码
    - `internal/service/voucher_service.go`
    - 用户及管理员 voucher handler、route、API 和页面
-3. 算力公司部门组织与提现
+3. 五级分销与提现
    - `177_distribution_program.sql`
    - `180_distribution_reversals.sql`
    - `internal/service/distribution_service.go`
@@ -32,7 +32,7 @@
 | --- | --- | --- |
 | `credit_bucket_enforce_enabled` | `false` | `false` 时旧余额权威且额度桶影子写入，`true` 时额度桶接管兼容余额 |
 | `balance_voucher_enabled` | `false` | 控制用户创建额度兑换码 |
-| `distribution_programs.enabled` | `false` | 控制算力公司首充奖励、团队业绩和部门绩效 |
+| `distribution_programs.enabled` | `false` | 控制算力公司首充奖励、团队业绩和五级佣金 |
 | `distribution_programs.stack_with_legacy` | `false` | 是否同时发放旧单层返利 |
 | `saas_control_plane_enabled` | `false` | 控制租户创建和批发 Key 访问 |
 
