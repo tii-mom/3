@@ -16,12 +16,33 @@ func TestDistributionDashboardDisabledUserWithoutProfileReturnsZeroValues(t *tes
 
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id, enabled FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company'`)).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "enabled"}).AddRow(7, false))
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT team_volume_cny_minor, current_tier FROM distribution_members WHERE program_id = $1 AND user_id = $2`)).
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT team_volume_cny_minor, current_tier, tier_override FROM distribution_members WHERE program_id = $1 AND user_id = $2`)).
 		WithArgs(int64(7), int64(42)).
-		WillReturnRows(sqlmock.NewRows([]string{"team_volume_cny_minor", "current_tier"}))
+		WillReturnRows(sqlmock.NewRows([]string{"team_volume_cny_minor", "current_tier", "tier_override"}))
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT depth, COUNT(*) FROM distribution_relations WHERE program_id = $1 AND ancestor_user_id = $2 AND depth BETWEEN 1 AND 5 GROUP BY depth`)).
 		WithArgs(int64(7), int64(42)).
 		WillReturnRows(sqlmock.NewRows([]string{"depth", "count"}))
+	mock.ExpectQuery(regexp.QuoteMeta(`
+SELECT r.depth, COUNT(DISTINCT r.descendant_user_id), COALESCE(SUM(e.base_cny_minor), 0)
+FROM distribution_relations r
+LEFT JOIN distribution_recharge_events e
+  ON e.program_id = r.program_id
+ AND e.user_id = r.descendant_user_id
+ AND e.status = 'APPLIED'
+WHERE r.program_id = $1 AND r.ancestor_user_id = $2 AND r.depth BETWEEN 1 AND 5
+GROUP BY r.depth`)).
+		WithArgs(int64(7), int64(42)).
+		WillReturnRows(sqlmock.NewRows([]string{"depth", "members", "recharge"}))
+	mock.ExpectQuery(regexp.QuoteMeta(`
+SELECT depth,
+       COALESCE(SUM(CASE WHEN status <> 'REVERSED' THEN amount_cny_minor ELSE 0 END), 0),
+       COALESCE(SUM(CASE WHEN status = 'AVAILABLE' THEN amount_cny_minor ELSE 0 END), 0),
+       COALESCE(SUM(CASE WHEN status = 'FROZEN' THEN amount_cny_minor ELSE 0 END), 0)
+FROM distribution_commissions
+WHERE program_id = $1 AND beneficiary_user_id = $2 AND depth BETWEEN 1 AND 5
+GROUP BY depth`)).
+		WithArgs(int64(7), int64(42)).
+		WillReturnRows(sqlmock.NewRows([]string{"depth", "commission", "available", "frozen"}))
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT available_cny_minor, frozen_cny_minor, withdrawing_cny_minor, debt_cny_minor, lifetime_earned_cny_minor FROM distribution_cash_wallets WHERE program_id = $1 AND user_id = $2`)).
 		WithArgs(int64(7), int64(42)).
 		WillReturnRows(sqlmock.NewRows([]string{"available", "frozen", "withdrawing", "debt", "lifetime"}))
@@ -40,6 +61,7 @@ func TestDistributionDashboardDisabledUserWithoutProfileReturnsZeroValues(t *tes
 	require.Zero(t, dashboard.AvailableMinor)
 	require.Zero(t, dashboard.FrozenMinor)
 	require.Empty(t, dashboard.LevelCounts)
+	require.Len(t, dashboard.Levels, 5)
 	require.Len(t, dashboard.Tiers, 3)
 	require.NoError(t, mock.ExpectationsWereMet())
 }

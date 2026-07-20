@@ -62,16 +62,16 @@ export default {
       claudeBackup: 'Claude 备用路由',
       geminiDirect: 'Gemini 直连路由',
       computeNetwork: '算力公司网络',
-      departmentsCount: '5 部门'
+      companyUnitsCount: '5 个公司单元'
     },
     architecture: {
       directPartner: '直属伙伴',
       computeCompany: '算力公司',
-      performanceBadge: '团队业绩 · 部门绩效',
+      performanceBadge: '团队业绩 · 公司收益',
       endUser: '终端用户',
-      t1: 'T1 基础',
-      t2: 'T2 增长',
-      t3: 'T3 规模'
+      t1: 'T1',
+      t2: 'T2',
+      t3: 'T3'
     },
     ccswitch: {
       title: '配置 CcSwitch',
@@ -174,10 +174,10 @@ export default {
       review4Text: '对于多项目开发者来说，一键分发至 CCS 是最爽的体验。管理密钥从来没有这么高效过，官方通道非常稳定。'
     },
     business: {
-      title: '算力公司与部门绩效网络',
+      title: '算力公司与收益网络',
       subtitle: '个人调用和算力合作都由同一套高可用路由、计费与资源控制面支撑。',
       computeTitle: '算力，也能成为业务网络',
-      computeDesc: '用团队业绩驱动部门绩效提成，冻结、可用与提现流水清晰分层，合作关系可持续增长。',
+      computeDesc: '用团队业绩驱动公司收益，冻结、可用与提现流水清晰可追踪，合作关系可持续增长。',
       openCompute: '进入算力公司'
     },
     // 用户痛点区块

@@ -62,16 +62,16 @@ export default {
       claudeBackup: 'Claude Backup Route',
       geminiDirect: 'Gemini Direct Route',
       computeNetwork: 'Compute Company Network',
-      departmentsCount: '5 Departments'
+      companyUnitsCount: '5 Company Units'
     },
     architecture: {
       directPartner: 'Direct Partner',
       computeCompany: 'Compute Company',
-      performanceBadge: 'Team Volume · Department Performance',
+      performanceBadge: 'Team Volume · Company Performance',
       endUser: 'End User',
-      t1: 'T1 Foundation',
-      t2: 'T2 Growth',
-      t3: 'T3 Scale'
+      t1: 'T1',
+      t2: 'T2',
+      t3: 'T3'
     },
     ccswitch: {
       title: 'Configure CcSwitch',
@@ -177,7 +177,7 @@ export default {
       title: 'Compute Company & Performance Network',
       subtitle: 'Personal usage and compute partnerships run on the same high-availability routing, billing, and resource control plane.',
       computeTitle: 'Compute can also form an operational network',
-      computeDesc: 'Grow through team volume and department performance with clear frozen, available, and payout states.',
+      computeDesc: 'Grow through team volume and company earnings with clear frozen, available, and payout states.',
       openCompute: 'Open Compute Company'
     },
     // Pain points section

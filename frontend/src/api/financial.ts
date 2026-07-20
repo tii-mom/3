@@ -22,8 +22,9 @@ export interface VoucherAvailability {
   maximum_face_value_usd: string
 }
 export interface DistributionTier { tier: number; threshold_cny_minor: number; rates_bps: [number, number, number, number, number] }
-export interface DistributionDashboard { enabled: boolean; team_volume_cny_minor: number; current_tier: number; next_threshold_cny_minor: number; level_counts: Record<number, number>; available_cny_minor: number; frozen_cny_minor: number; withdrawing_cny_minor: number; debt_cny_minor: number; lifetime_earned_cny_minor: number; tiers: DistributionTier[] }
-export interface TeamNode { user_id: number; parent_user_id: number; email_masked: string; username: string; direct_children: number; team_volume_cny_minor: number; current_tier: number }
+export interface DistributionLevelSummary { depth: number; member_count: number; recharge_cny_minor: number; commission_cny_minor: number; available_cny_minor: number; frozen_cny_minor: number }
+export interface DistributionDashboard { enabled: boolean; team_volume_cny_minor: number; current_tier: number; auto_tier: number; tier_override?: number; next_threshold_cny_minor: number; level_counts: Record<number, number>; levels: DistributionLevelSummary[]; available_cny_minor: number; frozen_cny_minor: number; withdrawing_cny_minor: number; debt_cny_minor: number; lifetime_earned_cny_minor: number; tiers: DistributionTier[] }
+export interface TeamNode { user_id: number; parent_user_id: number; email_masked: string; username: string; direct_children: number; team_volume_cny_minor: number; current_tier: number; auto_tier: number; tier_override?: number; effective_tier: number }
 export interface Commission { id: number; source_order_id: number; source_user_id: number; depth: number; tier: number; rate_bps: number; base_cny_minor: number; amount_cny_minor: number; team_volume_cny_minor: number; status: string; frozen_until: string; created_at: string }
 export interface PayoutAccount { account_type: string; account_mask: string; real_name_mask: string }
 export interface Withdrawal { id: number; amount_cny_minor: number; fee_cny_minor: number; fee_rate_bps: number; config_version: number; status: string; reject_reason?: string; payment_reference?: string; submitted_at: string }

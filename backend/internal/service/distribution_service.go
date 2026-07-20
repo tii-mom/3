@@ -37,17 +37,29 @@ type DistributionProcessResult struct {
 }
 
 type DistributionDashboard struct {
-	Enabled          bool               `json:"enabled"`
-	TeamVolumeMinor  int64              `json:"team_volume_cny_minor"`
-	CurrentTier      int                `json:"current_tier"`
-	NextThreshold    int64              `json:"next_threshold_cny_minor"`
-	LevelCounts      map[int]int64      `json:"level_counts"`
-	AvailableMinor   int64              `json:"available_cny_minor"`
-	FrozenMinor      int64              `json:"frozen_cny_minor"`
-	WithdrawingMinor int64              `json:"withdrawing_cny_minor"`
-	DebtMinor        int64              `json:"debt_cny_minor"`
-	LifetimeMinor    int64              `json:"lifetime_earned_cny_minor"`
-	Tiers            []DistributionTier `json:"tiers"`
+	Enabled          bool                       `json:"enabled"`
+	TeamVolumeMinor  int64                      `json:"team_volume_cny_minor"`
+	CurrentTier      int                        `json:"current_tier"`
+	AutoTier         int                        `json:"auto_tier"`
+	TierOverride     *int                       `json:"tier_override,omitempty"`
+	NextThreshold    int64                      `json:"next_threshold_cny_minor"`
+	LevelCounts      map[int]int64              `json:"level_counts"`
+	Levels           []DistributionLevelSummary `json:"levels"`
+	AvailableMinor   int64                      `json:"available_cny_minor"`
+	FrozenMinor      int64                      `json:"frozen_cny_minor"`
+	WithdrawingMinor int64                      `json:"withdrawing_cny_minor"`
+	DebtMinor        int64                      `json:"debt_cny_minor"`
+	LifetimeMinor    int64                      `json:"lifetime_earned_cny_minor"`
+	Tiers            []DistributionTier         `json:"tiers"`
+}
+
+type DistributionLevelSummary struct {
+	Depth           int   `json:"depth"`
+	MemberCount     int64 `json:"member_count"`
+	RechargeMinor   int64 `json:"recharge_cny_minor"`
+	CommissionMinor int64 `json:"commission_cny_minor"`
+	AvailableMinor  int64 `json:"available_cny_minor"`
+	FrozenMinor     int64 `json:"frozen_cny_minor"`
 }
 
 type DistributionTier struct {
@@ -74,6 +86,9 @@ type DistributionTreeNode struct {
 	DirectChildren  int64  `json:"direct_children"`
 	TeamVolumeMinor int64  `json:"team_volume_cny_minor"`
 	CurrentTier     int    `json:"current_tier"`
+	AutoTier        int    `json:"auto_tier"`
+	TierOverride    *int   `json:"tier_override,omitempty"`
+	EffectiveTier   int    `json:"effective_tier"`
 }
 
 type DistributionCommission struct {
@@ -94,6 +109,16 @@ type DistributionCommission struct {
 type AdminDistributionCommission struct {
 	DistributionCommission
 	BeneficiaryUserID int64 `json:"beneficiary_user_id"`
+}
+
+type DistributionTierAssignment struct {
+	UserID          int64  `json:"user_id"`
+	Email           string `json:"email"`
+	Username        string `json:"username"`
+	TeamVolumeMinor int64  `json:"team_volume_cny_minor"`
+	AutoTier        int    `json:"auto_tier"`
+	TierOverride    *int   `json:"tier_override,omitempty"`
+	EffectiveTier   int    `json:"effective_tier"`
 }
 
 type DistributionRechargeEvent struct {
@@ -343,18 +368,23 @@ SET team_volume_cny_minor = team_volume_cny_minor + $2, updated_at = NOW()
 WHERE program_id = $1 AND user_id IN (
     SELECT ancestor_user_id FROM distribution_relations WHERE program_id = $1 AND descendant_user_id = $3 AND depth BETWEEN 0 AND 5
 )
-RETURNING user_id, team_volume_cny_minor`, programID, baseMinor, userID)
+	RETURNING user_id, team_volume_cny_minor, tier_override`, programID, baseMinor, userID)
 	if err != nil {
 		return result, err
 	}
 	volumes := make(map[int64]int64)
+	overrides := make(map[int64]int)
 	for rows.Next() {
 		var memberID, volume int64
-		if err := rows.Scan(&memberID, &volume); err != nil {
+		var override sql.NullInt64
+		if err := rows.Scan(&memberID, &volume, &override); err != nil {
 			_ = rows.Close()
 			return result, err
 		}
 		volumes[memberID] = volume
+		if override.Valid {
+			overrides[memberID] = int(override.Int64)
+		}
 	}
 	if err := rows.Close(); err != nil {
 		return result, err
@@ -391,6 +421,9 @@ ORDER BY r.depth`, programID, userID)
 	for _, ancestor := range ancestors {
 		volume := volumes[ancestor.userID]
 		tier := tierForVolume(tiers, volume)
+		if override, ok := overrides[ancestor.userID]; ok {
+			tier = override
+		}
 		if tier == 0 {
 			continue
 		}
@@ -605,14 +638,29 @@ RETURNING id`, programID, eventID, orderID, userID, reversalType, baseMinor, cre
 }
 
 func (s *DistributionService) Dashboard(ctx context.Context, userID int64) (*DistributionDashboard, error) {
-	dashboard := &DistributionDashboard{LevelCounts: map[int]int64{}, Tiers: []DistributionTier{}}
+	dashboard := &DistributionDashboard{
+		LevelCounts: map[int]int64{},
+		Levels:      make([]DistributionLevelSummary, 5),
+		Tiers:       []DistributionTier{},
+	}
+	for depth := 1; depth <= 5; depth++ {
+		dashboard.Levels[depth-1].Depth = depth
+	}
 	var programID int64
 	err := s.db.QueryRowContext(ctx, `SELECT id, enabled FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company'`).Scan(&programID, &dashboard.Enabled)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.db.QueryRowContext(ctx, `SELECT team_volume_cny_minor, current_tier FROM distribution_members WHERE program_id = $1 AND user_id = $2`, programID, userID).Scan(&dashboard.TeamVolumeMinor, &dashboard.CurrentTier); err != nil && !errors.Is(err, sql.ErrNoRows) {
+	var override sql.NullInt64
+	if err := s.db.QueryRowContext(ctx, `SELECT team_volume_cny_minor, current_tier, tier_override FROM distribution_members WHERE program_id = $1 AND user_id = $2`, programID, userID).Scan(&dashboard.TeamVolumeMinor, &dashboard.AutoTier, &override); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
+	}
+	if override.Valid {
+		tier := int(override.Int64)
+		dashboard.TierOverride = &tier
+		dashboard.CurrentTier = tier
+	} else {
+		dashboard.CurrentTier = dashboard.AutoTier
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT depth, COUNT(*) FROM distribution_relations WHERE program_id = $1 AND ancestor_user_id = $2 AND depth BETWEEN 1 AND 5 GROUP BY depth`, programID, userID)
 	if err != nil {
@@ -628,6 +676,60 @@ func (s *DistributionService) Dashboard(ctx context.Context, userID int64) (*Dis
 		dashboard.LevelCounts[depth] = count
 	}
 	_ = rows.Close()
+	rechargeRows, err := s.db.QueryContext(ctx, `
+SELECT r.depth, COUNT(DISTINCT r.descendant_user_id), COALESCE(SUM(e.base_cny_minor), 0)
+FROM distribution_relations r
+LEFT JOIN distribution_recharge_events e
+  ON e.program_id = r.program_id
+ AND e.user_id = r.descendant_user_id
+ AND e.status = 'APPLIED'
+WHERE r.program_id = $1 AND r.ancestor_user_id = $2 AND r.depth BETWEEN 1 AND 5
+GROUP BY r.depth`, programID, userID)
+	if err != nil {
+		return nil, err
+	}
+	for rechargeRows.Next() {
+		var depth int
+		var memberCount, rechargeMinor int64
+		if err := rechargeRows.Scan(&depth, &memberCount, &rechargeMinor); err != nil {
+			_ = rechargeRows.Close()
+			return nil, err
+		}
+		if depth >= 1 && depth <= 5 {
+			dashboard.Levels[depth-1].MemberCount = memberCount
+			dashboard.Levels[depth-1].RechargeMinor = rechargeMinor
+		}
+	}
+	if err := rechargeRows.Close(); err != nil {
+		return nil, err
+	}
+	commissionRows, err := s.db.QueryContext(ctx, `
+SELECT depth,
+       COALESCE(SUM(CASE WHEN status <> 'REVERSED' THEN amount_cny_minor ELSE 0 END), 0),
+       COALESCE(SUM(CASE WHEN status = 'AVAILABLE' THEN amount_cny_minor ELSE 0 END), 0),
+       COALESCE(SUM(CASE WHEN status = 'FROZEN' THEN amount_cny_minor ELSE 0 END), 0)
+FROM distribution_commissions
+WHERE program_id = $1 AND beneficiary_user_id = $2 AND depth BETWEEN 1 AND 5
+GROUP BY depth`, programID, userID)
+	if err != nil {
+		return nil, err
+	}
+	for commissionRows.Next() {
+		var depth int
+		var commissionMinor, availableMinor, frozenMinor int64
+		if err := commissionRows.Scan(&depth, &commissionMinor, &availableMinor, &frozenMinor); err != nil {
+			_ = commissionRows.Close()
+			return nil, err
+		}
+		if depth >= 1 && depth <= 5 {
+			dashboard.Levels[depth-1].CommissionMinor = commissionMinor
+			dashboard.Levels[depth-1].AvailableMinor = availableMinor
+			dashboard.Levels[depth-1].FrozenMinor = frozenMinor
+		}
+	}
+	if err := commissionRows.Close(); err != nil {
+		return nil, err
+	}
 	if err := s.db.QueryRowContext(ctx, `SELECT available_cny_minor, frozen_cny_minor, withdrawing_cny_minor, debt_cny_minor, lifetime_earned_cny_minor FROM distribution_cash_wallets WHERE program_id = $1 AND user_id = $2`, programID, userID).Scan(&dashboard.AvailableMinor, &dashboard.FrozenMinor, &dashboard.WithdrawingMinor, &dashboard.DebtMinor, &dashboard.LifetimeMinor); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
@@ -678,9 +780,9 @@ func (s *DistributionService) Tree(ctx context.Context, ownerUserID, parentUserI
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx, `
-SELECT u.id, $1, u.email, u.username,
+SELECT u.id, $1::bigint, u.email, u.username,
        (SELECT COUNT(*) FROM user_affiliates c WHERE c.inviter_id = u.id),
-       COALESCE(dm.team_volume_cny_minor, 0), COALESCE(dm.current_tier, 0)
+       COALESCE(dm.team_volume_cny_minor, 0), COALESCE(dm.current_tier, 0), dm.tier_override
 FROM user_affiliates ua JOIN users u ON u.id = ua.user_id
 LEFT JOIN distribution_members dm ON dm.program_id = $2 AND dm.user_id = u.id
 WHERE ua.inviter_id = $1 AND ($3 = '%%' OR u.email ILIKE $3 OR u.username ILIKE $3)
@@ -693,9 +795,18 @@ ORDER BY u.id LIMIT $4 OFFSET $5`, parentUserID, programID, pattern, pageSize, (
 	for rows.Next() {
 		var node DistributionTreeNode
 		var email string
-		if err := rows.Scan(&node.UserID, &node.ParentUserID, &email, &node.Username, &node.DirectChildren, &node.TeamVolumeMinor, &node.CurrentTier); err != nil {
+		var override sql.NullInt64
+		if err := rows.Scan(&node.UserID, &node.ParentUserID, &email, &node.Username, &node.DirectChildren, &node.TeamVolumeMinor, &node.AutoTier, &override); err != nil {
 			return nil, 0, err
 		}
+		if override.Valid {
+			tier := int(override.Int64)
+			node.TierOverride = &tier
+			node.EffectiveTier = tier
+		} else {
+			node.EffectiveTier = node.AutoTier
+		}
+		node.CurrentTier = node.EffectiveTier
 		node.EmailMasked = maskDistributionEmail(email)
 		items = append(items, node)
 	}
@@ -999,6 +1110,125 @@ LIMIT $2 OFFSET $3`, programID, pageSize, (page-1)*pageSize)
 		items = append(items, item)
 	}
 	return items, total, rows.Err()
+}
+
+func (s *DistributionService) AdminListTierAssignments(ctx context.Context, search string, page, pageSize int) ([]DistributionTierAssignment, int64, error) {
+	page, pageSize = normalizeFinancialPage(page, pageSize)
+	search = strings.TrimSpace(search)
+	var programID int64
+	if err := s.db.QueryRowContext(ctx, `SELECT id FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company'`).Scan(&programID); err != nil {
+		return nil, 0, err
+	}
+	var total int64
+	if err := s.db.QueryRowContext(ctx, `
+SELECT COUNT(*)
+FROM users u
+WHERE u.deleted_at IS NULL AND u.status = 'active'
+  AND ($1 = '' OR u.email ILIKE '%' || $1 || '%' OR COALESCE(u.username, '') ILIKE '%' || $1 || '%')`, search).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT u.id, u.email, COALESCE(u.username, ''),
+       COALESCE(dm.team_volume_cny_minor, 0), COALESCE(dm.current_tier, 0), dm.tier_override
+FROM users u
+LEFT JOIN distribution_members dm ON dm.program_id = $1 AND dm.user_id = u.id
+WHERE u.deleted_at IS NULL AND u.status = 'active'
+  AND ($2 = '' OR u.email ILIKE '%' || $2 || '%' OR COALESCE(u.username, '') ILIKE '%' || $2 || '%')
+ORDER BY u.id DESC
+LIMIT $3 OFFSET $4`, programID, search, pageSize, (page-1)*pageSize)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer func() { _ = rows.Close() }()
+	items := make([]DistributionTierAssignment, 0, pageSize)
+	for rows.Next() {
+		var item DistributionTierAssignment
+		var override sql.NullInt64
+		if err := rows.Scan(&item.UserID, &item.Email, &item.Username, &item.TeamVolumeMinor, &item.AutoTier, &override); err != nil {
+			return nil, 0, err
+		}
+		if override.Valid {
+			tier := int(override.Int64)
+			item.TierOverride = &tier
+			item.EffectiveTier = tier
+		} else {
+			item.EffectiveTier = item.AutoTier
+		}
+		items = append(items, item)
+	}
+	return items, total, rows.Err()
+}
+
+func (s *DistributionService) AdminSetTierOverride(ctx context.Context, operatorID, userID int64, tierOverride *int, reason string) (*DistributionTierAssignment, error) {
+	if operatorID <= 0 || userID <= 0 {
+		return nil, infraerrors.BadRequest("DISTRIBUTION_TIER_ASSIGNMENT_INVALID", "invalid user id")
+	}
+	if tierOverride != nil && (*tierOverride < 1 || *tierOverride > 3) {
+		return nil, infraerrors.BadRequest("DISTRIBUTION_TIER_ASSIGNMENT_INVALID", "tier override must be between 1 and 3")
+	}
+	reason = strings.TrimSpace(reason)
+	if len(reason) > 500 {
+		return nil, infraerrors.BadRequest("DISTRIBUTION_TIER_ASSIGNMENT_INVALID", "tier override reason is too long")
+	}
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var programID int64
+	if err := tx.QueryRowContext(ctx, `SELECT id FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company' FOR UPDATE`).Scan(&programID); err != nil {
+		return nil, err
+	}
+	var exists bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL)`, userID).Scan(&exists); err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, infraerrors.NotFound("USER_NOT_FOUND", "user not found")
+	}
+	if err := ensureDistributionMemberTx(ctx, tx, programID, userID); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+UPDATE distribution_members
+SET tier_override = $3::smallint,
+    tier_override_by = CASE WHEN $3::smallint IS NULL THEN NULL ELSE $4::bigint END,
+    tier_override_at = CASE WHEN $3::smallint IS NULL THEN NULL ELSE NOW() END,
+    tier_override_reason = CASE WHEN $3::smallint IS NULL THEN NULL ELSE NULLIF($5, '') END,
+    updated_at = NOW()
+WHERE program_id = $1 AND user_id = $2`, programID, userID, tierOverride, operatorID, reason); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return s.loadDistributionTierAssignment(ctx, programID, userID)
+}
+
+func (s *DistributionService) loadDistributionTierAssignment(ctx context.Context, programID, userID int64) (*DistributionTierAssignment, error) {
+	var item DistributionTierAssignment
+	var override sql.NullInt64
+	err := s.db.QueryRowContext(ctx, `
+SELECT u.id, u.email, COALESCE(u.username, ''),
+       COALESCE(dm.team_volume_cny_minor, 0), COALESCE(dm.current_tier, 0), dm.tier_override
+FROM users u
+LEFT JOIN distribution_members dm ON dm.program_id = $1 AND dm.user_id = u.id
+WHERE u.id = $2 AND u.deleted_at IS NULL`, programID, userID).Scan(
+		&item.UserID, &item.Email, &item.Username, &item.TeamVolumeMinor, &item.AutoTier, &override)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, infraerrors.NotFound("USER_NOT_FOUND", "user not found")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if override.Valid {
+		tier := int(override.Int64)
+		item.TierOverride = &tier
+		item.EffectiveTier = tier
+	} else {
+		item.EffectiveTier = item.AutoTier
+	}
+	return &item, nil
 }
 
 func normalizeFinancialPage(page, pageSize int) (int, int) {

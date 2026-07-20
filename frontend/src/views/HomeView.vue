@@ -104,7 +104,7 @@
                   <div class="home-route home-route-active"><span class="home-provider-mark">O</span><span>{{ t('home.routes.openaiMain') }}</span><strong>684ms</strong></div>
                   <div class="home-route"><span class="home-provider-mark">A</span><span>{{ t('home.routes.claudeBackup') }}</span><strong>ready</strong></div>
                   <div class="home-route"><span class="home-provider-mark">G</span><span>{{ t('home.routes.geminiDirect') }}</span><strong>ready</strong></div>
-                  <router-link class="home-route" :to="isAuthenticated ? '/distribution' : '/login'"><Icon name="users" /><span>{{ t('home.routes.computeNetwork') }}</span><strong>{{ t('home.routes.departmentsCount') }}</strong></router-link>
+                  <router-link class="home-route" :to="isAuthenticated ? '/distribution' : '/login'"><Icon name="users" /><span>{{ t('home.routes.computeNetwork') }}</span><strong>{{ t('home.routes.companyUnitsCount') }}</strong></router-link>
                 </div>
               </div>
             </div>
