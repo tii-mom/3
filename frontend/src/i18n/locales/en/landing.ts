@@ -150,18 +150,34 @@ export default {
       promptGame: 'Build a browser pixel game with collision detection and score tracking.',
       responseGame: 'Core loop, input controls, and collision system complete. Running unit tests...'
     },
+    heroDesc: 'Aggregate top-tier AI models with persistent sessions and pay-as-you-go pricing. Log into your dashboard or connect local developer tools to get started.',
     testimonials: {
       title: 'Trusted by Developers and Teams',
       subtitle: 'Thousands of software engineers and machine learning teams use 3API for their everyday agent pipelines'
     },
+    reviews: {
+      review1Avatar: 'AR',
+      review1Name: 'Alex Rivera',
+      review1Role: 'Senior AI Infrastructure Lead',
+      review1Text: '3API is game changing. Subscription endpoints convert directly to native keys, maintaining session state perfectly. Pairing with CC Switch took less than 20 seconds.',
+      review2Avatar: 'XZ',
+      review2Name: 'Xiaochuan Zhang',
+      review2Role: 'Indie Developer / Codex User',
+      review2Text: 'After connecting 3API to CCS, Codex runs nearly twice as fast! Development with full GPT-5 capability is extremely smooth, never hitting proxy blocks again.',
+      review3Avatar: 'ER',
+      review3Name: 'Elena Rostova',
+      review3Role: 'ML Engineer',
+      review3Text: 'The pay-as-you-go pricing has saved us thousands compared to keeping active high-tier team models. Zero configuration and seamless CC Switch client integrations.',
+      review4Avatar: 'LW',
+      review4Name: 'Li Wei',
+      review4Role: 'Tech Lead at ByteStart',
+      review4Text: 'For multi-project developers, one-click distribution to CCS is the smoothest experience. Managing keys has never been this efficient, official channels are rock solid.'
+    },
     business: {
-      title: 'One core, two paths to grow',
-      subtitle: 'Personal usage, branded SaaS, and compute partnerships run on the same routing, billing, and resource control plane.',
-      saasTitle: 'Turn 3API into your brand',
-      saasDesc: 'Manage tenants, plans, subscriptions, domains, resources, and partner payouts from one control surface for a faster branded AI API launch.',
+      title: 'Compute Company & Performance Network',
+      subtitle: 'Personal usage and compute partnerships run on the same high-availability routing, billing, and resource control plane.',
       computeTitle: 'Compute can also form an operational network',
       computeDesc: 'Grow through team volume and department performance with clear frozen, available, and payout states.',
-      openPartner: 'Enter SaaS Partner',
       openCompute: 'Open Compute Company'
     },
     // Pain points section

@@ -150,18 +150,34 @@ export default {
       promptGame: '制作一个可在浏览器运行的像素风小游戏，加入碰撞和计分。',
       responseGame: '核心循环、输入控制和碰撞检测已完成，正在运行自动化测试…'
     },
+    heroDesc: '聚合多家顶级模型，保持会话连续，按实际调用量计费。登录后台或接入本地开发工具，即刻开始使用。',
     testimonials: {
       title: '开发者与团队的使用体验',
       subtitle: '全球数千名全栈工程师和开发团队正在使用 3API 驱动他们的日常智能开发流程'
     },
+    reviews: {
+      review1Avatar: 'AR',
+      review1Name: 'Alex Rivera',
+      review1Role: '高级 AI 基础设施负责人',
+      review1Text: '3API 彻底改变了我们的开发流程。订阅接口能无缝映射原生 Key，保持会话状态完美。与 CC Switch 的配对只需要不到 20 秒。',
+      review2Avatar: '张',
+      review2Name: '张小川',
+      review2Role: '独立开发者 / Codex 用户',
+      review2Text: '把 3API 连入 CCS 之后，Codex 运行速度快了接近两倍！原生满血的 GPT-5 开发极其流畅，再也没遇到过代理阻断的情况。',
+      review3Avatar: 'ER',
+      review3Name: 'Elena Rostova',
+      review3Role: 'ML 工程师',
+      review3Text: '相比维持昂贵的高阶团队模型，按需计费的算力模式为我们省下了上万美元。零配置且完美契合 CC Switch 客户端集成。',
+      review4Avatar: 'LW',
+      review4Name: 'Li Wei',
+      review4Role: 'ByteStart 技术负责人',
+      review4Text: '对于多项目开发者来说，一键分发至 CCS 是最爽的体验。管理密钥从来没有这么高效过，官方通道非常稳定。'
+    },
     business: {
-      title: '同一个核心，承载两种增长方式',
-      subtitle: '个人调用、品牌化 SaaS 和算力合作都由同一套路由、计费与资源控制面支撑。',
-      saasTitle: '把 3API 变成你的品牌',
-      saasDesc: '租户、套餐、订阅、域名、资源分配和合作提现集中在一个控制面，快速上线独立品牌的 AI API 服务。',
+      title: '算力公司与部门绩效网络',
+      subtitle: '个人调用和算力合作都由同一套高可用路由、计费与资源控制面支撑。',
       computeTitle: '算力，也能成为业务网络',
       computeDesc: '用团队业绩驱动部门绩效提成，冻结、可用与提现流水清晰分层，合作关系可持续增长。',
-      openPartner: '进入 SaaS 合作伙伴',
       openCompute: '进入算力公司'
     },
     // 用户痛点区块

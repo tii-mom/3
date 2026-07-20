@@ -2,15 +2,15 @@
   <div class="home-redesign min-h-screen bg-slate-50 dark:bg-dark-950 font-sans text-slate-800 dark:text-gray-100 relative overflow-hidden selection:bg-primary-500/20">
     <!-- Custom Home Content Branch (Preserved logic) -->
     <div v-if="homeContent" class="fixed inset-0 z-50 bg-dark-950">
-      <iframe 
-        v-if="isHomeContentUrl" 
+      <iframe
+        v-if="isHomeContentUrl"
         :src="homeContentUrl"
         sandbox="allow-scripts allow-forms allow-popups"
         referrerpolicy="no-referrer"
         class="w-full h-full border-0"
       ></iframe>
-      <div 
-        v-else 
+      <div
+        v-else
         v-html="sanitizedHomeContent"
         class="w-full h-full overflow-auto p-6"
       ></div>
@@ -25,7 +25,7 @@
 
       <!-- Main Layout -->
       <main class="home-main max-w-6xl mx-auto px-4 md:px-6 relative z-10 pt-16 pb-32">
-        
+
         <!-- Hero Section -->
         <section class="home-hero grid grid-cols-1 lg:grid-cols-12 gap-12 items-center mb-24">
           <!-- Hero Left Content -->
@@ -51,17 +51,17 @@
             </p>
 
             <div class="flex flex-wrap items-center gap-4">
-              <router-link 
-                :to="isAuthenticated ? dashboardPath : '/login'" 
+              <router-link
+                :to="isAuthenticated ? dashboardPath : '/login'"
                 class="btn rounded-full bg-gradient-primary px-8 py-3.5 text-base font-bold text-white shadow-glow hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
                 <span>{{ isAuthenticated ? t('home.goToDashboard') : t('home.getStarted') }}</span>
               </router-link>
-              
-              <a 
-                v-if="docUrl" 
-                :href="docUrl" 
-                target="_blank" 
+
+              <a
+                v-if="docUrl"
+                :href="docUrl"
+                target="_blank"
                 rel="noopener noreferrer"
                 class="btn rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 px-8 py-3.5 text-base font-semibold text-slate-700 hover:text-slate-900 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] dark:border-white/[0.06] dark:text-gray-300 dark:hover:text-white transition-all active:scale-[0.98]"
               >
@@ -73,8 +73,8 @@
               <div class="flex items-center gap-2 p-1.5 rounded-full bg-slate-100/50 dark:bg-white/[0.04] border border-slate-200/50 dark:border-white/[0.06] shadow-sm">
                 <LocaleSwitcher />
                 <div class="h-4 w-px bg-slate-200 dark:bg-white/[0.08]"></div>
-                <button 
-                  @click="toggleTheme" 
+                <button
+                  @click="toggleTheme"
                   class="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-white/[0.06] text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white transition-all duration-200"
                   :title="isDark ? t('home.switchToLight') : t('home.switchToDark')"
                 >
@@ -149,24 +149,24 @@
 
                 <!-- Step 1 Right Column (Client Downloads) -->
                 <div class="md:col-span-6 space-y-2 flex flex-col justify-center h-full">
-                  <a 
-                    href="https://pub-e818eceec7614e3084a8a2ad38b6e3f1.r2.dev/Codex-x64.msix" 
+                  <a
+                    href="https://pub-e818eceec7614e3084a8a2ad38b6e3f1.r2.dev/Codex-x64.msix"
                     aria-label="Download OpenAI Codex Client for Windows"
                     class="group w-full rounded-2xl bg-slate-100/80 hover:bg-primary-500 hover:text-white border border-slate-200 hover:border-primary-400 text-slate-800 dark:bg-white/[0.04] dark:hover:bg-primary-500/15 dark:border-white/[0.06] dark:text-white flex items-center justify-between px-4 py-3 transition-all duration-200"
                   >
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.45H0V3.449zM0 12.45h9.75v9.45L0 20.551v-8.1zM10.95 1.95L24 0v11.55H10.95V1.95zM10.95 12.45H24v11.55l-13.05-1.95v-9.6z"/></svg>
                     <span class="flex items-center gap-3"><span class="text-left"><strong class="block text-sm">{{ t('home.download.windows') }}</strong><small class="block text-[10px] opacity-60">{{ t('home.download.windowsDesc') }}</small></span></span><Icon name="download" class="h-4 w-4 opacity-50 group-hover:opacity-100" />
                   </a>
-                  <a 
-                    href="https://pub-e818eceec7614e3084a8a2ad38b6e3f1.r2.dev/Codex-mac-arm64.dmg" 
+                  <a
+                    href="https://pub-e818eceec7614e3084a8a2ad38b6e3f1.r2.dev/Codex-mac-arm64.dmg"
                     aria-label="Download OpenAI Codex Client for Apple Silicon macOS"
                     class="group w-full rounded-2xl bg-slate-100/80 hover:bg-primary-500 hover:text-white border border-slate-200 hover:border-primary-400 text-slate-800 dark:bg-white/[0.04] dark:hover:bg-primary-500/15 dark:border-white/[0.06] dark:text-white flex items-center justify-between px-4 py-3 transition-all duration-200"
                   >
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-1 .04-2.22.67-2.94 1.5-.62.71-1.16 1.85-1.01 2.96 1.12.09 2.27-.58 2.96-1.4z"/></svg>
                     <span class="flex items-center gap-3"><span class="text-left"><strong class="block text-sm">{{ t('home.download.macArm') }}</strong><small class="block text-[10px] opacity-60">{{ t('home.download.macArmDesc') }}</small></span></span><Icon name="download" class="h-4 w-4 opacity-50 group-hover:opacity-100" />
                   </a>
-                  <a 
-                    href="https://pub-e818eceec7614e3084a8a2ad38b6e3f1.r2.dev/Codex-mac-x64.dmg" 
+                  <a
+                    href="https://pub-e818eceec7614e3084a8a2ad38b6e3f1.r2.dev/Codex-mac-x64.dmg"
                     aria-label="Download OpenAI Codex Client for Intel macOS"
                     class="group w-full rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 dark:bg-white/[0.02] dark:hover:bg-white/[0.06] dark:border-white/[0.04] dark:text-gray-400 flex items-center justify-between px-4 py-3 transition-all"
                   >
@@ -190,20 +190,20 @@
                   <p class="text-sm text-slate-600 dark:text-gray-400 leading-relaxed mb-4">
                     {{ t('home.onboarding.step2Desc') }}
                   </p>
-                  
+
                   <!-- Tab switcher for mockup options -->
                   <div class="flex space-x-1 rounded-lg bg-slate-100 dark:bg-white/[0.04] border border-slate-200/50 dark:border-white/[0.08] p-1 mb-4 text-[10px] font-mono">
-                    <button 
-                      type="button" 
-                      class="flex-1 rounded py-1.5 transition-all text-center" 
+                    <button
+                      type="button"
+                      class="flex-1 rounded py-1.5 transition-all text-center"
                       :class="step2Tab === 'api' ? 'bg-white dark:bg-dark-800 text-slate-900 dark:text-white shadow-sm font-bold' : 'text-slate-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-white'"
                       @click="step2Tab = 'api'"
                     >
                       API Config
                     </button>
-                    <button 
-                      type="button" 
-                      class="flex-1 rounded py-1.5 transition-all text-center" 
+                    <button
+                      type="button"
+                      class="flex-1 rounded py-1.5 transition-all text-center"
                       :class="step2Tab === 'ccs' ? 'bg-white dark:bg-dark-800 text-slate-900 dark:text-white shadow-sm font-bold' : 'text-slate-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-white'"
                       @click="step2Tab = 'ccs'"
                     >
@@ -235,10 +235,10 @@
                     </div>
                     <div class="mt-4 rounded-xl border border-primary-500/20 bg-primary-500/[0.04] p-3 flex flex-col gap-3">
                       <div class="flex items-center justify-between"><span class="text-xs font-semibold text-white">{{ t('home.ccswitch.clientTitle') }}</span><span class="text-[10px] text-primary-400">{{ isCcsImported ? t('home.ccswitch.enabled') : t('home.ccswitch.waitImport') }}</span></div>
-                      <a 
-                        href="https://ccswitch.lovable.app/" 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
+                      <a
+                        href="https://ccswitch.lovable.app/"
+                        target="_blank"
+                        rel="noopener noreferrer"
                         class="group flex items-center justify-center gap-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold py-2.5 px-3 transition-colors shadow-sm w-full select-none"
                       >
                         <Icon name="download" class="h-3.5 w-3.5 transition-transform group-hover:translate-y-0.5" />
@@ -343,7 +343,7 @@
                       <span class="px-4 py-2 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-center text-xs font-mono">{{ t('home.architecture.endUser') }}</span>
                     </div>
                   </div>
-                  
+
                   <div class="w-full h-px bg-slate-200 dark:bg-white/[0.06] my-2"></div>
 
                   <div class="flex gap-2 justify-center">
@@ -471,8 +471,8 @@
                 <!-- Bottom input interface -->
                 <div class="pt-4 border-t border-white/[0.06] flex items-center justify-between gap-4">
                   <div class="flex-1 relative">
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       readonly
                       :placeholder="t('home.codex.inputPlaceholder')"
                       class="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl px-4 py-2.5 text-xs text-gray-400 focus:outline-none"
@@ -482,7 +482,7 @@
                       <span class="text-[10px] font-semibold text-white">{{ t('home.codex.demoGpt') }}</span>
                     </div>
                   </div>
-                  
+
                   <button class="p-2.5 rounded-xl bg-gradient-primary text-white shadow-glow hover:opacity-90 transition-all">
                     <Icon name="arrowRight" class="h-4 w-4" />
                   </button>
@@ -520,8 +520,8 @@
 
             <div class="flex gap-6 py-4 animate-marquee hover:[animation-play-state:paused]">
               <!-- First loop -->
-              <div 
-                v-for="(item, idx) in reviewsList" 
+              <div
+                v-for="(item, idx) in reviewsList"
                 :key="'rev-1-' + idx"
                 class="w-[320px] shrink-0 card-premium p-6 text-left flex flex-col justify-between"
               >
@@ -540,8 +540,8 @@
               </div>
 
               <!-- Duplicate loop for seamless scroll -->
-              <div 
-                v-for="(item, idx) in reviewsList" 
+              <div
+                v-for="(item, idx) in reviewsList"
                 :key="'rev-2-' + idx"
                 class="w-[320px] shrink-0 card-premium p-6 text-left flex flex-col justify-between"
               >
@@ -576,8 +576,8 @@
 
             <div class="flex gap-8 py-2 animate-marquee hover:[animation-play-state:paused]">
               <!-- First loop -->
-              <div 
-                v-for="(item, idx) in topModels" 
+              <div
+                v-for="(item, idx) in topModels"
                 :key="'model-1-' + idx"
                 class="flex items-center gap-2.5 px-5 py-2.5 rounded-full border border-slate-200 bg-slate-100/50 dark:border-white/[0.04] dark:bg-white/[0.01]"
               >
@@ -586,8 +586,8 @@
               </div>
 
               <!-- Duplicate loop -->
-              <div 
-                v-for="(item, idx) in topModels" 
+              <div
+                v-for="(item, idx) in topModels"
                 :key="'model-2-' + idx"
                 class="flex items-center gap-2.5 px-5 py-2.5 rounded-full border border-slate-200 bg-slate-100/50 dark:border-white/[0.04] dark:bg-white/[0.01]"
               >
@@ -601,9 +601,7 @@
         <!-- Bottom CTA -->
         <section class="reveal">
           <div class="card-premium p-12 text-center max-w-3xl mx-auto relative overflow-hidden">
-            <!-- Glow effect -->
-            <div class="absolute -right-24 -bottom-24 w-80 h-80 rounded-full bg-primary-500/[0.03] blur-3xl pointer-events-none"></div>
-            
+
             <h2 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-4">
               {{ t('home.cta.title') }}
             </h2>
@@ -611,8 +609,8 @@
               {{ t('home.cta.description') }}
             </p>
 
-            <router-link 
-              :to="isAuthenticated ? dashboardPath : '/login'" 
+            <router-link
+              :to="isAuthenticated ? dashboardPath : '/login'"
               class="btn rounded-full bg-gradient-primary px-10 py-4 text-base font-bold text-white shadow-glow hover:scale-[1.02] active:scale-[0.98] transition-all inline-flex"
             >
               <span>{{ isAuthenticated ? t('home.cta.goToDashboard') : t('home.cta.button') }}</span>
@@ -670,7 +668,7 @@ const topModels = [
 const isCcsImported = ref(false)
 
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || '3API')
-const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || '聚合多家顶级模型，保持会话连续，按实际调用量计费。登录后台或接入本地开发工具，即刻开始使用。')
+const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || t('home.heroDesc'))
 const siteLogo = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
 const docUrl = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.doc_url || appStore.docUrl || ''))
 const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
@@ -706,12 +704,12 @@ const activeTask = computed(() => codexTasks.value.find((task) => task.id === ac
 let codexTaskTimer: ReturnType<typeof setInterval> | undefined
 const step2Tab = ref('api')
 
-const reviewsList = [
-  { avatar: 'AR', name: 'Alex Rivera', role: 'Senior AI Infrastructure Lead', text: '3API is game changing. Subscription endpoints convert directly to native keys, maintaining session state perfectly. Pairing with CC Switch took less than 20 seconds.' },
-  { avatar: '张', name: '张小川', role: '独立开发者 / Codex 用户', text: '把 3API 连入 CCS 之后，Codex 运行速度快了接近两倍！原生满血的 GPT-5 开发极其流畅，再也没遇到过代理阻断的情况。' },
-  { avatar: 'ER', name: 'Elena Rostova', role: 'ML Engineer', text: 'The pay-as-you-go pricing has saved us thousands compared to keeping active high-tier team models. Zero configuration and seamless CC Switch client integrations.' },
-  { avatar: 'LW', name: 'Li Wei', role: 'Tech Lead at ByteStart', text: '对于多项目开发者来说，一键分发至 CCS 是最爽的体验。管理密钥从来没有这么高效过，官方通道非常稳定。' }
-]
+const reviewsList = computed(() => [
+  { avatar: t('home.reviews.review1Avatar'), name: t('home.reviews.review1Name'), role: t('home.reviews.review1Role'), text: t('home.reviews.review1Text') },
+  { avatar: t('home.reviews.review2Avatar'), name: t('home.reviews.review2Name'), role: t('home.reviews.review2Role'), text: t('home.reviews.review2Text') },
+  { avatar: t('home.reviews.review3Avatar'), name: t('home.reviews.review3Name'), role: t('home.reviews.review3Role'), text: t('home.reviews.review3Text') },
+  { avatar: t('home.reviews.review4Avatar'), name: t('home.reviews.review4Name'), role: t('home.reviews.review4Role'), text: t('home.reviews.review4Text') }
+])
 
 onMounted(() => {
   syncThemeFromDOM()
@@ -1316,9 +1314,6 @@ onUnmounted(() => {
   box-shadow: 0 14px 44px rgba(26, 28, 30, 0.07);
 }
 
-.home-redesign .pointer-events-none.blur-3xl {
-  display: none;
-}
 
 @media (max-width: 1023px) {
   .home-redesign .home-hero {

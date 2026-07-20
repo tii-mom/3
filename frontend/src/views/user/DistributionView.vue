@@ -186,7 +186,7 @@ async function renderGraph(parent?: number) {
   graph?.destroy?.()
   const G6: any = await import('@antv/g6')
   const root = String(parent || auth.user?.id || 'me')
-  
+
   const isDark = document.documentElement.classList.contains('dark')
   const brandColor = isDark ? '#E46B36' : '#D85A28'
   const surfaceColor = isDark ? '#181B1E' : '#FFFEFA'
@@ -223,7 +223,7 @@ async function renderGraph(parent?: number) {
     source: root,
     target: String(node.user_id)
   }))
-  
+
   graph = new G6.Graph({
     container: graphContainer.value,
     data: { nodes, edges },
