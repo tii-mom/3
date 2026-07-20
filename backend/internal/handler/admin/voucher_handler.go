@@ -65,11 +65,17 @@ func (h *VoucherHandler) List(c *gin.Context) {
 }
 
 type voucherRiskRequest struct {
-	Locked bool   `json:"locked"`
-	Reason string `json:"reason"`
+	Locked   bool   `json:"locked"`
+	Reason   string `json:"reason"`
+	TOTPCode string `json:"totp_code"`
 }
 
 func (h *VoucherHandler) SetRiskLock(c *gin.Context) {
+	subject, ok := middleware.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "Admin not authenticated")
+		return
+	}
 	voucherID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil || voucherID <= 0 {
 		response.BadRequest(c, "Invalid voucher id")
@@ -78,6 +84,14 @@ func (h *VoucherHandler) SetRiskLock(c *gin.Context) {
 	var request voucherRiskRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if request.TOTPCode == "" {
+		response.BadRequest(c, "totp_code is required")
+		return
+	}
+	if err := h.totp.VerifyCode(c.Request.Context(), subject.UserID, request.TOTPCode); err != nil {
+		response.ErrorFrom(c, err)
 		return
 	}
 	item, err := h.service.SetRiskLock(c.Request.Context(), voucherID, request.Locked, request.Reason)

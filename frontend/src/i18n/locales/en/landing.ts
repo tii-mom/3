@@ -57,6 +57,22 @@ export default {
       officialNative: 'Official Native・Pure Performance',
       officialNativeDesc: 'Provide official channel native API interfaces without any castration or debasing. Support the latest models to ensure native speed and output quality.'
     },
+    routes: {
+      openaiMain: 'OpenAI Main Route',
+      claudeBackup: 'Claude Backup Route',
+      geminiDirect: 'Gemini Direct Route',
+      computeNetwork: 'Compute Company Network',
+      companyUnitsCount: '5 Company Units'
+    },
+    architecture: {
+      directPartner: 'Direct Partner',
+      computeCompany: 'Compute Company',
+      performanceBadge: 'Team Volume · Company Performance',
+      endUser: 'End User',
+      t1: 'T1',
+      t2: 'T2',
+      t3: 'T3'
+    },
     ccswitch: {
       title: 'Configure CcSwitch',
       desc: 'Zero configuration access. Make your client gain full-blood AI capabilities in a second. No tedious settings, direct import of API keys and routing configs.',
@@ -73,6 +89,7 @@ export default {
       enabled: '3API Active',
       enable: 'Enable',
       clientDownload: 'Download CC Switch',
+      clientDownloadBtn: 'Download CC Switch Client',
       externalDownload: 'External Download'
     },
     onboarding: {
@@ -122,11 +139,46 @@ export default {
       envChanges: 'Changes',
       envLocal: 'Local',
       envBackground: 'Background Process',
-      envBrowser: 'Browser'
+      envBrowser: 'Browser',
+      taskWebsite: 'Develop Website',
+      promptWebsite: 'Create a responsive API console with login, usage charts, and mobile navigation.',
+      responseWebsite: 'Generated Vue pages, router, and responsive styles. Running visual checks...',
+      taskVideo: 'Produce Video',
+      promptVideo: 'Create a 30-second product launch video storyboard and subtitle timeline.',
+      responseVideo: 'Completed storyboard breakdown, script, and image prompts. Rendering preview...',
+      taskGame: 'Build Game',
+      promptGame: 'Build a browser pixel game with collision detection and score tracking.',
+      responseGame: 'Core loop, input controls, and collision system complete. Running unit tests...'
     },
+    heroDesc: 'Aggregate top-tier AI models with persistent sessions and pay-as-you-go pricing. Log into your dashboard or connect local developer tools to get started.',
     testimonials: {
       title: 'Trusted by Developers and Teams',
       subtitle: 'Thousands of software engineers and machine learning teams use 3API for their everyday agent pipelines'
+    },
+    reviews: {
+      review1Avatar: 'AR',
+      review1Name: 'Alex Rivera',
+      review1Role: 'Senior AI Infrastructure Lead',
+      review1Text: '3API is game changing. Subscription endpoints convert directly to native keys, maintaining session state perfectly. Pairing with CC Switch took less than 20 seconds.',
+      review2Avatar: 'XZ',
+      review2Name: 'Xiaochuan Zhang',
+      review2Role: 'Indie Developer / Codex User',
+      review2Text: 'After connecting 3API to CCS, Codex runs nearly twice as fast! Development with full GPT-5 capability is extremely smooth, never hitting proxy blocks again.',
+      review3Avatar: 'ER',
+      review3Name: 'Elena Rostova',
+      review3Role: 'ML Engineer',
+      review3Text: 'The pay-as-you-go pricing has saved us thousands compared to keeping active high-tier team models. Zero configuration and seamless CC Switch client integrations.',
+      review4Avatar: 'LW',
+      review4Name: 'Li Wei',
+      review4Role: 'Tech Lead at ByteStart',
+      review4Text: 'For multi-project developers, one-click distribution to CCS is the smoothest experience. Managing keys has never been this efficient, official channels are rock solid.'
+    },
+    business: {
+      title: 'Compute Company & Performance Network',
+      subtitle: 'Personal usage and compute partnerships run on the same high-availability routing, billing, and resource control plane.',
+      computeTitle: 'Compute can also form an operational network',
+      computeDesc: 'Grow through team volume and company earnings with clear frozen, available, and payout states.',
+      openCompute: 'Open Compute Company'
     },
     // Pain points section
     painPoints: {

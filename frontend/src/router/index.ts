@@ -257,7 +257,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/vouchers',
     name: 'BalanceVouchers',
-    component: () => import('@/views/user/VouchersView.vue'),
+    redirect: '/redeem',
     meta: { requiresAuth: true, requiresAdmin: false, title: 'Balance Vouchers', titleKey: 'finance.vouchers.title' }
   },
   {
@@ -265,12 +265,6 @@ const routes: RouteRecordRaw[] = [
     name: 'Distribution',
     component: () => import('@/views/user/DistributionView.vue'),
     meta: { requiresAuth: true, requiresAdmin: false, title: 'Compute Company', titleKey: 'finance.distribution.title' }
-  },
-  {
-    path: '/saas-partner',
-    name: 'SaaSPartner',
-    component: () => import('@/views/user/SaaSPartnerView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: false, title: 'SaaS Partner', titleKey: 'finance.partner.title' }
   },
   {
     path: '/available-channels',
@@ -675,12 +669,6 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminFinance',
     component: () => import('@/views/admin/FinanceOperationsView.vue'),
     meta: { requiresAuth: true, requiresAdmin: true, title: 'Finance Operations', titleKey: 'finance.admin.title' }
-  },
-  {
-    path: '/admin/saas',
-    name: 'AdminSaaS',
-    component: () => import('@/views/admin/SaaSControlView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true, title: 'SaaS Control', titleKey: 'finance.saas.title' }
   },
 
 

@@ -86,3 +86,11 @@ func TestSaaSApplicationMigrationSeparatesLeadReviewFromTenantCreation(t *testin
 	require.Contains(t, sql, "CREATE TABLE IF NOT EXISTS saas_tenant_application_events")
 	require.Contains(t, sql, "('saas_application_enabled', 'false', NOW())")
 }
+
+func TestDistributionTierOverrideMigrationIsBoundedAndIndexed(t *testing.T) {
+	sql := normalizedMigration(t, "187_distribution_tier_overrides.sql")
+	require.Contains(t, sql, "ADD COLUMN IF NOT EXISTS tier_override SMALLINT")
+	require.Contains(t, sql, "tier_override BETWEEN 1 AND 3")
+	require.Contains(t, sql, "tier_override_by BIGINT REFERENCES users(id)")
+	require.Contains(t, sql, "idx_distribution_members_tier_override")
+}

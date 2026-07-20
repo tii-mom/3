@@ -57,6 +57,22 @@ export default {
       officialNative: '官方账号・原生满血',
       officialNativeDesc: '提供官方渠道原生 API 接口，无任何阉割与降智。支持最新模型特性，确保企业级极速响应与原生输出质量。'
     },
+    routes: {
+      openaiMain: 'OpenAI 主路由',
+      claudeBackup: 'Claude 备用路由',
+      geminiDirect: 'Gemini 直连路由',
+      computeNetwork: '算力公司网络',
+      companyUnitsCount: '5 个公司单元'
+    },
+    architecture: {
+      directPartner: '直属伙伴',
+      computeCompany: '算力公司',
+      performanceBadge: '团队业绩 · 公司收益',
+      endUser: '终端用户',
+      t1: 'T1',
+      t2: 'T2',
+      t3: 'T3'
+    },
     ccswitch: {
       title: '配置 CcSwitch',
       desc: '零配置接入，让您的客户端瞬间具备满血 AI 能力。无需繁琐设置，直接导入 API 密钥及路由配置。',
@@ -73,6 +89,7 @@ export default {
       enabled: '3API 已启用',
       enable: '启用',
       clientDownload: '下载 CC Switch',
+      clientDownloadBtn: '下载 CC Switch 客户端',
       externalDownload: '外部下载'
     },
     onboarding: {
@@ -122,11 +139,46 @@ export default {
       envChanges: '变更',
       envLocal: '本地',
       envBackground: '后台进程',
-      envBrowser: '浏览器'
+      envBrowser: '浏览器',
+      taskWebsite: '开发网站',
+      promptWebsite: '创建一个响应式 API 控制台，包含登录、用量图表和移动端导航。',
+      responseWebsite: '已生成 Vue 页面、路由和响应式样式，正在运行视觉检查…',
+      taskVideo: '制作视频',
+      promptVideo: '为新品发布制作 30 秒短视频分镜和字幕时间轴。',
+      responseVideo: '已完成分镜拆解、旁白稿与画面提示词，正在合成预览…',
+      taskGame: '开发游戏',
+      promptGame: '制作一个可在浏览器运行的像素风小游戏，加入碰撞和计分。',
+      responseGame: '核心循环、输入控制和碰撞检测已完成，正在运行自动化测试…'
     },
+    heroDesc: '聚合多家顶级模型，保持会话连续，按实际调用量计费。登录后台或接入本地开发工具，即刻开始使用。',
     testimonials: {
       title: '开发者与团队的使用体验',
       subtitle: '全球数千名全栈工程师和开发团队正在使用 3API 驱动他们的日常智能开发流程'
+    },
+    reviews: {
+      review1Avatar: 'AR',
+      review1Name: 'Alex Rivera',
+      review1Role: '高级 AI 基础设施负责人',
+      review1Text: '3API 彻底改变了我们的开发流程。订阅接口能无缝映射原生 Key，保持会话状态完美。与 CC Switch 的配对只需要不到 20 秒。',
+      review2Avatar: '张',
+      review2Name: '张小川',
+      review2Role: '独立开发者 / Codex 用户',
+      review2Text: '把 3API 连入 CCS 之后，Codex 运行速度快了接近两倍！原生满血的 GPT-5 开发极其流畅，再也没遇到过代理阻断的情况。',
+      review3Avatar: 'ER',
+      review3Name: 'Elena Rostova',
+      review3Role: 'ML 工程师',
+      review3Text: '相比维持昂贵的高阶团队模型，按需计费的算力模式为我们省下了上万美元。零配置且完美契合 CC Switch 客户端集成。',
+      review4Avatar: 'LW',
+      review4Name: 'Li Wei',
+      review4Role: 'ByteStart 技术负责人',
+      review4Text: '对于多项目开发者来说，一键分发至 CCS 是最爽的体验。管理密钥从来没有这么高效过，官方通道非常稳定。'
+    },
+    business: {
+      title: '算力公司与收益网络',
+      subtitle: '个人调用和算力合作都由同一套高可用路由、计费与资源控制面支撑。',
+      computeTitle: '算力，也能成为业务网络',
+      computeDesc: '用团队业绩驱动公司收益，冻结、可用与提现流水清晰可追踪，合作关系可持续增长。',
+      openCompute: '进入算力公司'
     },
     // 用户痛点区块
     painPoints: {
