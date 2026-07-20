@@ -27,8 +27,6 @@ export interface TeamNode { user_id: number; parent_user_id: number; email_maske
 export interface Commission { id: number; source_order_id: number; source_user_id: number; depth: number; tier: number; rate_bps: number; base_cny_minor: number; amount_cny_minor: number; team_volume_cny_minor: number; status: string; frozen_until: string; created_at: string }
 export interface PayoutAccount { account_type: string; account_mask: string; real_name_mask: string }
 export interface Withdrawal { id: number; amount_cny_minor: number; fee_cny_minor: number; fee_rate_bps: number; config_version: number; status: string; reject_reason?: string; payment_reference?: string; submitted_at: string }
-export interface PartnerDashboard { available_cny_minor: number; frozen_cny_minor: number; withdrawing_cny_minor: number; lifetime_earned_cny_minor: number }
-export interface TenantControl { tenant: { id: number; name: string; site_name: string; site_logo: string; primary_domain?: string; wholesale_balance_usd: string }; retail_multiplier: string; payment_provider: string; payment_configured: boolean; instance_config: string }
 
 export async function createVoucher(amount: string, totpCode = ''): Promise<Voucher> { return (await apiClient.post<Voucher>('/user/vouchers', { amount, totp_code: totpCode })).data }
 export async function listVouchers(page = 1): Promise<Paginated<Voucher>> { return (await apiClient.get<Paginated<Voucher>>('/user/vouchers', { params: { page } })).data }
@@ -41,9 +39,3 @@ export async function getPayoutAccount(): Promise<PayoutAccount> { return (await
 export async function savePayoutAccount(alipayAccount: string, realName: string): Promise<PayoutAccount> { return (await apiClient.put<PayoutAccount>('/distribution/payout-account', { alipay_account: alipayAccount, real_name: realName })).data }
 export async function listWithdrawals(page = 1): Promise<Paginated<Withdrawal>> { return (await apiClient.get<Paginated<Withdrawal>>('/distribution/withdrawals', { params: { page } })).data }
 export async function createWithdrawal(amountMinor: number): Promise<Withdrawal> { return (await apiClient.post<Withdrawal>('/distribution/withdrawals', { amount_cny_minor: amountMinor })).data }
-export async function getPartnerDashboard(): Promise<PartnerDashboard> { return (await apiClient.get<PartnerDashboard>('/saas/partner/dashboard')).data }
-export async function listPartnerWithdrawals(): Promise<Withdrawal[]> { return (await apiClient.get<Withdrawal[]>('/saas/partner/withdrawals')).data }
-export async function createPartnerWithdrawal(amountMinor: number): Promise<Withdrawal> { return (await apiClient.post<Withdrawal>('/saas/partner/withdrawals', { amount_cny_minor: amountMinor })).data }
-export async function getTenantControl(): Promise<TenantControl> { return (await apiClient.get<TenantControl>('/saas/tenant/config')).data }
-export async function updateTenantControl(payload: { site_name: string; site_logo: string; retail_multiplier: string; payment_provider: string; payment_config: string; instance_config: string }): Promise<TenantControl> { return (await apiClient.put<TenantControl>('/saas/tenant/config', payload)).data }
-export async function addTenantDomain(domain: string): Promise<{ verification_token: string }> { return (await apiClient.post('/saas/tenant/domains', { domain })).data }

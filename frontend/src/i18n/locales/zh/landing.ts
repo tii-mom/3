@@ -57,6 +57,22 @@ export default {
       officialNative: '官方账号・原生满血',
       officialNativeDesc: '提供官方渠道原生 API 接口，无任何阉割与降智。支持最新模型特性，确保企业级极速响应与原生输出质量。'
     },
+    routes: {
+      openaiMain: 'OpenAI 主路由',
+      claudeBackup: 'Claude 备用路由',
+      geminiDirect: 'Gemini 直连路由',
+      computeNetwork: '算力公司网络',
+      departmentsCount: '5 部门'
+    },
+    architecture: {
+      directPartner: '直属伙伴',
+      computeCompany: '算力公司',
+      performanceBadge: '团队业绩 · 部门绩效',
+      endUser: '终端用户',
+      t1: 'T1 基础',
+      t2: 'T2 增长',
+      t3: 'T3 规模'
+    },
     ccswitch: {
       title: '配置 CcSwitch',
       desc: '零配置接入，让您的客户端瞬间具备满血 AI 能力。无需繁琐设置，直接导入 API 密钥及路由配置。',
@@ -73,6 +89,7 @@ export default {
       enabled: '3API 已启用',
       enable: '启用',
       clientDownload: '下载 CC Switch',
+      clientDownloadBtn: '下载 CC Switch 客户端',
       externalDownload: '外部下载'
     },
     onboarding: {
@@ -122,7 +139,16 @@ export default {
       envChanges: '变更',
       envLocal: '本地',
       envBackground: '后台进程',
-      envBrowser: '浏览器'
+      envBrowser: '浏览器',
+      taskWebsite: '开发网站',
+      promptWebsite: '创建一个响应式 API 控制台，包含登录、用量图表和移动端导航。',
+      responseWebsite: '已生成 Vue 页面、路由和响应式样式，正在运行视觉检查…',
+      taskVideo: '制作视频',
+      promptVideo: '为新品发布制作 30 秒短视频分镜和字幕时间轴。',
+      responseVideo: '已完成分镜拆解、旁白稿与画面提示词，正在合成预览…',
+      taskGame: '开发游戏',
+      promptGame: '制作一个可在浏览器运行的像素风小游戏，加入碰撞和计分。',
+      responseGame: '核心循环、输入控制和碰撞检测已完成，正在运行自动化测试…'
     },
     testimonials: {
       title: '开发者与团队的使用体验',

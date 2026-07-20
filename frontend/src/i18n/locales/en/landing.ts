@@ -57,6 +57,22 @@ export default {
       officialNative: 'Official Native・Pure Performance',
       officialNativeDesc: 'Provide official channel native API interfaces without any castration or debasing. Support the latest models to ensure native speed and output quality.'
     },
+    routes: {
+      openaiMain: 'OpenAI Main Route',
+      claudeBackup: 'Claude Backup Route',
+      geminiDirect: 'Gemini Direct Route',
+      computeNetwork: 'Compute Company Network',
+      departmentsCount: '5 Departments'
+    },
+    architecture: {
+      directPartner: 'Direct Partner',
+      computeCompany: 'Compute Company',
+      performanceBadge: 'Team Volume · Department Performance',
+      endUser: 'End User',
+      t1: 'T1 Foundation',
+      t2: 'T2 Growth',
+      t3: 'T3 Scale'
+    },
     ccswitch: {
       title: 'Configure CcSwitch',
       desc: 'Zero configuration access. Make your client gain full-blood AI capabilities in a second. No tedious settings, direct import of API keys and routing configs.',
@@ -73,6 +89,7 @@ export default {
       enabled: '3API Active',
       enable: 'Enable',
       clientDownload: 'Download CC Switch',
+      clientDownloadBtn: 'Download CC Switch Client',
       externalDownload: 'External Download'
     },
     onboarding: {
@@ -122,7 +139,16 @@ export default {
       envChanges: 'Changes',
       envLocal: 'Local',
       envBackground: 'Background Process',
-      envBrowser: 'Browser'
+      envBrowser: 'Browser',
+      taskWebsite: 'Develop Website',
+      promptWebsite: 'Create a responsive API console with login, usage charts, and mobile navigation.',
+      responseWebsite: 'Generated Vue pages, router, and responsive styles. Running visual checks...',
+      taskVideo: 'Produce Video',
+      promptVideo: 'Create a 30-second product launch video storyboard and subtitle timeline.',
+      responseVideo: 'Completed storyboard breakdown, script, and image prompts. Rendering preview...',
+      taskGame: 'Build Game',
+      promptGame: 'Build a browser pixel game with collision detection and score tracking.',
+      responseGame: 'Core loop, input controls, and collision system complete. Running unit tests...'
     },
     testimonials: {
       title: 'Trusted by Developers and Teams',

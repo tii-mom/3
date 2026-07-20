@@ -267,12 +267,6 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresAdmin: false, title: 'Compute Company', titleKey: 'finance.distribution.title' }
   },
   {
-    path: '/saas-partner',
-    name: 'SaaSPartner',
-    component: () => import('@/views/user/SaaSPartnerView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: false, title: 'SaaS Partner', titleKey: 'finance.partner.title' }
-  },
-  {
     path: '/available-channels',
     name: 'UserAvailableChannels',
     component: () => import('@/views/user/AvailableChannelsView.vue'),
@@ -675,12 +669,6 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminFinance',
     component: () => import('@/views/admin/FinanceOperationsView.vue'),
     meta: { requiresAuth: true, requiresAdmin: true, title: 'Finance Operations', titleKey: 'finance.admin.title' }
-  },
-  {
-    path: '/admin/saas',
-    name: 'AdminSaaS',
-    component: () => import('@/views/admin/SaaSControlView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true, title: 'SaaS Control', titleKey: 'finance.saas.title' }
   },
 
 

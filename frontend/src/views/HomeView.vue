@@ -19,12 +19,7 @@
     <!-- Default Home Page Branch -->
     <div v-else class="relative z-10">
       <!-- Quiet technical atmosphere -->
-      <div class="home-atmosphere pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <!-- Floating Ambient Glow Orbs -->
-        <div class="absolute top-[10%] left-[20%] w-[45vw] h-[45vw] rounded-full bg-primary-500/5 dark:bg-primary-500/[0.03] blur-[120px] animate-orb-float-1"></div>
-        <div class="absolute bottom-[20%] right-[10%] w-[50vw] h-[50vw] rounded-full bg-[#3b82f6]/5 dark:bg-[#3b82f6]/[0.02] blur-[140px] animate-orb-float-2"></div>
-        <div class="absolute top-[40%] right-[30%] w-[35vw] h-[35vw] rounded-full bg-primary-500/3 dark:bg-primary-500/[0.01] blur-[100px] animate-orb-float-3"></div>
-      </div>
+      <div class="home-atmosphere pointer-events-none fixed inset-0 z-0 overflow-hidden"></div>
 
 
 
@@ -106,10 +101,10 @@
                   <span class="home-console-trace">trace_92fa18</span>
                 </div>
                 <div class="home-console-routes">
-                  <div class="home-route home-route-active"><span class="home-provider-mark">O</span><span>OpenAI 主路由</span><strong>684ms</strong></div>
-                  <div class="home-route"><span class="home-provider-mark">A</span><span>Claude 备用路由</span><strong>ready</strong></div>
-                  <div class="home-route"><span class="home-provider-mark">G</span><span>Gemini 直连路由</span><strong>ready</strong></div>
-                  <router-link class="home-route" :to="isAuthenticated ? '/distribution' : '/login'"><Icon name="users" /><span>算力公司网络</span><strong>5 部门</strong></router-link>
+                  <div class="home-route home-route-active"><span class="home-provider-mark">O</span><span>{{ t('home.routes.openaiMain') }}</span><strong>684ms</strong></div>
+                  <div class="home-route"><span class="home-provider-mark">A</span><span>{{ t('home.routes.claudeBackup') }}</span><strong>ready</strong></div>
+                  <div class="home-route"><span class="home-provider-mark">G</span><span>{{ t('home.routes.geminiDirect') }}</span><strong>ready</strong></div>
+                  <router-link class="home-route" :to="isAuthenticated ? '/distribution' : '/login'"><Icon name="users" /><span>{{ t('home.routes.computeNetwork') }}</span><strong>{{ t('home.routes.departmentsCount') }}</strong></router-link>
                 </div>
               </div>
             </div>
@@ -247,7 +242,7 @@
                         class="group flex items-center justify-center gap-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold py-2.5 px-3 transition-colors shadow-sm w-full select-none"
                       >
                         <Icon name="download" class="h-3.5 w-3.5 transition-transform group-hover:translate-y-0.5" />
-                        <span>下载 CC Switch 客户端</span>
+                        <span>{{ t('home.ccswitch.clientDownloadBtn') }}</span>
                       </a>
                     </div>
                   </div>
@@ -323,8 +318,8 @@
                 <div class="home-network-preview flex flex-col justify-center items-center gap-6 py-6" aria-hidden="true">
                   <div class="flex items-center gap-8 w-full justify-center relative">
                     <div class="flex flex-col gap-2 shrink-0">
-                      <span class="px-4 py-2 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-center text-xs font-mono">直属伙伴</span>
-                      <span class="px-4 py-2 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-center text-xs font-mono">直属伙伴</span>
+                      <span class="px-4 py-2 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-center text-xs font-mono">{{ t('home.architecture.directPartner') }}</span>
+                      <span class="px-4 py-2 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-center text-xs font-mono">{{ t('home.architecture.directPartner') }}</span>
                     </div>
 
                     <!-- Connection Lines -->
@@ -334,8 +329,8 @@
                     </div>
 
                     <div class="px-6 py-4 border border-primary-500/30 bg-primary-500/5 rounded text-center shrink-0">
-                      <strong class="block text-sm text-slate-900 dark:text-white font-bold">算力公司</strong>
-                      <span class="text-[10px] text-primary-500 font-mono">团队业绩 · 部门绩效</span>
+                      <strong class="block text-sm text-slate-900 dark:text-white font-bold">{{ t('home.architecture.computeCompany') }}</strong>
+                      <span class="text-[10px] text-primary-500 font-mono">{{ t('home.architecture.performanceBadge') }}</span>
                     </div>
 
                     <div class="flex-1 h-px bg-primary-500/30 relative flex items-center justify-between">
@@ -344,17 +339,17 @@
                     </div>
 
                     <div class="flex flex-col gap-2 shrink-0">
-                      <span class="px-4 py-2 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-center text-xs font-mono">终端用户</span>
-                      <span class="px-4 py-2 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-center text-xs font-mono">终端用户</span>
+                      <span class="px-4 py-2 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-center text-xs font-mono">{{ t('home.architecture.endUser') }}</span>
+                      <span class="px-4 py-2 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-center text-xs font-mono">{{ t('home.architecture.endUser') }}</span>
                     </div>
                   </div>
                   
                   <div class="w-full h-px bg-slate-200 dark:bg-white/[0.06] my-2"></div>
 
                   <div class="flex gap-2 justify-center">
-                    <span class="px-3 py-1 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-[10px] font-mono">T1 基础</span>
-                    <span class="px-3 py-1 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-[10px] font-mono">T2 增长</span>
-                    <span class="px-3 py-1 border border-primary-500/50 bg-primary-500/5 text-primary-500 rounded text-[10px] font-mono font-bold">T3 规模</span>
+                    <span class="px-3 py-1 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-[10px] font-mono">{{ t('home.architecture.t1') }}</span>
+                    <span class="px-3 py-1 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-[10px] font-mono">{{ t('home.architecture.t2') }}</span>
+                    <span class="px-3 py-1 border border-primary-500/50 bg-primary-500/5 text-primary-500 rounded text-[10px] font-mono font-bold">{{ t('home.architecture.t3') }}</span>
                   </div>
                 </div>
               </div>
@@ -702,12 +697,12 @@ const dashboardPath = computed(() => isAdmin.value ? '/admin/dashboard' : '/dash
 
 
 const activeCodexTask = ref('website')
-const codexTasks = [
-  { id: 'website', label: '开发网站', prompt: '创建一个响应式 API 控制台，包含登录、用量图表和移动端导航。', response: '已生成 Vue 页面、路由和响应式样式，正在运行视觉检查…', status: 'Building responsive interface', progress: 86 },
-  { id: 'video', label: '制作视频', prompt: '为新品发布制作 30 秒短视频分镜和字幕时间轴。', response: '已完成分镜拆解、旁白稿与画面提示词，正在合成预览…', status: 'Rendering storyboard preview', progress: 72 },
-  { id: 'game', label: '开发游戏', prompt: '制作一个可在浏览器运行的像素风小游戏，加入碰撞和计分。', response: '核心循环、输入控制和碰撞检测已完成，正在运行自动化测试…', status: 'Running gameplay tests', progress: 64 }
-]
-const activeTask = computed(() => codexTasks.find((task) => task.id === activeCodexTask.value) || codexTasks[0])
+const codexTasks = computed(() => [
+  { id: 'website', label: t('home.codex.taskWebsite'), prompt: t('home.codex.promptWebsite'), response: t('home.codex.responseWebsite'), status: 'Building responsive interface', progress: 86 },
+  { id: 'video', label: t('home.codex.taskVideo'), prompt: t('home.codex.promptVideo'), response: t('home.codex.responseVideo'), status: 'Rendering storyboard preview', progress: 72 },
+  { id: 'game', label: t('home.codex.taskGame'), prompt: t('home.codex.promptGame'), response: t('home.codex.responseGame'), status: 'Running gameplay tests', progress: 64 }
+])
+const activeTask = computed(() => codexTasks.value.find((task) => task.id === activeCodexTask.value) || codexTasks.value[0])
 let codexTaskTimer: ReturnType<typeof setInterval> | undefined
 const step2Tab = ref('api')
 
@@ -741,8 +736,8 @@ onMounted(() => {
   revealElements.forEach((el) => observer.observe(el))
 
   codexTaskTimer = setInterval(() => {
-    const currentIndex = codexTasks.findIndex((task) => task.id === activeCodexTask.value)
-    activeCodexTask.value = codexTasks[(currentIndex + 1) % codexTasks.length].id
+    const currentIndex = codexTasks.value.findIndex((task) => task.id === activeCodexTask.value)
+    activeCodexTask.value = codexTasks.value[(currentIndex + 1) % codexTasks.value.length].id
   }, 5200)
 })
 
@@ -851,32 +846,6 @@ onUnmounted(() => {
 @keyframes gridMove {
   0% { background-position: 0 0; }
   100% { background-position: 34px 34px; }
-}
-
-@keyframes orbFloat1 {
-  0% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(40px, -60px) scale(1.08); }
-  100% { transform: translate(0, 0) scale(1); }
-}
-@keyframes orbFloat2 {
-  0% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-50px, 40px) scale(0.92); }
-  100% { transform: translate(0, 0) scale(1); }
-}
-@keyframes orbFloat3 {
-  0% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(30px, 30px) scale(1.05); }
-  100% { transform: translate(0, 0) scale(1); }
-}
-
-.animate-orb-float-1 {
-  animation: orbFloat1 25s infinite ease-in-out;
-}
-.animate-orb-float-2 {
-  animation: orbFloat2 30s infinite ease-in-out;
-}
-.animate-orb-float-3 {
-  animation: orbFloat3 22s infinite ease-in-out;
 }
 
 .home-redesign .home-header nav {
