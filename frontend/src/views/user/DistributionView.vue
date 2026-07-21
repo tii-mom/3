@@ -6,8 +6,10 @@
           <h1 class="text-xl font-semibold text-gray-950 dark:text-white">{{ t('finance.distribution.title') }}</h1>
           <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">{{ t('finance.distribution.subtitle') }}</p>
         </div>
-        <div class="inline-flex h-9 self-start border border-gray-200 bg-gray-50 p-0.5 dark:border-dark-700 dark:bg-dark-800">
-          <button v-for="tab in tabs" :key="tab.id" class="px-3 text-sm" :class="activeTab === tab.id ? 'bg-white font-medium text-gray-950 shadow-sm dark:bg-dark-700 dark:text-white' : 'text-gray-500'" @click="activeTab = tab.id">{{ tab.label }}</button>
+        <div class="max-w-full overflow-x-auto self-start" role="tablist" :aria-label="t('finance.distribution.title')">
+          <div class="inline-flex h-9 min-w-max border border-gray-200 bg-gray-50 p-0.5 dark:border-dark-700 dark:bg-dark-800">
+            <button v-for="tab in tabs" :key="tab.id" type="button" role="tab" :aria-selected="activeTab === tab.id" :tabindex="activeTab === tab.id ? 0 : -1" class="px-3 text-sm" :class="activeTab === tab.id ? 'bg-white font-medium text-gray-950 shadow-sm dark:bg-dark-700 dark:text-white' : 'text-gray-500'" @click="activeTab = tab.id">{{ tab.label }}</button>
+          </div>
         </div>
       </section>
 

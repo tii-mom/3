@@ -21,84 +21,127 @@
         </div>
       </div>
 
-      <!-- Redeem Form -->
-      <div class="card">
-        <div class="p-6">
-          <form @submit.prevent="handleRedeem" class="space-y-5">
-            <div>
-              <label for="code" class="input-label">
-                {{ t('redeem.redeemCodeLabel') }}
-              </label>
-              <div class="relative mt-1">
-                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                  <Icon name="gift" size="md" class="text-gray-400 dark:text-dark-500" />
-                </div>
-                <input
-                  id="code"
-                  v-model="redeemCode"
-                  type="text"
-                  required
-                  :placeholder="t('redeem.redeemCodePlaceholder')"
-                  :disabled="submitting"
-                  class="input py-3 pl-12 text-lg"
-                />
-              </div>
-              <p class="input-hint">
-                {{ t('redeem.redeemCodeHint') }}
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              :disabled="!redeemCode || submitting"
-              class="btn btn-primary w-full py-3"
-            >
-              <svg
-                v-if="submitting"
-                class="-ml-1 mr-2 h-5 w-5 animate-spin"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  class="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  stroke-width="4"
-                ></circle>
-                <path
-                  class="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
-              <Icon v-else name="checkCircle" size="md" class="mr-2" />
-              {{ submitting ? t('redeem.redeeming') : t('redeem.redeemButton') }}
-            </button>
-          </form>
+      <!-- Primary mode switch -->
+      <div class="rounded-xl border border-gray-200 bg-gray-50 p-1.5 dark:border-dark-700 dark:bg-dark-800/80" role="tablist" :aria-label="t('redeem.modeSwitcherLabel')">
+        <div class="grid grid-cols-2 gap-1.5">
+          <button
+            id="redeem-mode-tab"
+            type="button"
+            role="tab"
+            :aria-selected="activeMode === 'redeem'"
+            aria-controls="redeem-mode-panel"
+            :class="[
+              'flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-dark-900',
+              activeMode === 'redeem'
+                ? 'bg-white text-primary-700 shadow-sm dark:bg-dark-700 dark:text-primary-300'
+                : 'text-gray-500 hover:bg-white/70 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-700/70 dark:hover:text-white'
+            ]"
+            @click="activeMode = 'redeem'"
+          >
+            <Icon name="gift" size="sm" />
+            {{ t('redeem.redeemMode') }}
+          </button>
+          <button
+            id="create-mode-tab"
+            type="button"
+            role="tab"
+            :aria-selected="activeMode === 'create'"
+            aria-controls="create-mode-panel"
+            :class="[
+              'flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-dark-900',
+              activeMode === 'create'
+                ? 'bg-white text-primary-700 shadow-sm dark:bg-dark-700 dark:text-primary-300'
+                : 'text-gray-500 hover:bg-white/70 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-700/70 dark:hover:text-white'
+            ]"
+            @click="activeMode = 'create'"
+          >
+            <Icon name="plus" size="sm" />
+            {{ t('redeem.createMode') }}
+          </button>
         </div>
       </div>
 
-      <!-- User Balance Voucher Creation -->
-      <div class="card">
-        <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                {{ t('finance.vouchers.createTitle') }}
-              </h2>
-              <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">
-                {{ t('finance.vouchers.createSubtitle') }}
-              </p>
-            </div>
-            <button type="button" class="btn btn-secondary btn-sm" @click="loadVoucherData">
-              {{ t('common.refresh') }}
-            </button>
+      <!-- Redeem Form -->
+      <section v-if="activeMode === 'redeem'" id="redeem-mode-panel" role="tabpanel" aria-labelledby="redeem-mode-tab" class="space-y-6">
+        <div class="card">
+          <div class="p-6">
+            <form @submit.prevent="handleRedeem" class="space-y-5">
+              <div>
+                <label for="code" class="input-label">
+                  {{ t('redeem.redeemCodeLabel') }}
+                </label>
+                <div class="relative mt-1">
+                  <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                    <Icon name="gift" size="md" class="text-gray-400 dark:text-dark-500" />
+                  </div>
+                  <input
+                    id="code"
+                    v-model="redeemCode"
+                    type="text"
+                    required
+                    :placeholder="t('redeem.redeemCodePlaceholder')"
+                    :disabled="submitting"
+                    class="input py-3 pl-12 text-lg"
+                  />
+                </div>
+                <p class="input-hint">
+                  {{ t('redeem.redeemCodeHint') }}
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                :disabled="!redeemCode || submitting"
+                class="btn btn-primary w-full py-3"
+              >
+                <svg
+                  v-if="submitting"
+                  class="-ml-1 mr-2 h-5 w-5 animate-spin"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    class="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    stroke-width="4"
+                  ></circle>
+                  <path
+                    class="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                <Icon v-else name="checkCircle" size="md" class="mr-2" />
+                {{ submitting ? t('redeem.redeeming') : t('redeem.redeemButton') }}
+              </button>
+            </form>
           </div>
         </div>
+      </section>
 
-        <div class="space-y-5 p-6">
+      <!-- User Balance Voucher Creation -->
+      <section v-else id="create-mode-panel" role="tabpanel" aria-labelledby="create-mode-tab" class="space-y-6">
+        <div class="card">
+          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                  {{ t('finance.vouchers.createTitle') }}
+                </h2>
+                <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">
+                  {{ t('finance.vouchers.createSubtitle') }}
+                </p>
+              </div>
+              <button type="button" class="btn btn-secondary btn-sm" @click="loadVoucherData">
+                {{ t('common.refresh') }}
+              </button>
+            </div>
+          </div>
+
+          <div class="space-y-5 p-6">
           <div v-if="voucherAvailabilityLoading" class="flex items-center justify-center py-6">
             <svg class="h-6 w-6 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -210,13 +253,14 @@
               </table>
             </div>
           </template>
+          </div>
         </div>
-      </div>
+      </section>
 
       <!-- Success Message -->
       <transition name="fade">
         <div
-          v-if="redeemResult"
+          v-if="redeemResult && activeMode === 'redeem'"
           class="card border-emerald-200 bg-emerald-50 dark:border-emerald-800/50 dark:bg-emerald-900/20"
         >
           <div class="p-6">
@@ -270,7 +314,7 @@
       <!-- Error Message -->
       <transition name="fade">
         <div
-          v-if="errorMessage"
+          v-if="errorMessage && errorMode === activeMode"
           class="card border-red-200 bg-red-50 dark:border-red-800/50 dark:bg-red-900/20"
         >
           <div class="p-6">
@@ -502,6 +546,9 @@ const subscriptionStore = useSubscriptionStore()
 
 const user = computed(() => authStore.user)
 
+type RedeemMode = 'redeem' | 'create'
+
+const activeMode = ref<RedeemMode>('redeem')
 const redeemCode = ref('')
 const submitting = ref(false)
 const redeemResult = ref<{
@@ -514,6 +561,7 @@ const redeemResult = ref<{
   validity_days?: number
 } | null>(null)
 const errorMessage = ref('')
+const errorMode = ref<RedeemMode | null>(null)
 
 // History data
 const history = ref<RedeemHistoryItem[]>([])
@@ -639,6 +687,8 @@ const fillMaximumVoucherAmount = () => {
 const handleCreateVoucher = async () => {
   if (!canCreateVoucher.value) return
   voucherCreating.value = true
+  errorMessage.value = ''
+  errorMode.value = null
   try {
     const result = await createVoucher(voucherAmount.value.trim(), requiresVoucherTotp.value ? voucherTotpCode.value.trim() : '')
     voucherIssuedCode.value = result.code || ''
@@ -648,6 +698,7 @@ const handleCreateVoucher = async () => {
     appStore.showSuccess(t('finance.vouchers.createdCode'))
   } catch (error: any) {
     errorMessage.value = error.response?.data?.detail || error.message || t('finance.vouchers.createFailed')
+    errorMode.value = 'create'
     appStore.showError(errorMessage.value)
   } finally {
     voucherCreating.value = false
@@ -679,6 +730,7 @@ const handleRedeem = async () => {
 
   submitting.value = true
   errorMessage.value = ''
+  errorMode.value = null
   redeemResult.value = null
 
   try {
@@ -709,6 +761,7 @@ const handleRedeem = async () => {
     appStore.showSuccess(t('redeem.codeRedeemSuccess'))
   } catch (error: any) {
     errorMessage.value = error.response?.data?.detail || t('redeem.failedToRedeem')
+    errorMode.value = 'redeem'
 
     appStore.showError(t('redeem.redeemFailed'))
   } finally {

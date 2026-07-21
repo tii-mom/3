@@ -1,5 +1,7 @@
 <template>
   <aside
+    id="app-sidebar"
+    aria-label="Main navigation"
     class="sidebar app-sidebar-redesign"
     :class="[
       sidebarCollapsed ? 'w-[72px]' : 'w-64',
@@ -920,8 +922,15 @@ watch(
   { immediate: true }
 )
 
+const syncMobileNavLock = () => {
+  document.body.classList.toggle('mobile-nav-open', mobileOpen.value && window.innerWidth < 1024)
+}
+
+watch(mobileOpen, syncMobileNavLock, { immediate: true })
+
 onMounted(() => {
   void refreshBatchImageAccess()
+  window.addEventListener('resize', syncMobileNavLock)
   if (isAdmin.value) {
     adminSettingsStore.fetch()
   }
@@ -936,6 +945,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', syncMobileNavLock)
+  document.body.classList.remove('mobile-nav-open')
   if (sidebarNavRef.value) {
     appStore.sidebarScrollTop = sidebarNavRef.value.scrollTop
   }
