@@ -38,6 +38,7 @@ type DistributionProcessResult struct {
 
 type DistributionDashboard struct {
 	Enabled               bool                       `json:"enabled"`
+	BalanceRechargeMultiplier string                  `json:"balance_recharge_multiplier"`
 	USDToCNYRate          string                     `json:"usd_to_cny_rate"`
 	CommissionFreezeHours int                        `json:"commission_freeze_hours"`
 	WithdrawalMinMinor    int64                      `json:"withdrawal_min_cny_minor"`
@@ -86,6 +87,8 @@ type DistributionConversion struct {
 	ID             int64     `json:"id"`
 	AmountCNYMinor int64     `json:"amount_cny_minor"`
 	USDAmount      string    `json:"usd_amount"`
+	CNYToUSDRate   string    `json:"cny_to_usd_rate"`
+	RateSource     string    `json:"rate_source"`
 	USDToCNYRate   string    `json:"usd_to_cny_rate"`
 	ConfigVersion  int       `json:"config_version"`
 	CreatedAt      time.Time `json:"created_at"`
@@ -176,6 +179,8 @@ type DistributionConversionAudit struct {
 	UserID         int64     `json:"user_id"`
 	AmountCNYMinor int64     `json:"amount_cny_minor"`
 	USDAmount      string    `json:"usd_amount"`
+	CNYToUSDRate   string    `json:"cny_to_usd_rate,omitempty"`
+	RateSource     string    `json:"rate_source,omitempty"`
 	USDToCNYRate   string    `json:"usd_to_cny_rate"`
 	ConfigVersion  int       `json:"config_version"`
 	IdempotencyKey string    `json:"idempotency_key"`
@@ -241,7 +246,7 @@ func (s *DistributionService) ProgramConfig(ctx context.Context) (map[string]any
 	if err != nil {
 		return nil, err
 	}
-	rate, err := s.usdToCNYRate(ctx)
+	multiplier, err := s.balanceRechargeMultiplier(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -250,8 +255,31 @@ func (s *DistributionService) ProgramConfig(ctx context.Context) (map[string]any
 		"withdrawal_min_cny_minor": minimum, "withdrawal_daily_limit": dailyLimit,
 		"withdrawal_fee_bps": feeBPS, "first_recharge_bonus_bps": bonusBPS,
 		"first_recharge_bonus_cap_usd": bonusCap, "current_config_version": version, "tiers": tiers,
-		"usd_to_cny_rate": rate.String(),
+		"balance_recharge_multiplier": multiplier.String(),
+		// Kept for clients that still read the legacy field. New conversions use
+		// the explicit CNY-to-USD multiplier above.
+		"usd_to_cny_rate": decimal.NewFromInt(1).Div(multiplier).String(),
 	}, nil
+}
+
+// balanceRechargeMultiplier reads the same setting used by payment recharge
+// orders: how many USD of platform balance one CNY produces. Keeping this in
+// the distribution service prevents the earnings conversion from drifting
+// away from the purchase configuration.
+func (s *DistributionService) balanceRechargeMultiplier(ctx context.Context) (decimal.Decimal, error) {
+	var raw string
+	err := s.db.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = $1`, SettingBalanceRechargeMult).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return decimal.NewFromInt(1), nil
+	}
+	if err != nil {
+		return decimal.Zero, err
+	}
+	multiplier, err := decimal.NewFromString(strings.TrimSpace(raw))
+	if err != nil || !multiplier.IsPositive() {
+		return decimal.Zero, infraerrors.BadRequest("BALANCE_RECHARGE_MULTIPLIER_INVALID", "balance recharge multiplier is invalid")
+	}
+	return multiplier, nil
 }
 
 func (s *DistributionService) usdToCNYRate(ctx context.Context) (decimal.Decimal, error) {
@@ -825,11 +853,12 @@ GROUP BY depth`, programID, userID)
 	if err != nil {
 		return nil, err
 	}
-	rate, err := s.usdToCNYRate(ctx)
+	multiplier, err := s.balanceRechargeMultiplier(ctx)
 	if err != nil {
 		return nil, err
 	}
-	dashboard.USDToCNYRate = rate.String()
+	dashboard.BalanceRechargeMultiplier = multiplier.String()
+	dashboard.USDToCNYRate = decimal.NewFromInt(1).Div(multiplier).String()
 	for tierRows.Next() {
 		var tier DistributionTier
 		if err := tierRows.Scan(&tier.Tier, &tier.Threshold, &tier.RatesBPS[0], &tier.RatesBPS[1], &tier.RatesBPS[2], &tier.RatesBPS[3], &tier.RatesBPS[4]); err != nil {
@@ -1089,11 +1118,11 @@ func (s *DistributionService) ConvertToPlatformBalance(ctx context.Context, user
 		return nil, ErrDistributionDisabled
 	}
 	if err := tx.QueryRowContext(ctx, `
-SELECT id, amount_cny_minor, usd_amount::text, usd_to_cny_rate::text, config_version, created_at
+SELECT id, amount_cny_minor, usd_amount::text, COALESCE(cny_to_usd_rate::text, ''), COALESCE(rate_source, ''), usd_to_cny_rate::text, config_version, created_at
 FROM distribution_usd_conversions
 WHERE program_id = $1 AND user_id = $2 AND idempotency_key = $3`, programID, userID, idempotencyKey).Scan(
 		&conversion.ID, &conversion.AmountCNYMinor, &conversion.USDAmount,
-		&conversion.USDToCNYRate, &conversion.ConfigVersion, &conversion.CreatedAt,
+		&conversion.CNYToUSDRate, &conversion.RateSource, &conversion.USDToCNYRate, &conversion.ConfigVersion, &conversion.CreatedAt,
 	); err == nil {
 		if conversion.AmountCNYMinor != amountMinor {
 			return nil, infraerrors.Conflict("DISTRIBUTION_CONVERSION_IDEMPOTENCY_CONFLICT", "idempotency key was already used with a different amount")
@@ -1102,19 +1131,20 @@ WHERE program_id = $1 AND user_id = $2 AND idempotency_key = $3`, programID, use
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
-	rateRaw, err := settingValueTx(ctx, tx, "distribution_usd_to_cny_rate")
+	rateRaw, err := settingValueTx(ctx, tx, SettingBalanceRechargeMult)
 	if err != nil {
 		return nil, err
 	}
-	rate, err := decimal.NewFromString(rateRaw)
-	if err != nil || !rate.IsPositive() || rate.GreaterThan(decimal.NewFromInt(1000)) {
-		return nil, infraerrors.BadRequest("DISTRIBUTION_EXCHANGE_RATE_INVALID", "distribution USD to CNY rate is invalid")
+	multiplier, err := decimal.NewFromString(rateRaw)
+	if err != nil || !multiplier.IsPositive() {
+		return nil, infraerrors.BadRequest("BALANCE_RECHARGE_MULTIPLIER_INVALID", "balance recharge multiplier is invalid")
 	}
+	legacyRate := decimal.NewFromInt(1).Div(multiplier).Round(10)
 	var configVersion int
 	if err := tx.QueryRowContext(ctx, `SELECT current_config_version FROM distribution_programs WHERE id = $1`, programID).Scan(&configVersion); err != nil {
 		return nil, err
 	}
-	usdAmount := decimal.NewFromInt(amountMinor).Div(decimal.NewFromInt(100)).Div(rate).Round(8)
+	usdAmount := decimal.NewFromInt(amountMinor).Div(decimal.NewFromInt(100)).Mul(multiplier).Round(8)
 	if !usdAmount.IsPositive() {
 		return nil, infraerrors.BadRequest("DISTRIBUTION_CONVERSION_INVALID", "conversion amount is too small")
 	}
@@ -1137,9 +1167,9 @@ WHERE program_id = $1 AND user_id = $2 AND idempotency_key = $3`, programID, use
 		return nil, err
 	}
 	if err := tx.QueryRowContext(ctx, `
-INSERT INTO distribution_usd_conversions (program_id, tenant_id, user_id, amount_cny_minor, usd_amount, usd_to_cny_rate, config_version, idempotency_key)
-VALUES ($1, 1, $2, $3, $4, $5, $6, $7)
-RETURNING id, created_at`, programID, userID, amountMinor, usdAmount.String(), rate.String(), configVersion, idempotencyKey).Scan(&conversion.ID, &conversion.CreatedAt); err != nil {
+INSERT INTO distribution_usd_conversions (program_id, tenant_id, user_id, amount_cny_minor, usd_amount, cny_to_usd_rate, rate_source, usd_to_cny_rate, config_version, idempotency_key)
+VALUES ($1, 1, $2, $3, $4, $5, $6, $7, $8, $9)
+	RETURNING id, created_at`, programID, userID, amountMinor, usdAmount.String(), multiplier.String(), "balance_recharge_multiplier", legacyRate.String(), configVersion, idempotencyKey).Scan(&conversion.ID, &conversion.CreatedAt); err != nil {
 		return nil, err
 	}
 	_, applied, err := creditledger.Apply(ctx, tx, userID, usdAmount, creditctx.Metadata{
@@ -1157,7 +1187,9 @@ RETURNING id, created_at`, programID, userID, amountMinor, usdAmount.String(), r
 	}
 	conversion.AmountCNYMinor = amountMinor
 	conversion.USDAmount = usdAmount.String()
-	conversion.USDToCNYRate = rate.String()
+	conversion.CNYToUSDRate = multiplier.String()
+	conversion.RateSource = "balance_recharge_multiplier"
+	conversion.USDToCNYRate = legacyRate.String()
 	conversion.ConfigVersion = configVersion
 	return &conversion, tx.Commit()
 }
@@ -1165,6 +1197,9 @@ RETURNING id, created_at`, programID, userID, amountMinor, usdAmount.String(), r
 func settingValueTx(ctx context.Context, tx *sql.Tx, key string) (string, error) {
 	var raw string
 	if err := tx.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = $1`, key).Scan(&raw); errors.Is(err, sql.ErrNoRows) {
+		if key == SettingBalanceRechargeMult {
+			return "1", nil
+		}
 		if key == "distribution_usd_to_cny_rate" {
 			return "7.15", nil
 		}
@@ -1330,7 +1365,8 @@ func (s *DistributionService) AdminListConversions(ctx context.Context, page, pa
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx, `
-SELECT id, user_id, amount_cny_minor, usd_amount::text, usd_to_cny_rate::text,
+SELECT id, user_id, amount_cny_minor, usd_amount::text,
+       COALESCE(cny_to_usd_rate::text, ''), COALESCE(rate_source, ''), usd_to_cny_rate::text,
        config_version, idempotency_key, created_at
 FROM distribution_usd_conversions
 ORDER BY created_at DESC, id DESC
@@ -1342,7 +1378,7 @@ LIMIT $1 OFFSET $2`, pageSize, (page-1)*pageSize)
 	items := make([]DistributionConversionAudit, 0, pageSize)
 	for rows.Next() {
 		var item DistributionConversionAudit
-		if err := rows.Scan(&item.ID, &item.UserID, &item.AmountCNYMinor, &item.USDAmount, &item.USDToCNYRate, &item.ConfigVersion, &item.IdempotencyKey, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.UserID, &item.AmountCNYMinor, &item.USDAmount, &item.CNYToUSDRate, &item.RateSource, &item.USDToCNYRate, &item.ConfigVersion, &item.IdempotencyKey, &item.CreatedAt); err != nil {
 			return nil, 0, err
 		}
 		items = append(items, item)

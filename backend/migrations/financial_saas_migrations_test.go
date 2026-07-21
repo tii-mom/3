@@ -113,3 +113,13 @@ func TestDistributionConversionIdempotencyIsUserScoped(t *testing.T) {
 	require.Contains(t, sql, "DROP CONSTRAINT IF EXISTS distribution_usd_conversions_program_id_idempotency_key_key")
 	require.Contains(t, sql, "ON distribution_usd_conversions(program_id, user_id, idempotency_key)")
 }
+
+func TestDistributionConversionUsesPaymentPurchaseMultiplier(t *testing.T) {
+	sql := normalizedMigration(t, "190_distribution_purchase_multiplier.sql")
+	require.Contains(t, sql, "ADD COLUMN IF NOT EXISTS cny_to_usd_rate DECIMAL(20,10)")
+	require.Contains(t, sql, "ADD COLUMN IF NOT EXISTS rate_source VARCHAR(64)")
+	require.Contains(t, sql, "legacy_usd_to_cny_rate")
+	require.Contains(t, sql, "distribution_usd_conversions_cny_to_usd_rate_check")
+	require.Contains(t, sql, "IF NOT EXISTS (")
+	require.Contains(t, sql, "FROM pg_constraint")
+}

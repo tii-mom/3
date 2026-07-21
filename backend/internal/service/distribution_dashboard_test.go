@@ -53,8 +53,9 @@ GROUP BY depth`)).
 			AddRow(1, 100000, 1000, 400, 300, 200, 100).
 			AddRow(2, 1000000, 1500, 600, 400, 300, 200).
 			AddRow(3, 10000000, 2000, 800, 600, 400, 200))
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT value FROM settings WHERE key = 'distribution_usd_to_cny_rate'`)).
-		WillReturnRows(sqlmock.NewRows([]string{"value"}).AddRow("7.15"))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT value FROM settings WHERE key = $1`)).
+		WithArgs(SettingBalanceRechargeMult).
+		WillReturnRows(sqlmock.NewRows([]string{"value"}).AddRow("0.14"))
 
 	dashboard, err := NewDistributionService(db, nil).Dashboard(context.Background(), 42)
 	require.NoError(t, err)
@@ -66,5 +67,6 @@ GROUP BY depth`)).
 	require.Empty(t, dashboard.LevelCounts)
 	require.Len(t, dashboard.Levels, 5)
 	require.Len(t, dashboard.Tiers, 4)
+	require.Equal(t, "0.14", dashboard.BalanceRechargeMultiplier)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
