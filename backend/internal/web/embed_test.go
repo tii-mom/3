@@ -269,6 +269,15 @@ func TestFrontendServer_InjectSettings(t *testing.T) {
 
 		assert.Contains(t, string(result), `window.__APP_CONFIG__={"nested":{"array":[1,2,3]},"special":"<>&"};`)
 	})
+
+	t.Run("preserves_static_seo_title", func(t *testing.T) {
+		provider := &mockSettingsProvider{settings: map[string]string{"site_name": "CustomSite"}}
+		server, err := NewFrontendServer(provider)
+		require.NoError(t, err)
+
+		result := server.injectSettings([]byte(`{"site_name":"CustomSite"}`))
+		assert.NotContains(t, string(result), "CustomSite - AI API Gateway")
+	})
 }
 
 func TestFrontendServer_ServeIndexHTML(t *testing.T) {

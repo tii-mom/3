@@ -626,6 +626,10 @@
         <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400 dark:text-gray-500">
           <p>© {{ new Date().getFullYear() }} {{ siteName }}. {{ t('home.footer.allRightsReserved') }}</p>
           <div class="flex items-center gap-4">
+            <router-link to="/api-relay" class="hover:text-slate-600 dark:hover:text-gray-300 transition-colors">API 中转站</router-link>
+            <router-link to="/openai-api" class="hover:text-slate-600 dark:hover:text-gray-300 transition-colors">OpenAI API</router-link>
+            <router-link to="/token-guide" class="hover:text-slate-600 dark:hover:text-gray-300 transition-colors">Token 指南</router-link>
+            <router-link to="/compute-company" class="hover:text-slate-600 dark:hover:text-gray-300 transition-colors">渠道合作</router-link>
             <a v-if="docUrl" :href="docUrl" target="_blank" rel="noopener noreferrer" class="hover:text-slate-600 dark:hover:text-gray-300 transition-colors">
               {{ t('home.docs') }}
             </a>

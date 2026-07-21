@@ -31,13 +31,59 @@ const routes: RouteRecordRaw[] = [
 
   // ==================== Public Routes ====================
   {
-    path: '/home',
+    path: '/',
     name: 'Home',
     component: () => import('@/views/HomeView.vue'),
     meta: {
       requiresAuth: false,
       title: 'Home'
     }
+  },
+  {
+    path: '/home',
+    redirect: '/'
+  },
+  {
+    path: '/api-relay',
+    name: 'ApiRelay',
+    component: () => import('@/views/public/SeoLandingView.vue'),
+    meta: { requiresAuth: false, title: 'AI API 中转站', seoKey: 'api-relay' }
+  },
+  {
+    path: '/openai-api',
+    name: 'OpenAiApi',
+    component: () => import('@/views/public/SeoLandingView.vue'),
+    meta: { requiresAuth: false, title: 'OpenAI API 接入', seoKey: 'openai-api' }
+  },
+  {
+    path: '/codex-api',
+    name: 'CodexApi',
+    component: () => import('@/views/public/SeoLandingView.vue'),
+    meta: { requiresAuth: false, title: 'Codex API 接入', seoKey: 'codex-api' }
+  },
+  {
+    path: '/full-api',
+    name: 'FullApi',
+    component: () => import('@/views/public/SeoLandingView.vue'),
+    meta: { requiresAuth: false, title: '满血 API 说明', seoKey: 'full-api' }
+  },
+  {
+    path: '/token-guide',
+    name: 'TokenGuide',
+    component: () => import('@/views/public/SeoLandingView.vue'),
+    meta: { requiresAuth: false, title: 'Token 计费指南', seoKey: 'token-guide' }
+  },
+  {
+    path: '/chatgpt-plus-vs-api',
+    name: 'ChatGptPlusVsApi',
+    component: () => import('@/views/public/SeoLandingView.vue'),
+    meta: { requiresAuth: false, title: 'ChatGPT Plus 与 API 对比', seoKey: 'chatgpt-plus-vs-api' }
+  },
+  {
+    path: '/compute-company',
+    name: 'ComputeCompanyPublic',
+    component: () => import('@/views/public/SeoLandingView.vue'),
+    meta: { requiresAuth: false, title: 'AI 算力渠道合作', seoKey: 'compute-company' }
   },
   {
     path: '/login',
@@ -177,10 +223,6 @@ const routes: RouteRecordRaw[] = [
   },
 
   // ==================== User Routes ====================
-  {
-    path: '/',
-    redirect: '/home'
-  },
   {
     path: '/dashboard',
     name: 'Dashboard',

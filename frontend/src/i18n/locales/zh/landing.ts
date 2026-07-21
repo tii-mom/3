@@ -54,8 +54,8 @@ export default {
       subscriptionToApi: '订阅转 API',
       stickySession: '会话保持',
       realtimeBilling: '按量计费',
-      officialNative: '官方账号・原生满血',
-      officialNativeDesc: '提供官方渠道原生 API 接口，无任何阉割与降智。支持最新模型特性，确保企业级极速响应与原生输出质量。'
+      officialNative: '官方账号资源・原生能力',
+      officialNativeDesc: '上游使用官方账号资源，在页面标明的模型和功能范围内保留对应模型能力。实际可用模型、功能与调用状态以控制台为准。'
     },
     routes: {
       openaiMain: 'OpenAI 主路由',
