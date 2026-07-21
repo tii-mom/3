@@ -29,6 +29,8 @@ var requiredFinancialMigrations = []string{
 	"178_saas_control_plane.sql",
 	"179_financial_runtime_controls.sql",
 	"180_distribution_reversals.sql",
+	"188_compute_company_t0.sql",
+	"189_distribution_conversion_idempotency_scope.sql",
 }
 
 type gateReport struct {

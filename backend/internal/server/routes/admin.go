@@ -189,6 +189,8 @@ func registerAdminDistributionRoutes(admin *gin.RouterGroup, h *handler.Handlers
 	{
 		distribution.GET("/financial-runtime", h.Admin.Distribution.GetFinancialRuntimeConfig)
 		distribution.PUT("/financial-runtime", h.Admin.Distribution.UpdateFinancialRuntimeConfig)
+		distribution.GET("/exchange-rate", h.Admin.Distribution.GetExchangeRate)
+		distribution.PUT("/exchange-rate", h.Admin.Distribution.UpdateExchangeRate)
 		distribution.GET("/config", h.Admin.Distribution.GetConfig)
 		distribution.PUT("/config", h.Admin.Distribution.UpdateConfig)
 		distribution.POST("/config/versions", h.Admin.Distribution.CreatePolicyVersion)
@@ -197,6 +199,7 @@ func registerAdminDistributionRoutes(admin *gin.RouterGroup, h *handler.Handlers
 		distribution.GET("/recharge-events", h.Admin.Distribution.ListRechargeEvents)
 		distribution.POST("/recharge-events/:id/reverse", h.Admin.Distribution.ReverseRecharge)
 		distribution.GET("/relations", h.Admin.Distribution.ListRelations)
+		distribution.GET("/conversions", h.Admin.Distribution.ListConversions)
 		distribution.GET("/members", h.Admin.Distribution.ListTierAssignments)
 		distribution.PUT("/members/:user_id/tier", h.Admin.Distribution.SetTierOverride)
 		distribution.POST("/withdrawals/:id/transition", h.Admin.Distribution.TransitionWithdrawal)
@@ -798,10 +801,7 @@ func registerAffiliateRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		{
 			users.GET("", h.Admin.Affiliate.ListUsers)
 			users.GET("/lookup", h.Admin.Affiliate.LookupUsers)
-			users.POST("/batch-rate", h.Admin.Affiliate.BatchSetRate)
 			users.GET("/:user_id/overview", h.Admin.Affiliate.GetUserOverview)
-			users.PUT("/:user_id", h.Admin.Affiliate.UpdateUserSettings)
-			users.DELETE("/:user_id", h.Admin.Affiliate.ClearUserSettings)
 		}
 	}
 }

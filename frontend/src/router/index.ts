@@ -245,14 +245,8 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/affiliate',
     name: 'Affiliate',
-    component: () => import('@/views/user/AffiliateView.vue'),
-    meta: {
-      requiresAuth: true,
-      requiresAdmin: false,
-      title: 'Affiliate',
-      titleKey: 'affiliate.title',
-      descriptionKey: 'affiliate.description'
-    }
+    redirect: '/distribution',
+    meta: { requiresAuth: true, requiresAdmin: false, title: 'Compute Company', titleKey: 'finance.distribution.title' }
   },
   {
     path: '/vouchers',

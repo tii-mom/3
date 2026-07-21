@@ -64,6 +64,11 @@ type payoutAccountRequest struct {
 	RealName      string `json:"real_name" binding:"required"`
 }
 
+type conversionRequest struct {
+	AmountCNYMinor int64  `json:"amount_cny_minor" binding:"required"`
+	IdempotencyKey string `json:"idempotency_key" binding:"required"`
+}
+
 func (h *DistributionHandler) GetPayoutAccount(c *gin.Context) {
 	userID, ok := authenticatedUserID(c)
 	if !ok {
@@ -124,6 +129,24 @@ func (h *DistributionHandler) CreateWithdrawal(c *gin.Context) {
 		return
 	}
 	item, err := h.service.CreateWithdrawal(c.Request.Context(), userID, request.AmountMinor)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Created(c, item)
+}
+
+func (h *DistributionHandler) ConvertToPlatformBalance(c *gin.Context) {
+	userID, ok := authenticatedUserID(c)
+	if !ok {
+		return
+	}
+	var request conversionRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	item, err := h.service.ConvertToPlatformBalance(c.Request.Context(), userID, request.AmountCNYMinor, request.IdempotencyKey)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

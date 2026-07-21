@@ -121,7 +121,7 @@ func TestAdminService_UpdateUserBalance_NoChangeNoInvalidate(t *testing.T) {
 	require.Empty(t, redeemRepo.created)
 }
 
-func TestAdminService_UpdateUserBalance_AdminRechargeAffiliateRebate(t *testing.T) {
+func TestAdminService_UpdateUserBalance_DoesNotAccrueLegacyAffiliateRebate(t *testing.T) {
 	tests := []struct {
 		name      string
 		enabled   bool
@@ -139,7 +139,7 @@ func TestAdminService_UpdateUserBalance_AdminRechargeAffiliateRebate(t *testing.
 			enabled:   true,
 			operation: "add",
 			amount:    0.1,
-			wantCalls: []adminRechargeAffiliateAccrual{{userID: 7, amount: 0.1}},
+			wantCalls: nil,
 		},
 		{
 			name:      "enabled set increase",
@@ -175,7 +175,7 @@ func TestAdminService_UpdateUserBalance_AdminRechargeAffiliateRebate(t *testing.
 	}
 }
 
-func TestAdminService_UpdateUserBalance_AffiliateFailureDoesNotRollbackRecharge(t *testing.T) {
+func TestAdminService_UpdateUserBalance_LegacyAffiliateFailureDoesNotRollbackRecharge(t *testing.T) {
 	baseRepo := &userRepoStub{user: &User{ID: 7, Balance: 10}}
 	repo := &balanceUserRepoStub{userRepoStub: baseRepo}
 	redeemRepo := &balanceRedeemRepoStub{redeemRepoStub: &redeemRepoStub{}}
@@ -190,6 +190,6 @@ func TestAdminService_UpdateUserBalance_AffiliateFailureDoesNotRollbackRecharge(
 	user, err := svc.UpdateUserBalance(context.Background(), 7, 5, "add", "")
 	require.NoError(t, err)
 	require.Equal(t, 15.0, user.Balance)
-	require.Equal(t, []adminRechargeAffiliateAccrual{{userID: 7, amount: 5}}, affiliate.calls)
+	require.Empty(t, affiliate.calls)
 	require.Len(t, redeemRepo.created, 1)
 }

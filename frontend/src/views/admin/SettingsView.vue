@@ -6139,8 +6139,9 @@
           </div>
         </div>
 
-        <!-- Affiliate (邀请返利) feature card -->
-        <div class="card">
+        <!-- Legacy affiliate settings remain in the API for compatibility. The
+             active configuration is managed in Finance Operations (T0-T3). -->
+        <div v-if="false" class="card">
           <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
               {{ t('admin.settings.features.affiliate.title') }}

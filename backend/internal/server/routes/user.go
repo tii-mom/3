@@ -130,6 +130,7 @@ func RegisterUserRoutes(
 			distribution.PUT("/payout-account", h.Distribution.SavePayoutAccount)
 			distribution.GET("/withdrawals", h.Distribution.ListWithdrawals)
 			distribution.POST("/withdrawals", h.Distribution.CreateWithdrawal)
+			distribution.POST("/convert", h.Distribution.ConvertToPlatformBalance)
 		}
 
 		partner := authenticated.Group("/saas/partner")

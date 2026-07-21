@@ -51,6 +51,13 @@ func runFinancialScenarios(ctx context.Context, db *sql.DB) (_ map[string]string
 	if err := distribution.UpdateProgramConfig(ctx, true, false); err != nil {
 		return nil, err
 	}
+	var programID int64
+	if err := db.QueryRowContext(ctx, `SELECT id FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company'`).Scan(&programID); err != nil {
+		return nil, err
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE distribution_members SET team_volume_cny_minor = 100000, current_tier = 1 WHERE program_id = $1 AND user_id = ANY($2::bigint[])`, programID, pq.Array(users[:6])); err != nil {
+		return nil, err
+	}
 
 	orderID, err := seedRechargePrincipal(ctx, db, users[5])
 	if err != nil {
@@ -60,6 +67,14 @@ func runFinancialScenarios(ctx context.Context, db *sql.DB) (_ map[string]string
 		return nil, err
 	}
 	if err := assertDistributionScenario(ctx, db, orderID, users[:6]); err != nil {
+		return nil, err
+	}
+	tierScheduleResult, err := runTierScheduleScenario(ctx, db, distribution, users[:6])
+	if err != nil {
+		return nil, err
+	}
+	withdrawalResult, err := runWithdrawalScenario(ctx, db, users[0], users[1])
+	if err != nil {
 		return nil, err
 	}
 
@@ -80,10 +95,12 @@ func runFinancialScenarios(ctx context.Context, db *sql.DB) (_ map[string]string
 	}
 
 	return map[string]string{
-		"distribution_concurrency": fmt.Sprintf("%d duplicate deliveries -> 1 event, 5 commissions, CNY 200.00 total", scenarioWorkers),
-		"first_recharge_bonus":     "USD 10,000 principal -> USD 1,000 non-transferable bonus",
-		"voucher_lifecycle":        voucherResult,
-		"wholesale_billing":        wholesaleResult,
+		"distribution_concurrency":   fmt.Sprintf("%d duplicate deliveries -> 1 event, 5 commissions, CNY 200.00 total", scenarioWorkers),
+		"distribution_tier_schedule": tierScheduleResult,
+		"distribution_withdrawal":    withdrawalResult,
+		"first_recharge_bonus":       "USD 10,000 principal -> USD 1,000 non-transferable bonus",
+		"voucher_lifecycle":          voucherResult,
+		"wholesale_billing":          wholesaleResult,
 	}, nil
 }
 
@@ -219,7 +236,7 @@ WHERE source_order_id = $1
 	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM distribution_relations WHERE descendant_user_id = $1 AND depth BETWEEN 0 AND 5`, users[5]).Scan(&relationCount); err != nil {
 		return err
 	}
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM distribution_members WHERE user_id = ANY($1::bigint[]) AND team_volume_cny_minor = 100000 AND current_tier = 1`, pq.Array(users)).Scan(&tierOneMembers); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM distribution_members WHERE user_id = ANY($1::bigint[]) AND team_volume_cny_minor = 200000 AND current_tier = 1`, pq.Array(users)).Scan(&tierOneMembers); err != nil {
 		return err
 	}
 	if relationCount != 6 || tierOneMembers != 6 {
@@ -233,6 +250,150 @@ WHERE source_order_id = $1
 		return fmt.Errorf("first recharge buckets mismatch: transferable=%s non_transferable=%s balance=%s", transferable, nonTransferable, balance)
 	}
 	return nil
+}
+
+func runTierScheduleScenario(ctx context.Context, db *sql.DB, distribution *service.DistributionService, users []int64) (string, error) {
+	if len(users) < 6 {
+		return "", errors.New("tier schedule scenario requires a six-user chain")
+	}
+	var programID int64
+	if err := db.QueryRowContext(ctx, `SELECT id FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company'`).Scan(&programID); err != nil {
+		return "", err
+	}
+	// Set the pre-order volume of each ancestor to a different tier. The next
+	// recharge crosses some thresholds, proving that rates use the prior tier.
+	if _, err := db.ExecContext(ctx, `
+UPDATE distribution_members
+SET team_volume_cny_minor = CASE user_id
+    WHEN $2 THEN 100000
+    WHEN $3 THEN 1000000
+    WHEN $4 THEN 10000000
+    WHEN $5 THEN 0
+    WHEN $6 THEN 100000
+    ELSE team_volume_cny_minor
+END,
+current_tier = CASE user_id
+    WHEN $2 THEN 1
+    WHEN $3 THEN 2
+    WHEN $4 THEN 3
+    WHEN $5 THEN 0
+    WHEN $6 THEN 1
+    ELSE current_tier
+END
+WHERE program_id = $1 AND user_id = ANY($7::bigint[])`, programID, users[0], users[1], users[2], users[3], users[4], pq.Array(users)); err != nil {
+		return "", err
+	}
+	var orderID int64
+	if err := db.QueryRowContext(ctx, `
+INSERT INTO payment_orders (
+    user_id, user_email, amount, pay_amount, fee_rate, recharge_code,
+    payment_type, payment_trade_no, order_type, status, out_trade_no,
+    expires_at, paid_at, completed_at
+) VALUES ($1, 'financial-gate@example.invalid', 10000, 1000, 0, 'FGATE-TIERS',
+          'gate', 'financial-gate-tier-trade', 'balance', 'COMPLETED', 'financial-gate-tier-order',
+          NOW() + INTERVAL '1 hour', NOW(), NOW())
+RETURNING id`, users[5]).Scan(&orderID); err != nil {
+		return "", err
+	}
+	if _, err := distribution.ProcessRecharge(ctx, orderID, users[5], decimal.NewFromInt(1000), decimal.Zero, decimal.NewFromInt(10000)); err != nil {
+		return "", err
+	}
+	rows, err := db.QueryContext(ctx, `SELECT depth, rate_bps, amount_cny_minor FROM distribution_commissions WHERE source_order_id = $1 ORDER BY depth`, orderID)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = rows.Close() }()
+	type commission struct{ rate, amount int64 }
+	got := make(map[int]commission)
+	for rows.Next() {
+		var depth int
+		var item commission
+		if err := rows.Scan(&depth, &item.rate, &item.amount); err != nil {
+			return "", err
+		}
+		got[depth] = item
+	}
+	if err := rows.Err(); err != nil {
+		return "", err
+	}
+	expected := map[int]commission{
+		1: {rate: 1000, amount: 10000},
+		3: {rate: 600, amount: 6000},
+		4: {rate: 300, amount: 3000},
+		5: {rate: 100, amount: 1000},
+	}
+	if len(got) != len(expected) {
+		return "", fmt.Errorf("tier schedule commission count=%d, want %d", len(got), len(expected))
+	}
+	for depth, want := range expected {
+		if got[depth] != want {
+			return "", fmt.Errorf("tier schedule depth %d got=%+v want=%+v", depth, got[depth], want)
+		}
+	}
+	return "T1/T2/T3 five-layer rates settled with T0 zero-rate depth omitted", nil
+}
+
+func runWithdrawalScenario(ctx context.Context, db *sql.DB, paidUserID, rejectedUserID int64) (string, error) {
+	distribution := service.NewDistributionService(db, gateEncryptor{})
+	var programID int64
+	if err := db.QueryRowContext(ctx, `SELECT id FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company'`).Scan(&programID); err != nil {
+		return "", err
+	}
+	seedWallet := func(userID int64) error {
+		_, err := db.ExecContext(ctx, `
+INSERT INTO distribution_cash_wallets (program_id, tenant_id, user_id, available_cny_minor, frozen_cny_minor, withdrawing_cny_minor, debt_cny_minor)
+VALUES ($1, 1, $2, 5000, 0, 0, 0)
+ON CONFLICT (program_id, user_id) DO UPDATE
+SET available_cny_minor = 5000, frozen_cny_minor = 0, withdrawing_cny_minor = 0, debt_cny_minor = 0, updated_at = NOW()`, programID, userID)
+		return err
+	}
+	if err := seedWallet(paidUserID); err != nil {
+		return "", err
+	}
+	if err := seedWallet(rejectedUserID); err != nil {
+		return "", err
+	}
+	if _, err := distribution.SavePayoutAccount(ctx, paidUserID, "paid@example.invalid", "Paid User"); err != nil {
+		return "", err
+	}
+	if _, err := distribution.SavePayoutAccount(ctx, rejectedUserID, "reject@example.invalid", "Rejected User"); err != nil {
+		return "", err
+	}
+	paid, err := distribution.CreateWithdrawal(ctx, paidUserID, 2000)
+	if err != nil {
+		return "", err
+	}
+	if _, err := distribution.AdminTransitionWithdrawal(ctx, paid.ID, paidUserID, "APPROVED", "", "paid-ref", ""); err != nil {
+		return "", err
+	}
+	if _, err := distribution.AdminTransitionWithdrawal(ctx, paid.ID, paidUserID, "PAID", "", "paid-ref", "proof"); err != nil {
+		return "", err
+	}
+	if _, err := distribution.CreateWithdrawal(ctx, paidUserID, 2000); !errors.Is(err, service.ErrWithdrawalLimitExceeded) {
+		return "", fmt.Errorf("daily withdrawal limit returned %v", err)
+	}
+	rejected, err := distribution.CreateWithdrawal(ctx, rejectedUserID, 2000)
+	if err != nil {
+		return "", err
+	}
+	if _, err := distribution.AdminTransitionWithdrawal(ctx, rejected.ID, rejectedUserID, "APPROVED", "", "", ""); err != nil {
+		return "", err
+	}
+	if _, err := distribution.AdminTransitionWithdrawal(ctx, rejected.ID, rejectedUserID, "REJECTED", "manual review", "", ""); err != nil {
+		return "", err
+	}
+	var paidAvailable, paidWithdrawing, paidLifetime int64
+	if err := db.QueryRowContext(ctx, `SELECT available_cny_minor, withdrawing_cny_minor, lifetime_withdrawn_cny_minor FROM distribution_cash_wallets WHERE program_id = $1 AND user_id = $2`, programID, paidUserID).Scan(&paidAvailable, &paidWithdrawing, &paidLifetime); err != nil {
+		return "", err
+	}
+	var rejectedAvailable, rejectedWithdrawing int64
+	if err := db.QueryRowContext(ctx, `SELECT available_cny_minor, withdrawing_cny_minor FROM distribution_cash_wallets WHERE program_id = $1 AND user_id = $2`, programID, rejectedUserID).Scan(&rejectedAvailable, &rejectedWithdrawing); err != nil {
+		return "", err
+	}
+	if paidAvailable != 3000 || paidWithdrawing != 0 || paidLifetime != 2000 || rejectedAvailable != 5000 || rejectedWithdrawing != 0 {
+		return "", fmt.Errorf("withdrawal wallet mismatch: paid=(%d,%d,%d) rejected=(%d,%d)", paidAvailable, paidWithdrawing, paidLifetime, rejectedAvailable, rejectedWithdrawing)
+	}
+	return "paid and rejected withdrawals settle wallet balances; daily limit enforced", nil
 }
 
 func runVoucherScenario(ctx context.Context, db *sql.DB, settings databaseSettings, issuerID, redeemerID int64) (string, error) {

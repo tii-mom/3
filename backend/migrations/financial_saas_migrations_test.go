@@ -94,3 +94,22 @@ func TestDistributionTierOverrideMigrationIsBoundedAndIndexed(t *testing.T) {
 	require.Contains(t, sql, "tier_override_by BIGINT REFERENCES users(id)")
 	require.Contains(t, sql, "idx_distribution_members_tier_override")
 }
+
+func TestComputeCompanyT0MigrationUnifiesWalletPolicy(t *testing.T) {
+	sql := normalizedMigration(t, "188_compute_company_t0.sql")
+	require.Contains(t, sql, "CHECK (tier BETWEEN 0 AND 3)")
+	require.Contains(t, sql, "CHECK (tier_override IS NULL OR tier_override BETWEEN 0 AND 3)")
+	require.Contains(t, sql, "0, 0, 1000, 0, 0, 0, 0")
+	require.Contains(t, sql, "INSERT INTO settings (key, value, updated_at) VALUES ('distribution_usd_to_cny_rate', '7.15', NOW())")
+	require.Contains(t, sql, "withdrawal_min_cny_minor = 2000")
+	require.Contains(t, sql, "withdrawal_daily_limit = 1")
+	require.Contains(t, sql, "stack_with_legacy = FALSE")
+	require.Contains(t, sql, "CREATE TABLE IF NOT EXISTS distribution_usd_conversions")
+	require.Contains(t, sql, "UNIQUE (program_id, idempotency_key)")
+}
+
+func TestDistributionConversionIdempotencyIsUserScoped(t *testing.T) {
+	sql := normalizedMigration(t, "189_distribution_conversion_idempotency_scope.sql")
+	require.Contains(t, sql, "DROP CONSTRAINT IF EXISTS distribution_usd_conversions_program_id_idempotency_key_key")
+	require.Contains(t, sql, "ON distribution_usd_conversions(program_id, user_id, idempotency_key)")
+}
