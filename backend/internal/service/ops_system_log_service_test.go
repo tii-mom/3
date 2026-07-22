@@ -35,6 +35,7 @@ func TestOpsServiceListSystemLogs_DefaultClampAndSuccess(t *testing.T) {
 	}
 	if gotFilter == nil {
 		t.Fatalf("expected repository to receive filter")
+		return
 	}
 	if gotFilter.Page != 1 || gotFilter.PageSize != 200 {
 		t.Fatalf("filter normalized unexpectedly: page=%d pageSize=%d", gotFilter.Page, gotFilter.PageSize)
