@@ -9,6 +9,7 @@
 
   html {
     @apply scroll-smooth antialiased;
+    min-height: 100%;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -17,6 +18,15 @@
   body {
     @apply bg-gray-50 text-gray-900 dark:bg-dark-950 dark:text-gray-100;
     @apply min-h-screen;
+    overflow-x: clip;
+  }
+
+  #app {
+    min-height: 100%;
+  }
+
+  body.mobile-nav-open {
+    overflow: hidden;
   }
 
   /* 自定义滚动条 - 仅针对 Firefox，避免 Chrome 取消 webkit 的全局定制 */
@@ -865,6 +875,7 @@
   color: var(--ui-ink);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0 !important;
+  overflow-x: clip;
 }
 .app-shell-redesign *,
 .home-redesign,
@@ -892,7 +903,7 @@
 }
 
 .app-main-redesign > main {
-  padding: 1.25rem 1.5rem 3rem !important;
+  padding: 1.25rem max(1.5rem, env(safe-area-inset-left)) calc(3rem + env(safe-area-inset-bottom)) max(1.5rem, env(safe-area-inset-right)) !important;
 }
 
 .app-sidebar-redesign {
@@ -933,6 +944,13 @@
   color: var(--ui-brand-strong) !important;
   box-shadow: inset 2px 0 0 var(--ui-brand) !important;
   border-radius: 0 5px 5px 0;
+}
+
+.app-sidebar-redesign .sidebar-link:focus-visible,
+.app-header-redesign button:focus-visible,
+.app-header-redesign a:focus-visible {
+  outline: 2px solid var(--ui-brand);
+  outline-offset: 2px;
 }
 
 .app-sidebar-redesign .sidebar-section-title {
@@ -1032,6 +1050,14 @@
 .app-shell-redesign .table-wrapper {
   border-color: var(--ui-line);
   border-radius: 7px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.business-page-redesign .overflow-x-auto,
+.admin-page-redesign .overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 
 .app-shell-redesign .table th {
@@ -1171,13 +1197,13 @@
 
 @media (max-width: 1023px) {
   .app-main-redesign > main {
-    padding: 1rem 1rem 2.5rem !important;
+    padding: 1rem max(1rem, env(safe-area-inset-left)) calc(2.5rem + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-right)) !important;
   }
 }
 
 @media (max-width: 639px) {
   .app-main-redesign > main {
-    padding: 0.85rem 0.75rem 2rem !important;
+    padding: 0.85rem max(0.75rem, env(safe-area-inset-left)) calc(2rem + env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-right)) !important;
   }
 
   .app-header-redesign > div {
@@ -1190,5 +1216,20 @@
   .app-shell-redesign .card-glass,
   .app-shell-redesign .glass-card {
     border-radius: 6px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
   }
 }

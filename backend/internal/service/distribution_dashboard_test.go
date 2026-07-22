@@ -14,8 +14,8 @@ func TestDistributionDashboardDisabledUserWithoutProfileReturnsZeroValues(t *tes
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id, enabled FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company'`)).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "enabled"}).AddRow(7, false))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id, enabled, commission_freeze_hours, withdrawal_min_cny_minor, withdrawal_daily_limit FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company'`)).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "enabled", "freeze_hours", "minimum", "daily_limit"}).AddRow(7, false, 168, 2000, 1))
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT team_volume_cny_minor, current_tier, tier_override FROM distribution_members WHERE program_id = $1 AND user_id = $2`)).
 		WithArgs(int64(7), int64(42)).
 		WillReturnRows(sqlmock.NewRows([]string{"team_volume_cny_minor", "current_tier", "tier_override"}))
@@ -49,9 +49,13 @@ GROUP BY depth`)).
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT tier, threshold_cny_minor, level1_bps, level2_bps, level3_bps, level4_bps, level5_bps FROM distribution_tier_configs WHERE program_id = $1 AND config_version = (SELECT current_config_version FROM distribution_programs WHERE id = $1) ORDER BY tier`)).
 		WithArgs(int64(7)).
 		WillReturnRows(sqlmock.NewRows([]string{"tier", "threshold", "l1", "l2", "l3", "l4", "l5"}).
+			AddRow(0, 0, 1000, 0, 0, 0, 0).
 			AddRow(1, 100000, 1000, 400, 300, 200, 100).
 			AddRow(2, 1000000, 1500, 600, 400, 300, 200).
 			AddRow(3, 10000000, 2000, 800, 600, 400, 200))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT value FROM settings WHERE key = $1`)).
+		WithArgs(SettingBalanceRechargeMult).
+		WillReturnRows(sqlmock.NewRows([]string{"value"}).AddRow("0.14"))
 
 	dashboard, err := NewDistributionService(db, nil).Dashboard(context.Background(), 42)
 	require.NoError(t, err)
@@ -62,6 +66,7 @@ GROUP BY depth`)).
 	require.Zero(t, dashboard.FrozenMinor)
 	require.Empty(t, dashboard.LevelCounts)
 	require.Len(t, dashboard.Levels, 5)
-	require.Len(t, dashboard.Tiers, 3)
+	require.Len(t, dashboard.Tiers, 4)
+	require.Equal(t, "0.14", dashboard.BalanceRechargeMultiplier)
 	require.NoError(t, mock.ExpectationsWereMet())
 }

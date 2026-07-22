@@ -59,9 +59,41 @@ func (h *DistributionHandler) Ledger(c *gin.Context) {
 	response.Paginated(c, items, total, page, pageSize)
 }
 
+func (h *DistributionHandler) Analytics(c *gin.Context) {
+	userID, ok := authenticatedUserID(c)
+	if !ok {
+		return
+	}
+	days := 30
+	if value := c.Query("range"); value != "" {
+		switch value {
+		case "7d":
+			days = 7
+		case "30d":
+			days = 30
+		case "90d":
+			days = 90
+		default:
+			response.BadRequest(c, "range must be 7d, 30d, or 90d")
+			return
+		}
+	}
+	result, err := h.service.Analytics(c.Request.Context(), userID, days)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
 type payoutAccountRequest struct {
 	AlipayAccount string `json:"alipay_account" binding:"required"`
 	RealName      string `json:"real_name" binding:"required"`
+}
+
+type conversionRequest struct {
+	AmountCNYMinor int64  `json:"amount_cny_minor" binding:"required"`
+	IdempotencyKey string `json:"idempotency_key" binding:"required"`
 }
 
 func (h *DistributionHandler) GetPayoutAccount(c *gin.Context) {
@@ -124,6 +156,24 @@ func (h *DistributionHandler) CreateWithdrawal(c *gin.Context) {
 		return
 	}
 	item, err := h.service.CreateWithdrawal(c.Request.Context(), userID, request.AmountMinor)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Created(c, item)
+}
+
+func (h *DistributionHandler) ConvertToPlatformBalance(c *gin.Context) {
+	userID, ok := authenticatedUserID(c)
+	if !ok {
+		return
+	}
+	var request conversionRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	item, err := h.service.ConvertToPlatformBalance(c.Request.Context(), userID, request.AmountCNYMinor, request.IdempotencyKey)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

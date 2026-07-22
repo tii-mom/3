@@ -7,6 +7,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/shopspring/decimal"
 )
 
 type DistributionHandler struct {
@@ -51,6 +52,16 @@ func (h *DistributionHandler) ListRechargeEvents(c *gin.Context) {
 func (h *DistributionHandler) ListRelations(c *gin.Context) {
 	page, pageSize := response.ParsePagination(c)
 	items, total, err := h.service.AdminListRelations(c.Request.Context(), page, pageSize)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Paginated(c, items, total, page, pageSize)
+}
+
+func (h *DistributionHandler) ListConversions(c *gin.Context) {
+	page, pageSize := response.ParsePagination(c)
+	items, total, err := h.service.AdminListConversions(c.Request.Context(), page, pageSize)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -154,6 +165,47 @@ func (h *DistributionHandler) GetFinancialRuntimeConfig(c *gin.Context) {
 	response.Success(c, config)
 }
 
+func (h *DistributionHandler) GetExchangeRate(c *gin.Context) {
+	config, err := h.service.ProgramConfig(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"usd_to_cny_rate": config["usd_to_cny_rate"]})
+}
+
+type exchangeRateRequest struct {
+	USDToCNYRate string `json:"usd_to_cny_rate" binding:"required"`
+	TOTPCode     string `json:"totp_code" binding:"required"`
+}
+
+func (h *DistributionHandler) UpdateExchangeRate(c *gin.Context) {
+	subject, ok := middleware.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "Admin not authenticated")
+		return
+	}
+	var request exchangeRateRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if err := h.totp.VerifyCode(c.Request.Context(), subject.UserID, request.TOTPCode); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	rate, err := decimal.NewFromString(request.USDToCNYRate)
+	if err != nil {
+		response.BadRequest(c, "Invalid USD to CNY rate")
+		return
+	}
+	if err := h.service.UpdateUSDToCNYRate(c.Request.Context(), rate); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"usd_to_cny_rate": rate.String()})
+}
+
 type distributionConfigRequest struct {
 	Enabled         bool   `json:"enabled"`
 	StackWithLegacy bool   `json:"stack_with_legacy"`
@@ -234,7 +286,7 @@ func (h *DistributionHandler) UpdateConfig(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	response.Success(c, gin.H{"enabled": request.Enabled, "stack_with_legacy": request.StackWithLegacy})
+	response.Success(c, gin.H{"enabled": request.Enabled, "stack_with_legacy": false})
 }
 
 type withdrawalTransitionRequest struct {

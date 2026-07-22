@@ -1,0 +1,184 @@
+{
+  "api-relay": {
+    "path": "/api-relay",
+    "title": "AI API 中转站 - 多模型统一接入与按量计费 | 3API",
+    "description": "3API 为开发者提供 OpenAI、Claude、Gemini 等 AI 模型的统一 API 接入、智能路由、Token 用量统计和按量计费服务。",
+    "eyebrow": "AI API GATEWAY",
+    "heading": "一个 API 中转站，统一接入主流 AI 模型",
+    "summary": "不必分别维护多套接口和账单。使用一个 API Key 接入后台已开通的模型，并在同一控制台查看请求、Token 和费用。",
+    "primaryCta": "开始接入",
+    "secondaryCta": "了解 Token 计费",
+    "secondaryPath": "/token-guide",
+    "highlights": [
+      { "title": "统一兼容接口", "text": "使用熟悉的 OpenAI 兼容调用方式，降低已有应用的迁移成本。" },
+      { "title": "智能路由", "text": "通过多上游调度、会话保持和失败切换提升持续调用体验。" },
+      { "title": "用量透明", "text": "按请求查看模型、输入 Token、输出 Token 与实际费用。" }
+    ],
+    "sections": [
+      { "title": "API 中转站适合谁", "body": "适合需要在应用、Agent、IDE 或自动化流程中调用多个 AI 模型的个人开发者与团队。3API 提供的是 API 接入服务，不是 ChatGPT Plus 订阅或代购服务。" },
+      { "title": "如何判断服务是否可靠", "body": "重点检查模型来源说明、接口兼容性、计费明细、状态监控、故障处理和售后渠道。不要只用单次回答风格判断模型，更应结合模型标识、能力测试和长期调用记录。" },
+      { "title": "从现有项目迁移", "body": "通常只需替换 Base URL 和 API Key，并根据可用模型调整 model 参数。生产项目应先在测试环境验证流式输出、工具调用、超时和重试策略。" }
+    ],
+    "faqs": [
+      { "question": "3API 是 ChatGPT Plus 代购吗？", "answer": "不是。3API 提供面向开发者的 API 接入和用量管理服务，不销售或代购 ChatGPT Plus。" },
+      { "question": "是否支持按 Token 统计？", "answer": "支持。控制台可按模型查看输入、输出及缓存相关 Token，用量与价格以实际开通分组为准。" },
+      { "question": "可以接入现有 OpenAI SDK 吗？", "answer": "兼容 OpenAI 接口的模型通常可以通过修改 Base URL 与 API Key 接入，具体端点和模型以文档为准。" }
+    ]
+  },
+  "openai-api": {
+    "path": "/openai-api",
+    "title": "OpenAI API 接入 - 官方账号资源与统一计费 | 3API",
+    "description": "通过 3API 接入基于 OpenAI 官方账号资源提供的模型能力，支持 OpenAI 兼容接口、流式响应、Token 统计和统一 API Key 管理。",
+    "eyebrow": "OPENAI API",
+    "heading": "面向开发者的 OpenAI API 接入",
+    "summary": "通过统一接口调用后台实际开放的 OpenAI 模型。上游使用官方账号资源，3API 负责鉴权、调度、计量和转发；3API 本身并非 OpenAI 官方网站。",
+    "primaryCta": "创建 API Key",
+    "secondaryCta": "了解接入要点",
+    "secondaryPath": "/openai-api",
+    "highlights": [
+      { "title": "官方账号资源", "text": "上游账号来自官方服务，页面同时明确第三方接入平台身份。" },
+      { "title": "OpenAI 兼容", "text": "降低 SDK、Agent 和已有应用的接口迁移成本。" },
+      { "title": "统一管理", "text": "集中管理 API Key、额度、模型权限与请求记录。" }
+    ],
+    "sections": [
+      { "title": "官方资源与第三方平台的区别", "body": "官方账号资源说明上游服务来源，不代表 3API 是 OpenAI 或获得其品牌背书。3API 是独立的第三方 API 网关与计费服务商。" },
+      { "title": "适合的调用场景", "body": "可用于代码助手、内容处理、结构化输出、工具调用和 Agent 工作流。实际可用模型及功能以控制台为准。" },
+      { "title": "生产接入建议", "body": "为不同环境创建独立密钥，设置额度上限，妥善处理超时、限流和失败重试，并避免把 API Key 写入前端代码或公开仓库。" }
+    ],
+    "faqs": [
+      { "question": "3API 是 OpenAI 官方官网吗？", "answer": "不是。3API 是独立第三方 API 接入平台，上游使用官方账号资源。" },
+      { "question": "OpenAI API 和 ChatGPT Plus 是一回事吗？", "answer": "不是。API 通常按实际调用量计费，ChatGPT Plus 是 ChatGPT 产品的订阅方案。" },
+      { "question": "支持哪些 OpenAI 模型？", "answer": "模型会随上游和平台配置变化，请以登录后控制台展示的可用模型为准。" }
+    ]
+  },
+  "codex-api": {
+    "path": "/codex-api",
+    "title": "Codex API 接入与配置 - AI 编程统一接口 | 3API",
+    "description": "3API Codex API 接入指南：配置 API 地址与密钥，在 Codex 客户端和 AI 编程工作流中使用后台已开通的模型能力。",
+    "eyebrow": "CODEX FOR DEVELOPERS",
+    "heading": "让 Codex 接入更清晰、更可控",
+    "summary": "创建独立 API Key，配置接口地址，在控制台持续查看调用量与费用。适合个人开发者、Agent 工程师和研发团队。",
+    "primaryCta": "开始配置",
+    "secondaryCta": "了解配置要点",
+    "secondaryPath": "/codex-api",
+    "highlights": [
+      { "title": "快速配置", "text": "通过 API 地址和密钥完成客户端接入。" },
+      { "title": "会话连续", "text": "路由系统支持会话保持，减少长任务中的上下文漂移。" },
+      { "title": "成本可见", "text": "按任务所产生的请求和 Token 追踪实际使用情况。" }
+    ],
+    "sections": [
+      { "title": "接入前需要准备什么", "body": "注册 3API、确认可用分组并创建 API Key。密钥只应保存在可信的本地配置或服务端环境变量中。" },
+      { "title": "兼容性检查", "body": "接入后先验证模型名称、流式输出、工具调用和长任务行为。不同客户端版本的配置字段可能不同，应以对应客户端文档为准。" },
+      { "title": "团队使用", "body": "建议为成员或项目拆分密钥并设置额度，避免多人共享一个密钥造成权限和成本归属不清。" }
+    ],
+    "faqs": [
+      { "question": "需要购买 ChatGPT Plus 才能使用吗？", "answer": "不需要。ChatGPT Plus 和 API 服务是不同产品，3API 不销售 Plus。" },
+      { "question": "是否可以用于其他 AI 编程工具？", "answer": "支持自定义 OpenAI 兼容地址的工具通常可以接入，仍需以客户端能力和平台可用模型为准。" },
+      { "question": "API Key 可以公开分享吗？", "answer": "不可以。API Key 等同调用凭证，应避免提交到 Git、网页前端或公开聊天记录。" }
+    ]
+  },
+  "full-api": {
+    "path": "/full-api",
+    "title": "满血 API 是什么？模型能力与验证方法 | 3API",
+    "description": "解释满血 API 的含义，以及如何通过模型标识、上下文、流式输出、工具调用、用量记录等方式验证 AI API 能力。",
+    "eyebrow": "MODEL CAPABILITY",
+    "heading": "“满血 API”不应只是一句宣传语",
+    "summary": "我们将“满血”定义为：在平台标明的模型和功能范围内，保留对应上游模型的原生能力，不主动替换为低规格模型或删减已承诺的功能。",
+    "primaryCta": "查看可用模型",
+    "secondaryCta": "了解 API 中转",
+    "secondaryPath": "/api-relay",
+    "highlights": [
+      { "title": "模型标识", "text": "核对请求模型、响应模型和平台实际路由记录。" },
+      { "title": "能力测试", "text": "验证上下文、工具调用、结构化输出和流式响应。" },
+      { "title": "长期记录", "text": "结合延迟、成功率和用量明细持续判断，而不是依赖单次问答。" }
+    ],
+    "sections": [
+      { "title": "什么叫满血 API", "body": "它不是行业统一认证术语。对 3API 而言，它描述的是已标明模型的原生能力交付，而不是对所有请求速度、输出结果或永久可用性的无条件保证。" },
+      { "title": "怎样验证模型能力", "body": "使用可重复的测试集检查模型标识、最大上下文、工具调用、JSON 输出、视觉输入与流式响应，再把结果与平台标注能力进行核对。" },
+      { "title": "为什么结果仍可能不同", "body": "模型版本、系统提示、采样参数、上下文内容、客户端实现和上游更新都会影响输出，不应把措辞差异直接等同于模型降级。" }
+    ],
+    "faqs": [
+      { "question": "满血 API 是官方认证名称吗？", "answer": "不是，这是市场常用表达，并无统一官方认证标准。" },
+      { "question": "回答风格不同就是模型被替换了吗？", "answer": "不能据此判断。应结合模型标识、能力测试、请求记录和多次可复现实验。" },
+      { "question": "3API 是否保证永不波动？", "answer": "不作这种绝对承诺。上游限流和网络变化可能影响调用，平台通过调度与监控改善可用性。" }
+    ]
+  },
+  "token-guide": {
+    "path": "/token-guide",
+    "title": "API Token 是什么？Token 计费与成本说明 | 3API",
+    "description": "了解 AI API Token、输入 Token、输出 Token、缓存 Token 和 API Key 的区别，并学习如何估算与控制模型调用成本。",
+    "eyebrow": "TOKEN GUIDE",
+    "heading": "看懂 Token，才能真正控制 API 成本",
+    "summary": "Token 是模型处理文本和其他内容时使用的计量单位。输入、输出和缓存可能采用不同价格，最终费用以模型、分组与实际用量为准。",
+    "primaryCta": "查看我的用量",
+    "secondaryCta": "比较 Plus 与 API",
+    "secondaryPath": "/chatgpt-plus-vs-api",
+    "highlights": [
+      { "title": "输入 Token", "text": "通常包括系统提示、用户消息、历史上下文和工具结果。" },
+      { "title": "输出 Token", "text": "模型生成的回答与工具调用参数通常计入输出。" },
+      { "title": "缓存 Token", "text": "部分模型为重复上下文提供缓存读取或写入计费。" }
+    ],
+    "sections": [
+      { "title": "Token 和 API Key 不一样", "body": "Token 是模型用量单位；API Key 是调用凭证。不要因为两者都常被称作 token 而混淆，更不要向任何人泄露 API Key。" },
+      { "title": "费用为什么会变化", "body": "不同模型、输入输出方向、缓存策略和平台分组可能使用不同单价。长上下文和较长输出通常会增加费用。" },
+      { "title": "如何控制成本", "body": "选择适合任务的模型，限制最大输出，压缩无关上下文，为密钥设置额度，并定期检查异常请求和高消耗任务。" }
+    ],
+    "faqs": [
+      { "question": "一个中文字符等于一个 Token 吗？", "answer": "不一定。Token 数量由具体模型的分词方式决定，不能简单按字符一比一计算。" },
+      { "question": "为什么输入比我写的内容更多？", "answer": "请求还可能包含系统提示、历史消息、工具定义和客户端附加上下文。" },
+      { "question": "如何查看实际消耗？", "answer": "可以在 3API 控制台的用量记录中按模型和时间查看请求与 Token 明细。" }
+    ]
+  },
+  "chatgpt-plus-vs-api": {
+    "path": "/chatgpt-plus-vs-api",
+    "title": "ChatGPT Plus 和 API 有什么区别？| 3API",
+    "description": "客观比较 ChatGPT Plus 与 OpenAI API 的使用方式、计费、适用人群和开发能力。3API 不销售或代购 ChatGPT Plus。",
+    "eyebrow": "PLUS VS API",
+    "heading": "ChatGPT Plus 和 API，不是同一种产品",
+    "summary": "Plus 面向 ChatGPT 产品内的交互使用；API 面向程序、自动化与开发集成。3API 提供 API 接入服务，不销售或代购 ChatGPT Plus。",
+    "primaryCta": "使用 API 服务",
+    "secondaryCta": "阅读 Token 指南",
+    "secondaryPath": "/token-guide",
+    "highlights": [
+      { "title": "使用方式", "text": "Plus 主要在 ChatGPT 产品中使用，API 由程序通过接口调用。" },
+      { "title": "计费方式", "text": "Plus 通常为周期订阅，API 通常按照模型实际调用量计费。" },
+      { "title": "适用对象", "text": "日常对话偏向 Plus；应用开发、Agent 和自动化偏向 API。" }
+    ],
+    "sections": [
+      { "title": "什么时候选择 Plus", "body": "如果主要需求是在 ChatGPT 官方产品中进行对话、文件处理和使用其产品功能，应了解官方 Plus 订阅。订阅可用性和地区要求以 OpenAI 官方说明为准。" },
+      { "title": "什么时候选择 API", "body": "如果要把模型接入网站、内部系统、IDE、机器人或批处理流程，API 通常更合适，并且需要自行处理界面、数据和调用逻辑。" },
+      { "title": "两者额度互通吗", "body": "通常不互通。购买 ChatGPT Plus 不等于获得 API 调用余额，API 消费也不会自动获得 Plus 权益。" }
+    ],
+    "faqs": [
+      { "question": "3API 可以代购 ChatGPT Plus 吗？", "answer": "不可以。3API 不销售或代购 ChatGPT Plus。" },
+      { "question": "有 Plus 就能免费调用 API 吗？", "answer": "通常不能。Plus 订阅与 API 计费是不同体系，请以 OpenAI 官方最新规则为准。" },
+      { "question": "开发应用应该选哪个？", "answer": "需要程序化调用、批处理或嵌入自有产品时，应使用 API。" }
+    ]
+  },
+  "compute-company": {
+    "path": "/compute-company",
+    "title": "AI 算力渠道合作 - 个人低门槛开展 API 业务 | 3API",
+    "description": "3API 算力公司面向个人与团队提供 AI API 渠道合作能力，无需自建模型和网关即可开展客户拓展，并通过清晰规则查看业绩与收益。",
+    "eyebrow": "CHANNEL PARTNERS",
+    "heading": "无需自建算力平台，从渠道合作开始",
+    "summary": "3API 提供产品、计费、路由和交付基础设施，合作伙伴负责合规推广与客户服务。加入本身不收取创业加盟费用，但获客、运营和时间成本仍需自行评估。",
+    "primaryCta": "登录查看合作计划",
+    "secondaryCta": "了解 API 产品",
+    "secondaryPath": "/api-relay",
+    "highlights": [
+      { "title": "无需自建系统", "text": "不需要自行开发 API 网关、计费后台和模型调度系统。" },
+      { "title": "渠道合作", "text": "以真实产品使用和客户服务为基础，不是算力投资或理财项目。" },
+      { "title": "规则透明", "text": "业绩、冻结、可用和提现状态在合作后台中记录。" }
+    ],
+    "sections": [
+      { "title": "所谓 0 成本指什么", "body": "指平台不要求合作伙伴购买服务器、训练模型或支付加盟费，不代表经营完全没有成本，也不保证收入。推广、客户支持、合规和时间都可能产生实际成本。" },
+      { "title": "收益来自哪里", "body": "收益来自符合平台规则的真实客户消费和渠道业绩，不来自购买虚拟算力份额，也不以发展人员数量本身作为收益来源。具体比例、冻结期和提现条件以合作后台生效规则为准。" },
+      { "title": "合作伙伴需要做什么", "body": "理解 API 产品、寻找真实需求客户、提供基础接入协助，并确保宣传内容真实，不承诺固定收益，不冒用上游厂商品牌。" }
+    ],
+    "faqs": [
+      { "question": "这是算力投资或理财吗？", "answer": "不是。这是 AI API 产品的渠道合作，不销售算力份额，也不承诺投资回报。" },
+      { "question": "真的完全没有成本吗？", "answer": "平台不收取加盟费且无需自建技术系统，但经营仍可能产生获客、服务和时间成本。" },
+      { "question": "是否保证获得收益？", "answer": "不保证。收益取决于真实客户消费、合作规则和个人运营情况。" }
+    ]
+  }
+}

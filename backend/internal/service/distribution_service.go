@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -37,20 +38,63 @@ type DistributionProcessResult struct {
 }
 
 type DistributionDashboard struct {
-	Enabled          bool                       `json:"enabled"`
-	TeamVolumeMinor  int64                      `json:"team_volume_cny_minor"`
-	CurrentTier      int                        `json:"current_tier"`
-	AutoTier         int                        `json:"auto_tier"`
-	TierOverride     *int                       `json:"tier_override,omitempty"`
-	NextThreshold    int64                      `json:"next_threshold_cny_minor"`
-	LevelCounts      map[int]int64              `json:"level_counts"`
-	Levels           []DistributionLevelSummary `json:"levels"`
-	AvailableMinor   int64                      `json:"available_cny_minor"`
-	FrozenMinor      int64                      `json:"frozen_cny_minor"`
-	WithdrawingMinor int64                      `json:"withdrawing_cny_minor"`
-	DebtMinor        int64                      `json:"debt_cny_minor"`
-	LifetimeMinor    int64                      `json:"lifetime_earned_cny_minor"`
-	Tiers            []DistributionTier         `json:"tiers"`
+	Enabled                   bool                       `json:"enabled"`
+	BalanceRechargeMultiplier string                     `json:"balance_recharge_multiplier"`
+	USDToCNYRate              string                     `json:"usd_to_cny_rate"`
+	CommissionFreezeHours     int                        `json:"commission_freeze_hours"`
+	WithdrawalMinMinor        int64                      `json:"withdrawal_min_cny_minor"`
+	WithdrawalDailyLimit      int                        `json:"withdrawal_daily_limit"`
+	TeamVolumeMinor           int64                      `json:"team_volume_cny_minor"`
+	CurrentTier               int                        `json:"current_tier"`
+	AutoTier                  int                        `json:"auto_tier"`
+	TierOverride              *int                       `json:"tier_override,omitempty"`
+	NextThreshold             int64                      `json:"next_threshold_cny_minor"`
+	LevelCounts               map[int]int64              `json:"level_counts"`
+	Levels                    []DistributionLevelSummary `json:"levels"`
+	AvailableMinor            int64                      `json:"available_cny_minor"`
+	FrozenMinor               int64                      `json:"frozen_cny_minor"`
+	WithdrawingMinor          int64                      `json:"withdrawing_cny_minor"`
+	DebtMinor                 int64                      `json:"debt_cny_minor"`
+	LifetimeMinor             int64                      `json:"lifetime_earned_cny_minor"`
+	Tiers                     []DistributionTier         `json:"tiers"`
+}
+
+type DistributionAnalyticsPoint struct {
+	Date            string `json:"date"`
+	RechargeMinor   int64  `json:"recharge_cny_minor"`
+	CommissionMinor int64  `json:"commission_cny_minor"`
+}
+
+type DistributionAnalyticsSummary struct {
+	RechargeMinor           int64   `json:"recharge_cny_minor"`
+	CommissionMinor         int64   `json:"commission_cny_minor"`
+	PreviousRechargeMinor   int64   `json:"previous_recharge_cny_minor"`
+	PreviousCommissionMinor int64   `json:"previous_commission_cny_minor"`
+	RechargeGrowthPercent   float64 `json:"recharge_growth_percent"`
+	CommissionGrowthPercent float64 `json:"commission_growth_percent"`
+}
+
+type DistributionForecastHorizon struct {
+	Eligible                 bool    `json:"eligible"`
+	Reason                   string  `json:"reason,omitempty"`
+	EstimatedRechargeMinor   int64   `json:"estimated_recharge_cny_minor"`
+	EstimatedCommissionMinor int64   `json:"estimated_commission_cny_minor"`
+	RechargeGrowthPercent    float64 `json:"recharge_growth_percent"`
+	CommissionGrowthPercent  float64 `json:"commission_growth_percent"`
+}
+
+type DistributionForecast struct {
+	Method     string                      `json:"method"`
+	SevenDays  DistributionForecastHorizon `json:"seven_days"`
+	ThirtyDays DistributionForecastHorizon `json:"thirty_days"`
+}
+
+type DistributionAnalytics struct {
+	AsOf      time.Time                    `json:"as_of"`
+	RangeDays int                          `json:"range_days"`
+	Series    []DistributionAnalyticsPoint `json:"series"`
+	Summary   DistributionAnalyticsSummary `json:"summary"`
+	Forecast  DistributionForecast         `json:"forecast"`
 }
 
 type DistributionLevelSummary struct {
@@ -76,6 +120,17 @@ type DistributionPolicyInput struct {
 	FirstRechargeBonusBPS int                `json:"first_recharge_bonus_bps"`
 	FirstRechargeBonusCap string             `json:"first_recharge_bonus_cap_usd"`
 	Tiers                 []DistributionTier `json:"tiers"`
+}
+
+type DistributionConversion struct {
+	ID             int64     `json:"id"`
+	AmountCNYMinor int64     `json:"amount_cny_minor"`
+	USDAmount      string    `json:"usd_amount"`
+	CNYToUSDRate   string    `json:"cny_to_usd_rate"`
+	RateSource     string    `json:"rate_source"`
+	USDToCNYRate   string    `json:"usd_to_cny_rate"`
+	ConfigVersion  int       `json:"config_version"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 type DistributionTreeNode struct {
@@ -158,6 +213,19 @@ type DistributionRelationAudit struct {
 	CreatedAt        time.Time `json:"created_at"`
 }
 
+type DistributionConversionAudit struct {
+	ID             int64     `json:"id"`
+	UserID         int64     `json:"user_id"`
+	AmountCNYMinor int64     `json:"amount_cny_minor"`
+	USDAmount      string    `json:"usd_amount"`
+	CNYToUSDRate   string    `json:"cny_to_usd_rate,omitempty"`
+	RateSource     string    `json:"rate_source,omitempty"`
+	USDToCNYRate   string    `json:"usd_to_cny_rate"`
+	ConfigVersion  int       `json:"config_version"`
+	IdempotencyKey string    `json:"idempotency_key"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
 type PayoutAccount struct {
 	AccountType  string `json:"account_type"`
 	AccountMask  string `json:"account_mask"`
@@ -217,12 +285,48 @@ func (s *DistributionService) ProgramConfig(ctx context.Context) (map[string]any
 	if err != nil {
 		return nil, err
 	}
+	multiplier, err := s.balanceRechargeMultiplier(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return map[string]any{
-		"enabled": enabled, "stack_with_legacy": stack, "commission_freeze_hours": freezeHours,
+		"enabled": enabled, "stack_with_legacy": false, "commission_freeze_hours": freezeHours,
 		"withdrawal_min_cny_minor": minimum, "withdrawal_daily_limit": dailyLimit,
 		"withdrawal_fee_bps": feeBPS, "first_recharge_bonus_bps": bonusBPS,
 		"first_recharge_bonus_cap_usd": bonusCap, "current_config_version": version, "tiers": tiers,
+		"balance_recharge_multiplier": multiplier.String(),
+		// Kept for clients that still read the legacy field. New conversions use
+		// the explicit CNY-to-USD multiplier above.
+		"usd_to_cny_rate": decimal.NewFromInt(1).Div(multiplier).String(),
 	}, nil
+}
+
+// balanceRechargeMultiplier reads the same setting used by payment recharge
+// orders: how many USD of platform balance one CNY produces. Keeping this in
+// the distribution service prevents the earnings conversion from drifting
+// away from the purchase configuration.
+func (s *DistributionService) balanceRechargeMultiplier(ctx context.Context) (decimal.Decimal, error) {
+	var raw string
+	err := s.db.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = $1`, SettingBalanceRechargeMult).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return decimal.NewFromInt(1), nil
+	}
+	if err != nil {
+		return decimal.Zero, err
+	}
+	multiplier, err := decimal.NewFromString(strings.TrimSpace(raw))
+	if err != nil || !multiplier.IsPositive() {
+		return decimal.Zero, infraerrors.BadRequest("BALANCE_RECHARGE_MULTIPLIER_INVALID", "balance recharge multiplier is invalid")
+	}
+	return multiplier, nil
+}
+
+func (s *DistributionService) UpdateUSDToCNYRate(ctx context.Context, rate decimal.Decimal) error {
+	if !rate.IsPositive() || rate.GreaterThan(decimal.NewFromInt(1000)) || rate.Exponent() < -10 {
+		return infraerrors.BadRequest("DISTRIBUTION_EXCHANGE_RATE_INVALID", "distribution USD to CNY rate is invalid")
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT INTO settings (key, value, updated_at) VALUES ('distribution_usd_to_cny_rate', $1, NOW()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, rate.String())
+	return err
 }
 
 func (s *DistributionService) FinancialRuntimeConfig(ctx context.Context) (map[string]any, error) {
@@ -266,6 +370,20 @@ func (s *DistributionService) CreatePolicyVersion(ctx context.Context, operatorI
 	if _, err := tx.ExecContext(ctx, `UPDATE distribution_programs SET commission_freeze_hours = $2, withdrawal_min_cny_minor = $3, withdrawal_daily_limit = $4, withdrawal_fee_bps = $5, first_recharge_bonus_bps = $6, first_recharge_bonus_cap_usd = $7, current_config_version = $8, updated_at = NOW() WHERE id = $1`, programID, input.CommissionFreezeHours, input.WithdrawalMinMinor, input.WithdrawalDailyLimit, input.WithdrawalFeeBPS, input.FirstRechargeBonusBPS, bonusCap.String(), version); err != nil {
 		return 0, err
 	}
+	if _, err := tx.ExecContext(ctx, `
+UPDATE distribution_members m
+SET current_tier = COALESCE((
+    SELECT t.tier
+    FROM distribution_tier_configs t
+    WHERE t.program_id = m.program_id
+      AND t.config_version = $2
+      AND t.threshold_cny_minor <= m.team_volume_cny_minor
+    ORDER BY t.threshold_cny_minor DESC
+    LIMIT 1
+), 0), updated_at = NOW()
+WHERE m.program_id = $1`, programID, version); err != nil {
+		return 0, err
+	}
 	if err := insertFinancialOutboxEvent(ctx, tx, "distribution_policy", strconv.Itoa(version), "distribution.policy_version_created", fmt.Sprintf("distribution-policy:%d", version), map[string]any{"operator_user_id": operatorID, "config_version": version}); err != nil {
 		return 0, err
 	}
@@ -287,7 +405,9 @@ func (s *DistributionService) UpdateProgramConfig(ctx context.Context, enabled, 
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	if _, err := tx.ExecContext(ctx, `UPDATE distribution_programs SET enabled = $1, stack_with_legacy = $2, updated_at = NOW() WHERE tenant_id = 1 AND code = 'compute_company'`, enabled, stack); err != nil {
+	// Legacy rewards are no longer part of the active compute-company policy.
+	// Keep the column for rollback compatibility, but never enable stacking.
+	if _, err := tx.ExecContext(ctx, `UPDATE distribution_programs SET enabled = $1, stack_with_legacy = FALSE, updated_at = NOW() WHERE tenant_id = 1 AND code = 'compute_company'`, enabled); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO settings (key, value, updated_at) VALUES ('distribution_enabled', $1, NOW()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, strconv.FormatBool(enabled)); err != nil {
@@ -311,12 +431,14 @@ func (s *DistributionService) ProcessRecharge(ctx context.Context, orderID, user
 	var bonusCapRaw string
 	err = tx.QueryRowContext(ctx, `SELECT id, enabled, stack_with_legacy, commission_freeze_hours, current_config_version, first_recharge_bonus_bps, first_recharge_bonus_cap_usd::text FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company' FOR SHARE`).Scan(&programID, &enabled, &stack, &freezeHours, &configVersion, &bonusBPS, &bonusCapRaw)
 	if errors.Is(err, sql.ErrNoRows) || !enabled {
-		return DistributionProcessResult{Enabled: false, StackWithLegacy: true}, nil
+		return DistributionProcessResult{Enabled: false, StackWithLegacy: false}, nil
 	}
 	if err != nil {
 		return DistributionProcessResult{}, err
 	}
-	result := DistributionProcessResult{Enabled: true, StackWithLegacy: stack}
+	// The legacy stack flag is retained in the schema for compatibility, but
+	// active settlements are always single-source compute-company settlements.
+	result := DistributionProcessResult{Enabled: true, StackWithLegacy: false}
 	baseMinor := rechargeBaseMinor(payAmount, feeRate)
 	if baseMinor <= 0 {
 		return result, nil
@@ -368,20 +490,22 @@ SET team_volume_cny_minor = team_volume_cny_minor + $2, updated_at = NOW()
 WHERE program_id = $1 AND user_id IN (
     SELECT ancestor_user_id FROM distribution_relations WHERE program_id = $1 AND descendant_user_id = $3 AND depth BETWEEN 0 AND 5
 )
-	RETURNING user_id, team_volume_cny_minor, tier_override`, programID, baseMinor, userID)
+	RETURNING user_id, team_volume_cny_minor, team_volume_cny_minor - $2 AS previous_team_volume_cny_minor, tier_override`, programID, baseMinor, userID)
 	if err != nil {
 		return result, err
 	}
 	volumes := make(map[int64]int64)
+	previousVolumes := make(map[int64]int64)
 	overrides := make(map[int64]int)
 	for rows.Next() {
-		var memberID, volume int64
+		var memberID, volume, previousVolume int64
 		var override sql.NullInt64
-		if err := rows.Scan(&memberID, &volume, &override); err != nil {
+		if err := rows.Scan(&memberID, &volume, &previousVolume, &override); err != nil {
 			_ = rows.Close()
 			return result, err
 		}
 		volumes[memberID] = volume
+		previousVolumes[memberID] = previousVolume
 		if override.Valid {
 			overrides[memberID] = int(override.Int64)
 		}
@@ -391,7 +515,7 @@ WHERE program_id = $1 AND user_id IN (
 	}
 	for memberID, volume := range volumes {
 		tier := tierForVolume(tiers, volume)
-		if _, err := tx.ExecContext(ctx, `UPDATE distribution_members SET current_tier = $3::smallint, activated_at = CASE WHEN $3::smallint > 0 THEN COALESCE(activated_at, NOW()) ELSE activated_at END WHERE program_id = $1 AND user_id = $2`, programID, memberID, tier); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE distribution_members SET current_tier = $3::smallint, activated_at = COALESCE(activated_at, NOW()) WHERE program_id = $1 AND user_id = $2`, programID, memberID, tier); err != nil {
 			return result, err
 		}
 	}
@@ -418,17 +542,29 @@ ORDER BY r.depth`, programID, userID)
 		ancestors = append(ancestors, item)
 	}
 	_ = ancestorRows.Close()
+	tierByID := make(map[int]DistributionTier, len(tiers))
+	for _, tier := range tiers {
+		tierByID[tier.Tier] = tier
+	}
 	for _, ancestor := range ancestors {
-		volume := volumes[ancestor.userID]
-		tier := tierForVolume(tiers, volume)
+		// Promotions affect subsequent recharges only. The current order uses
+		// the beneficiary's pre-recharge volume; the post-recharge volume above
+		// remains the new automatic tier for later orders.
+		volume := previousVolumes[ancestor.userID]
+		var overrideTier *int
 		if override, ok := overrides[ancestor.userID]; ok {
-			tier = override
+			overrideTier = &override
 		}
-		if tier == 0 {
+		tier := commissionTierForRecharge(tiers, volume, overrideTier)
+		tierConfig, ok := tierByID[tier]
+		if !ok || ancestor.depth < 1 || ancestor.depth > len(tierConfig.RatesBPS) {
 			continue
 		}
-		rateBPS := tiers[tier-1].RatesBPS[ancestor.depth-1]
-		amountMinor := decimal.NewFromInt(baseMinor).Mul(decimal.NewFromInt(rateBPS)).Div(decimal.NewFromInt(10000)).Round(0).IntPart()
+		rateBPS := tierConfig.RatesBPS[ancestor.depth-1]
+		if rateBPS <= 0 {
+			continue
+		}
+		amountMinor := calculateCommissionMinor(baseMinor, rateBPS)
 		if amountMinor <= 0 {
 			continue
 		}
@@ -500,8 +636,11 @@ FROM (
     UNION
     SELECT user_id FROM user_affiliate_ledger
     WHERE source_order_id = $2 AND action = 'accrue' AND reversed_at IS NULL
+    UNION
+    SELECT beneficiary_user_id FROM distribution_commissions
+    WHERE program_id = $3 AND source_order_id = $2
 ) locked_users
-ORDER BY user_id`, userID, orderID)
+ORDER BY user_id`, userID, orderID, programID)
 	if err != nil {
 		return nil, err
 	}
@@ -647,7 +786,7 @@ func (s *DistributionService) Dashboard(ctx context.Context, userID int64) (*Dis
 		dashboard.Levels[depth-1].Depth = depth
 	}
 	var programID int64
-	err := s.db.QueryRowContext(ctx, `SELECT id, enabled FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company'`).Scan(&programID, &dashboard.Enabled)
+	err := s.db.QueryRowContext(ctx, `SELECT id, enabled, commission_freeze_hours, withdrawal_min_cny_minor, withdrawal_daily_limit FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company'`).Scan(&programID, &dashboard.Enabled, &dashboard.CommissionFreezeHours, &dashboard.WithdrawalMinMinor, &dashboard.WithdrawalDailyLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -737,6 +876,12 @@ GROUP BY depth`, programID, userID)
 	if err != nil {
 		return nil, err
 	}
+	multiplier, err := s.balanceRechargeMultiplier(ctx)
+	if err != nil {
+		return nil, err
+	}
+	dashboard.BalanceRechargeMultiplier = multiplier.String()
+	dashboard.USDToCNYRate = decimal.NewFromInt(1).Div(multiplier).String()
 	for tierRows.Next() {
 		var tier DistributionTier
 		if err := tierRows.Scan(&tier.Tier, &tier.Threshold, &tier.RatesBPS[0], &tier.RatesBPS[1], &tier.RatesBPS[2], &tier.RatesBPS[3], &tier.RatesBPS[4]); err != nil {
@@ -749,6 +894,168 @@ GROUP BY depth`, programID, userID)
 		}
 	}
 	return dashboard, tierRows.Close()
+}
+
+func (s *DistributionService) Analytics(ctx context.Context, userID int64, days int) (*DistributionAnalytics, error) {
+	if days != 7 && days != 30 && days != 90 {
+		days = 30
+	}
+	var programID int64
+	if err := s.db.QueryRowContext(ctx, `SELECT id FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company'`).Scan(&programID); err != nil {
+		return nil, err
+	}
+
+	end := time.Now().UTC().Truncate(24 * time.Hour).Add(24 * time.Hour)
+	start := end.Add(-time.Duration(days*2) * 24 * time.Hour)
+	rows, err := s.db.QueryContext(ctx, `
+WITH day_grid AS (
+    SELECT generate_series($2::timestamptz, $3::timestamptz - INTERVAL '1 day', INTERVAL '1 day')::date AS day
+), recharge_totals AS (
+    SELECT (e.created_at AT TIME ZONE 'UTC')::date AS day,
+           COALESCE(SUM(e.base_cny_minor), 0)::bigint AS recharge_cny_minor
+    FROM distribution_recharge_events e
+    JOIN distribution_relations r
+      ON r.program_id = e.program_id
+     AND r.descendant_user_id = e.user_id
+     AND r.ancestor_user_id = $4
+     AND r.depth BETWEEN 1 AND 5
+    WHERE e.program_id = $1
+      AND e.status = 'APPLIED'
+      AND e.created_at >= $2
+      AND e.created_at < $3
+    GROUP BY 1
+), commission_totals AS (
+    SELECT (c.created_at AT TIME ZONE 'UTC')::date AS day,
+           COALESCE(SUM(CASE WHEN c.status <> 'REVERSED' THEN c.amount_cny_minor ELSE 0 END), 0)::bigint AS commission_cny_minor
+    FROM distribution_commissions c
+    WHERE c.program_id = $1
+      AND c.beneficiary_user_id = $4
+      AND c.created_at >= $2
+      AND c.created_at < $3
+    GROUP BY 1
+)
+SELECT TO_CHAR(g.day, 'YYYY-MM-DD'),
+       COALESCE(r.recharge_cny_minor, 0),
+       COALESCE(c.commission_cny_minor, 0)
+FROM day_grid g
+LEFT JOIN recharge_totals r ON r.day = g.day
+LEFT JOIN commission_totals c ON c.day = g.day
+ORDER BY g.day`, programID, start, end, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	allSeries := make([]DistributionAnalyticsPoint, 0, days*2)
+	for rows.Next() {
+		var point DistributionAnalyticsPoint
+		if err := rows.Scan(&point.Date, &point.RechargeMinor, &point.CommissionMinor); err != nil {
+			return nil, err
+		}
+		allSeries = append(allSeries, point)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(allSeries) < days {
+		return nil, fmt.Errorf("distribution analytics returned incomplete date series")
+	}
+	current := allSeries[len(allSeries)-days:]
+	previous := allSeries[:len(allSeries)-days]
+	summary := DistributionAnalyticsSummary{}
+	for _, point := range current {
+		summary.RechargeMinor += point.RechargeMinor
+		summary.CommissionMinor += point.CommissionMinor
+	}
+	for _, point := range previous {
+		summary.PreviousRechargeMinor += point.RechargeMinor
+		summary.PreviousCommissionMinor += point.CommissionMinor
+	}
+	summary.RechargeGrowthPercent = growthPercent(summary.RechargeMinor, summary.PreviousRechargeMinor)
+	summary.CommissionGrowthPercent = growthPercent(summary.CommissionMinor, summary.PreviousCommissionMinor)
+	return &DistributionAnalytics{
+		AsOf:      time.Now().UTC(),
+		RangeDays: days,
+		Series:    append([]DistributionAnalyticsPoint(nil), current...),
+		Summary:   summary,
+		Forecast: DistributionForecast{
+			Method:     "weighted_recent_trend_v1",
+			SevenDays:  forecastHorizon(current, 7, 7),
+			ThirtyDays: forecastHorizon(current, 30, 14),
+		},
+	}, nil
+}
+
+func growthPercent(current, previous int64) float64 {
+	if previous == 0 {
+		if current == 0 {
+			return 0
+		}
+		return 100
+	}
+	return (float64(current-previous) / float64(previous)) * 100
+}
+
+func forecastHorizon(series []DistributionAnalyticsPoint, horizon, minimumActiveDays int) DistributionForecastHorizon {
+	activeDays := 0
+	for _, point := range series {
+		if point.RechargeMinor > 0 || point.CommissionMinor > 0 {
+			activeDays++
+		}
+	}
+	if len(series) < horizon {
+		return DistributionForecastHorizon{Reason: "insufficient_history"}
+	}
+	if activeDays < minimumActiveDays {
+		return DistributionForecastHorizon{Reason: "insufficient_activity"}
+	}
+	recentWindow := 7
+	if horizon > 7 {
+		recentWindow = 14
+	}
+	if recentWindow > len(series) {
+		recentWindow = len(series)
+	}
+	recharge, rechargeGrowth := projectMetric(series, recentWindow, horizon, func(point DistributionAnalyticsPoint) int64 { return point.RechargeMinor })
+	commission, commissionGrowth := projectMetric(series, recentWindow, horizon, func(point DistributionAnalyticsPoint) int64 { return point.CommissionMinor })
+	return DistributionForecastHorizon{
+		Eligible:                 true,
+		EstimatedRechargeMinor:   recharge,
+		EstimatedCommissionMinor: commission,
+		RechargeGrowthPercent:    rechargeGrowth,
+		CommissionGrowthPercent:  commissionGrowth,
+	}
+}
+
+func projectMetric(series []DistributionAnalyticsPoint, recentWindow, horizon int, value func(DistributionAnalyticsPoint) int64) (int64, float64) {
+	start := len(series) - recentWindow
+	var recentTotal, previousTotal int64
+	for index := start; index < len(series); index++ {
+		recentTotal += value(series[index])
+	}
+	previousStart := start - recentWindow
+	if previousStart < 0 {
+		previousStart = 0
+	}
+	for index := previousStart; index < start; index++ {
+		previousTotal += value(series[index])
+	}
+	recentAverage := float64(recentTotal) / float64(recentWindow)
+	previousCount := start - previousStart
+	previousAverage := recentAverage
+	if previousCount > 0 {
+		previousAverage = float64(previousTotal) / float64(previousCount)
+	}
+	slope := (recentAverage - previousAverage) / float64(recentWindow)
+	var projected float64
+	for step := 1; step <= horizon; step++ {
+		projected += math.Max(0, recentAverage+slope*float64(step))
+	}
+	baseline := recentAverage * float64(horizon)
+	growth := 0.0
+	if baseline > 0 {
+		growth = ((projected / baseline) - 1) * 100
+	}
+	return int64(math.Round(projected)), growth
 }
 
 func (s *DistributionService) Tree(ctx context.Context, ownerUserID, parentUserID int64, search string, page, pageSize int) ([]DistributionTreeNode, int64, error) {
@@ -964,6 +1271,130 @@ func (s *DistributionService) CreateWithdrawal(ctx context.Context, userID, amou
 	return &withdrawal, tx.Commit()
 }
 
+// ConvertToPlatformBalance exchanges available company CNY earnings into a
+// non-transferable USD platform balance. The exchange is one-way and is
+// recorded with the rate and an idempotency key for auditability.
+func (s *DistributionService) ConvertToPlatformBalance(ctx context.Context, userID, amountMinor int64, idempotencyKey string) (*DistributionConversion, error) {
+	if userID <= 0 || amountMinor <= 0 || strings.TrimSpace(idempotencyKey) == "" {
+		return nil, infraerrors.BadRequest("DISTRIBUTION_CONVERSION_INVALID", "conversion amount and idempotency key are required")
+	}
+	if err := s.Thaw(ctx, userID); err != nil {
+		return nil, err
+	}
+	idempotencyKey = strings.TrimSpace(idempotencyKey)
+	if len(idempotencyKey) > 160 {
+		return nil, infraerrors.BadRequest("DISTRIBUTION_CONVERSION_INVALID", "idempotency key is too long")
+	}
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1)`, userID); err != nil {
+		return nil, err
+	}
+	var conversion DistributionConversion
+	var programID int64
+	var enabled bool
+	if err := tx.QueryRowContext(ctx, `SELECT id, enabled FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company' FOR SHARE`).Scan(&programID, &enabled); err != nil {
+		return nil, err
+	}
+	if !enabled {
+		return nil, ErrDistributionDisabled
+	}
+	if err := tx.QueryRowContext(ctx, `
+SELECT id, amount_cny_minor, usd_amount::text, COALESCE(cny_to_usd_rate::text, ''), COALESCE(rate_source, ''), usd_to_cny_rate::text, config_version, created_at
+FROM distribution_usd_conversions
+WHERE program_id = $1 AND user_id = $2 AND idempotency_key = $3`, programID, userID, idempotencyKey).Scan(
+		&conversion.ID, &conversion.AmountCNYMinor, &conversion.USDAmount,
+		&conversion.CNYToUSDRate, &conversion.RateSource, &conversion.USDToCNYRate, &conversion.ConfigVersion, &conversion.CreatedAt,
+	); err == nil {
+		if conversion.AmountCNYMinor != amountMinor {
+			return nil, infraerrors.Conflict("DISTRIBUTION_CONVERSION_IDEMPOTENCY_CONFLICT", "idempotency key was already used with a different amount")
+		}
+		return &conversion, tx.Commit()
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+	rateRaw, err := settingValueTx(ctx, tx, SettingBalanceRechargeMult)
+	if err != nil {
+		return nil, err
+	}
+	multiplier, err := decimal.NewFromString(rateRaw)
+	if err != nil || !multiplier.IsPositive() {
+		return nil, infraerrors.BadRequest("BALANCE_RECHARGE_MULTIPLIER_INVALID", "balance recharge multiplier is invalid")
+	}
+	legacyRate := decimal.NewFromInt(1).Div(multiplier).Round(10)
+	var configVersion int
+	if err := tx.QueryRowContext(ctx, `SELECT current_config_version FROM distribution_programs WHERE id = $1`, programID).Scan(&configVersion); err != nil {
+		return nil, err
+	}
+	usdAmount := decimal.NewFromInt(amountMinor).Div(decimal.NewFromInt(100)).Mul(multiplier).Round(8)
+	if !usdAmount.IsPositive() {
+		return nil, infraerrors.BadRequest("DISTRIBUTION_CONVERSION_INVALID", "conversion amount is too small")
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO distribution_cash_wallets (program_id, tenant_id, user_id) VALUES ($1, 1, $2) ON CONFLICT DO NOTHING`, programID, userID); err != nil {
+		return nil, err
+	}
+	var available, debt int64
+	if err := tx.QueryRowContext(ctx, `SELECT available_cny_minor, debt_cny_minor FROM distribution_cash_wallets WHERE program_id = $1 AND user_id = $2 FOR UPDATE`, programID, userID).Scan(&available, &debt); errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrWithdrawalInsufficient
+	} else if err != nil {
+		return nil, err
+	}
+	if debt > 0 {
+		return nil, ErrCommissionDebt
+	}
+	if available < amountMinor {
+		return nil, ErrWithdrawalInsufficient
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE distribution_cash_wallets SET available_cny_minor = available_cny_minor - $3, updated_at = NOW() WHERE program_id = $1 AND user_id = $2`, programID, userID, amountMinor); err != nil {
+		return nil, err
+	}
+	if err := tx.QueryRowContext(ctx, `
+INSERT INTO distribution_usd_conversions (program_id, tenant_id, user_id, amount_cny_minor, usd_amount, cny_to_usd_rate, rate_source, usd_to_cny_rate, config_version, idempotency_key)
+VALUES ($1, 1, $2, $3, $4, $5, $6, $7, $8, $9)
+	RETURNING id, created_at`, programID, userID, amountMinor, usdAmount.String(), multiplier.String(), "balance_recharge_multiplier", legacyRate.String(), configVersion, idempotencyKey).Scan(&conversion.ID, &conversion.CreatedAt); err != nil {
+		return nil, err
+	}
+	_, applied, err := creditledger.Apply(ctx, tx, userID, usdAmount, creditctx.Metadata{
+		EntryType: "distribution_commission_conversion", SourceType: "distribution_usd_conversion", SourceID: strconv.FormatInt(conversion.ID, 10),
+		IdempotencyKey: fmt.Sprintf("distribution:usd-conversion:%d:%s", userID, idempotencyKey), Transferable: false,
+	}, false)
+	if err != nil {
+		return nil, err
+	}
+	if !applied {
+		return nil, infraerrors.Conflict("DISTRIBUTION_CONVERSION_IDEMPOTENCY_CONFLICT", "conversion ledger idempotency key was already used")
+	}
+	if err := insertDistributionWalletLedger(ctx, tx, programID, userID, "commission_converted", -amountMinor, "distribution_usd_conversion", strconv.FormatInt(conversion.ID, 10), fmt.Sprintf("distribution:usd-conversion:%d:%s", userID, idempotencyKey)); err != nil {
+		return nil, err
+	}
+	conversion.AmountCNYMinor = amountMinor
+	conversion.USDAmount = usdAmount.String()
+	conversion.CNYToUSDRate = multiplier.String()
+	conversion.RateSource = "balance_recharge_multiplier"
+	conversion.USDToCNYRate = legacyRate.String()
+	conversion.ConfigVersion = configVersion
+	return &conversion, tx.Commit()
+}
+
+func settingValueTx(ctx context.Context, tx *sql.Tx, key string) (string, error) {
+	var raw string
+	if err := tx.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = $1`, key).Scan(&raw); errors.Is(err, sql.ErrNoRows) {
+		if key == SettingBalanceRechargeMult {
+			return "1", nil
+		}
+		if key == "distribution_usd_to_cny_rate" {
+			return "7.15", nil
+		}
+		return "", err
+	} else if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(raw), nil
+}
+
 func (s *DistributionService) ListWithdrawals(ctx context.Context, userID int64, page, pageSize int) ([]Withdrawal, int64, error) {
 	if page < 1 {
 		page = 1
@@ -1112,6 +1543,34 @@ LIMIT $2 OFFSET $3`, programID, pageSize, (page-1)*pageSize)
 	return items, total, rows.Err()
 }
 
+func (s *DistributionService) AdminListConversions(ctx context.Context, page, pageSize int) ([]DistributionConversionAudit, int64, error) {
+	page, pageSize = normalizeFinancialPage(page, pageSize)
+	var total int64
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM distribution_usd_conversions`).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id, user_id, amount_cny_minor, usd_amount::text,
+       COALESCE(cny_to_usd_rate::text, ''), COALESCE(rate_source, ''), usd_to_cny_rate::text,
+       config_version, idempotency_key, created_at
+FROM distribution_usd_conversions
+ORDER BY created_at DESC, id DESC
+LIMIT $1 OFFSET $2`, pageSize, (page-1)*pageSize)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer func() { _ = rows.Close() }()
+	items := make([]DistributionConversionAudit, 0, pageSize)
+	for rows.Next() {
+		var item DistributionConversionAudit
+		if err := rows.Scan(&item.ID, &item.UserID, &item.AmountCNYMinor, &item.USDAmount, &item.CNYToUSDRate, &item.RateSource, &item.USDToCNYRate, &item.ConfigVersion, &item.IdempotencyKey, &item.CreatedAt); err != nil {
+			return nil, 0, err
+		}
+		items = append(items, item)
+	}
+	return items, total, rows.Err()
+}
+
 func (s *DistributionService) AdminListTierAssignments(ctx context.Context, search string, page, pageSize int) ([]DistributionTierAssignment, int64, error) {
 	page, pageSize = normalizeFinancialPage(page, pageSize)
 	search = strings.TrimSpace(search)
@@ -1163,8 +1622,8 @@ func (s *DistributionService) AdminSetTierOverride(ctx context.Context, operator
 	if operatorID <= 0 || userID <= 0 {
 		return nil, infraerrors.BadRequest("DISTRIBUTION_TIER_ASSIGNMENT_INVALID", "invalid user id")
 	}
-	if tierOverride != nil && (*tierOverride < 1 || *tierOverride > 3) {
-		return nil, infraerrors.BadRequest("DISTRIBUTION_TIER_ASSIGNMENT_INVALID", "tier override must be between 1 and 3")
+	if tierOverride != nil && (*tierOverride < 0 || *tierOverride > 3) {
+		return nil, infraerrors.BadRequest("DISTRIBUTION_TIER_ASSIGNMENT_INVALID", "tier override must be between 0 and 3")
 	}
 	reason = strings.TrimSpace(reason)
 	if len(reason) > 500 {
@@ -1305,6 +1764,20 @@ func (s *DistributionService) AdminTransitionWithdrawal(ctx context.Context, wit
 		if strings.TrimSpace(reference) == "" {
 			return nil, infraerrors.BadRequest("PAYMENT_REFERENCE_REQUIRED", "payment reference is required")
 		}
+		// Reversals acquire the same beneficiary lock before creating debt. This
+		// prevents a chargeback from racing a payout after the debt is observed.
+		if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1)`, userID); err != nil {
+			return nil, err
+		}
+		var debt int64
+		if err = tx.QueryRowContext(ctx, `SELECT debt_cny_minor FROM distribution_cash_wallets WHERE program_id = $1 AND user_id = $2 FOR UPDATE`, programID, userID).Scan(&debt); errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrWithdrawalInsufficient
+		} else if err != nil {
+			return nil, err
+		}
+		if debt > 0 {
+			return nil, ErrCommissionDebt
+		}
 		_, err = tx.ExecContext(ctx, `UPDATE distribution_withdrawals SET status = 'PAID', operator_user_id = $2, payment_reference = $3, proof_url = NULLIF($4, ''), paid_at = $5, updated_at = NOW() WHERE id = $1`, withdrawalID, operatorUserID, reference, proofURL, now)
 		if err == nil {
 			_, err = tx.ExecContext(ctx, `UPDATE distribution_cash_wallets SET withdrawing_cny_minor = withdrawing_cny_minor - $3, lifetime_withdrawn_cny_minor = lifetime_withdrawn_cny_minor + $3, updated_at = NOW() WHERE program_id = $1 AND user_id = $2`, programID, userID, amountMinor)
@@ -1383,10 +1856,15 @@ func (s *DistributionService) Thaw(ctx context.Context, userID int64) error {
 		return err
 	}
 	if amount > 0 {
-		if _, err := tx.ExecContext(ctx, `UPDATE distribution_cash_wallets SET frozen_cny_minor = frozen_cny_minor - $3, debt_cny_minor = GREATEST(debt_cny_minor - $3, 0), available_cny_minor = available_cny_minor + GREATEST($3 - debt_cny_minor, 0), updated_at = NOW() WHERE program_id = $1 AND user_id = $2`, programID, userID, amount); err != nil {
+		result, err := tx.ExecContext(ctx, `UPDATE distribution_cash_wallets SET frozen_cny_minor = frozen_cny_minor - $3, debt_cny_minor = GREATEST(debt_cny_minor - $3, 0), available_cny_minor = available_cny_minor + GREATEST($3 - debt_cny_minor, 0), updated_at = NOW() WHERE program_id = $1 AND user_id = $2`, programID, userID, amount)
+		if err != nil {
 			return err
 		}
-		if err := insertDistributionWalletLedger(ctx, tx, programID, userID, "commission_thaw", amount, "commission_batch", time.Now().UTC().Format("20060102150405"), fmt.Sprintf("distribution:%d:thaw:%d", userID, time.Now().Unix()/60)); err != nil {
+		if affected, err := result.RowsAffected(); err == nil && affected != 1 {
+			return ErrWithdrawalInsufficient
+		}
+		batchID := fmt.Sprintf("%d-%d-%d", programID, userID, time.Now().UTC().UnixNano())
+		if err := insertDistributionWalletLedger(ctx, tx, programID, userID, "commission_thaw", amount, "commission_batch", batchID, "distribution:thaw:"+batchID); err != nil {
 			return err
 		}
 	}
@@ -1400,7 +1878,8 @@ func (s *DistributionService) ThawDue(ctx context.Context, limit int) error {
 	rows, err := s.db.QueryContext(ctx, `
 SELECT DISTINCT beneficiary_user_id
 FROM distribution_commissions
-WHERE status = 'FROZEN' AND frozen_until <= NOW()
+WHERE program_id = (SELECT id FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company')
+  AND status = 'FROZEN' AND frozen_until <= NOW()
 ORDER BY beneficiary_user_id
 LIMIT $1`, limit)
 	if err != nil {
@@ -1446,15 +1925,25 @@ func calculateWithdrawalFee(amountMinor int64, feeBPS int) int64 {
 	return decimal.NewFromInt(amountMinor).Mul(decimal.NewFromInt(int64(feeBPS))).Div(decimal.NewFromInt(10000)).Round(0).IntPart()
 }
 
+func calculateCommissionMinor(baseMinor int64, rateBPS int64) int64 {
+	if baseMinor <= 0 || rateBPS <= 0 {
+		return 0
+	}
+	return decimal.NewFromInt(baseMinor).Mul(decimal.NewFromInt(rateBPS)).Div(decimal.NewFromInt(10000)).Round(0).IntPart()
+}
+
 func validateDistributionPolicy(input DistributionPolicyInput) (decimal.Decimal, error) {
 	bonusCap, err := decimal.NewFromString(strings.TrimSpace(input.FirstRechargeBonusCap))
-	if err != nil || bonusCap.IsNegative() || bonusCap.Exponent() < -8 || input.CommissionFreezeHours < 0 || input.WithdrawalMinMinor <= 0 || input.WithdrawalDailyLimit <= 0 || input.WithdrawalFeeBPS < 0 || input.WithdrawalFeeBPS >= 10000 || input.FirstRechargeBonusBPS < 0 || input.FirstRechargeBonusBPS > 10000 || len(input.Tiers) != 3 {
+	if err != nil || bonusCap.IsNegative() || bonusCap.Exponent() < -8 || input.CommissionFreezeHours < 0 || input.WithdrawalMinMinor <= 0 || input.WithdrawalDailyLimit <= 0 || input.WithdrawalFeeBPS < 0 || input.WithdrawalFeeBPS >= 10000 || input.FirstRechargeBonusBPS < 0 || input.FirstRechargeBonusBPS > 10000 || len(input.Tiers) != 4 {
 		return decimal.Zero, infraerrors.BadRequest("DISTRIBUTION_POLICY_INVALID", "invalid distribution policy")
 	}
 	previousThreshold := int64(0)
 	for index, tier := range input.Tiers {
-		if tier.Tier != index+1 || tier.Threshold <= previousThreshold {
+		if tier.Tier != index || (index == 0 && tier.Threshold != 0) || (index > 0 && tier.Threshold <= previousThreshold) {
 			return decimal.Zero, infraerrors.BadRequest("DISTRIBUTION_POLICY_INVALID", "distribution tiers must be ordered and increasing")
+		}
+		if index == 0 && tier.RatesBPS != [5]int64{1000, 0, 0, 0, 0} {
+			return decimal.Zero, infraerrors.BadRequest("DISTRIBUTION_POLICY_INVALID", "T0 must pay only the core compute department at 10%")
 		}
 		for _, rate := range tier.RatesBPS {
 			if rate < 0 || rate > 10000 {
@@ -1480,7 +1969,7 @@ func loadDistributionTiersDB(ctx context.Context, db distributionTierQueryer, pr
 		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
-	tiers := make([]DistributionTier, 0, 3)
+	tiers := make([]DistributionTier, 0, 4)
 	for rows.Next() {
 		var tier DistributionTier
 		if err := rows.Scan(&tier.Tier, &tier.Threshold, &tier.RatesBPS[0], &tier.RatesBPS[1], &tier.RatesBPS[2], &tier.RatesBPS[3], &tier.RatesBPS[4]); err != nil {
@@ -1499,6 +1988,13 @@ func tierForVolume(tiers []DistributionTier, volume int64) int {
 		}
 	}
 	return tier
+}
+
+func commissionTierForRecharge(tiers []DistributionTier, previousVolume int64, override *int) int {
+	if override != nil {
+		return *override
+	}
+	return tierForVolume(tiers, previousVolume)
 }
 
 func ensureDistributionMemberTx(ctx context.Context, tx *sql.Tx, programID, userID int64) error {

@@ -6,30 +6,75 @@
           <h1 class="text-xl font-semibold text-gray-950 dark:text-white">{{ t('finance.distribution.title') }}</h1>
           <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">{{ t('finance.distribution.subtitle') }}</p>
         </div>
-        <div class="inline-flex h-9 self-start border border-gray-200 bg-gray-50 p-0.5 dark:border-dark-700 dark:bg-dark-800">
-          <button v-for="tab in tabs" :key="tab.id" class="px-3 text-sm" :class="activeTab === tab.id ? 'bg-white font-medium text-gray-950 shadow-sm dark:bg-dark-700 dark:text-white' : 'text-gray-500'" @click="activeTab = tab.id">{{ tab.label }}</button>
+        <div class="max-w-full overflow-x-auto self-start" role="tablist" :aria-label="t('finance.distribution.title')">
+          <div class="inline-flex h-9 min-w-max border border-gray-200 bg-gray-50 p-0.5 dark:border-dark-700 dark:bg-dark-800">
+          <button v-for="tab in tabs" :key="tab.id" type="button" role="tab" :aria-selected="activeTab === tab.id" :tabindex="activeTab === tab.id ? 0 : -1" class="inline-flex items-center gap-1.5 px-3 text-sm" :class="activeTab === tab.id ? 'bg-white font-medium text-gray-950 shadow-sm dark:bg-dark-700 dark:text-white' : 'text-gray-500'" @click="activeTab = tab.id"><Icon :name="tab.icon" size="xs" />{{ tab.label }}</button>
+          </div>
         </div>
       </section>
 
       <template v-if="dashboard">
         <section class="grid gap-px overflow-hidden border border-gray-200 bg-gray-200 sm:grid-cols-2 lg:grid-cols-4 dark:border-dark-700 dark:bg-dark-700">
           <div v-for="stat in stats" :key="stat.label" class="bg-white p-5 dark:bg-dark-900">
-            <p class="text-xs font-medium uppercase text-gray-500">{{ stat.label }}</p>
+            <div class="flex items-center gap-2 text-gray-500"><Icon :name="stat.icon" size="sm" class="text-primary-600 dark:text-primary-400" /><p class="text-xs font-medium uppercase">{{ stat.label }}</p></div>
             <p class="mt-2 font-mono text-2xl font-semibold tabular-nums text-gray-950 dark:text-white">{{ stat.value }}</p>
           </div>
         </section>
 
+        <section class="space-y-3" aria-labelledby="company-unit-overview-title">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="company-unit-overview-title" class="text-base font-semibold text-gray-900 dark:text-white">{{ t('finance.distribution.unitOverview') }}</h2>
+            <span v-if="previewDataEnabled" class="inline-flex items-center gap-1.5 border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-200"><Icon name="eye" size="xs" />{{ t('finance.distribution.previewDataBadge') }}</span>
+          </div>
+          <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <article v-for="summary in companySummaries" :key="`unit-card-${summary.depth}`" class="group border border-gray-200 bg-white p-4 transition-colors hover:border-primary-300 dark:border-dark-700 dark:bg-dark-900 dark:hover:border-primary-800">
+              <div class="flex items-start justify-between gap-3">
+                <span class="flex h-10 w-10 items-center justify-center border border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-900/60 dark:bg-primary-950/30 dark:text-primary-300"><Icon :name="companyUnitIcons[summary.depth - 1]" size="md" /></span>
+                <span class="font-mono text-xs text-gray-400 dark:text-dark-500">D{{ summary.depth }}</span>
+              </div>
+              <h3 class="mt-4 text-sm font-semibold text-gray-900 dark:text-white">{{ companyUnitName(summary.depth) }}</h3>
+              <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">{{ formatCount(summary.member_count) }} {{ t('finance.distribution.memberCount') }}</p>
+              <dl class="mt-4 space-y-2 border-t border-gray-100 pt-3 text-xs dark:border-dark-700">
+                <div class="flex items-center justify-between gap-2"><dt class="text-gray-500">{{ t('finance.distribution.recharge') }}</dt><dd class="font-mono font-medium tabular-nums text-gray-900 dark:text-white">{{ cny(summary.recharge_cny_minor) }}</dd></div>
+                <div class="flex items-center justify-between gap-2"><dt class="text-gray-500">{{ t('finance.distribution.commission') }}</dt><dd class="font-mono font-medium tabular-nums text-emerald-600 dark:text-emerald-400">{{ cny(summary.commission_cny_minor) }}</dd></div>
+              </dl>
+            </article>
+          </div>
+          <p v-if="previewDataEnabled" class="text-xs leading-5 text-amber-700 dark:text-amber-300">{{ t('finance.distribution.previewDataNotice') }}</p>
+        </section>
+
+        <section v-if="activeTab === 'overview'" class="grid gap-6 xl:grid-cols-[minmax(300px,0.72fr)_minmax(0,1.28fr)]">
+          <ComputeCompanyTeamChart :segments="teamSegments" :total="teamChartTotal" @select="selectTeamSegment" />
+          <section class="border border-gray-200 bg-white p-5 dark:border-dark-700 dark:bg-dark-900">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('finance.distribution.analyticsTitle') }}</h2>
+                <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">{{ t('finance.distribution.analyticsHint') }}</p>
+              </div>
+              <div class="inline-flex border border-gray-200 bg-gray-50 p-0.5 dark:border-dark-700 dark:bg-dark-800" role="group" :aria-label="t('finance.distribution.analyticsTitle')">
+                <button v-for="range in analyticsRanges" :key="range" type="button" class="px-2.5 py-1 text-xs font-medium transition-colors" :class="analyticsRange === range ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:text-dark-400 dark:hover:text-white'" @click="changeAnalyticsRange(range)">{{ t(`finance.distribution.range${range === '7d' ? '7d' : range === '90d' ? '90d' : '30d'}`) }}</button>
+              </div>
+            </div>
+            <ComputeCompanyTrendChart class="mt-4" :series="analytics?.series || []" :loading="analyticsLoading" />
+            <div v-if="analytics" class="mt-4 grid gap-3 border-t border-gray-100 pt-4 sm:grid-cols-2 dark:border-dark-700">
+              <div><p class="text-xs text-gray-500">{{ t('finance.distribution.recharge') }} {{ t('finance.distribution.periodComparison') }}</p><p class="mt-1 font-mono text-sm font-semibold tabular-nums" :class="analytics.summary.recharge_growth_percent >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'">{{ signedPercent(analytics.summary.recharge_growth_percent) }}</p></div>
+              <div><p class="text-xs text-gray-500">{{ t('finance.distribution.commission') }} {{ t('finance.distribution.periodComparison') }}</p><p class="mt-1 font-mono text-sm font-semibold tabular-nums" :class="analytics.summary.commission_growth_percent >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'">{{ signedPercent(analytics.summary.commission_growth_percent) }}</p></div>
+            </div>
+          </section>
+        </section>
+
         <section v-if="activeTab === 'overview'" class="space-y-6">
+          <ComputeCompanyShareCard :invite-link="inviteLink" :invite-code="inviteDetail?.aff_code || ''" />
           <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
             <div>
               <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('finance.distribution.companySummary') }}</h2>
-                <span v-if="dashboard.tier_override" class="text-xs font-medium text-amber-700 dark:text-amber-300">{{ t('finance.distribution.manualTier') }} · {{ tierDisplay(dashboard.tier_override, tierThreshold(dashboard.tier_override)) }}</span>
+                <span v-if="dashboard.tier_override !== undefined" class="text-xs font-medium text-amber-700 dark:text-amber-300">{{ t('finance.distribution.manualTier') }} · {{ tierDisplay(dashboard.tier_override, tierThreshold(dashboard.tier_override)) }}</span>
               </div>
               <div class="overflow-x-auto border border-gray-200 dark:border-dark-700">
                 <table class="w-full min-w-[760px] text-sm">
                   <thead class="bg-gray-50 text-gray-500 dark:bg-dark-800"><tr><th class="px-4 py-3 text-left">{{ t('finance.distribution.companyUnit') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.memberCount') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.recharge') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.commission') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.availableCommission') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.frozenCommission') }}</th></tr></thead>
-                  <tbody><tr v-for="summary in companySummaries" :key="summary.depth" class="border-t border-gray-100 dark:border-dark-700"><td class="px-4 py-3 font-medium">{{ companyUnitName(summary.depth) }}</td><td class="px-4 py-3 text-right font-mono tabular-nums">{{ summary.member_count }}</td><td class="px-4 py-3 text-right font-mono tabular-nums">{{ cny(summary.recharge_cny_minor) }}</td><td class="px-4 py-3 text-right font-mono tabular-nums">{{ cny(summary.commission_cny_minor) }}</td><td class="px-4 py-3 text-right font-mono tabular-nums text-emerald-600">{{ cny(summary.available_cny_minor) }}</td><td class="px-4 py-3 text-right font-mono tabular-nums text-amber-600">{{ cny(summary.frozen_cny_minor) }}</td></tr></tbody>
+                  <tbody><tr v-for="summary in companySummaries" :key="summary.depth" class="border-t border-gray-100 dark:border-dark-700"><td class="px-4 py-3 font-medium"><span class="inline-flex items-center gap-2"><span class="flex h-7 w-7 items-center justify-center border border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-900/60 dark:bg-primary-950/30 dark:text-primary-300"><Icon :name="companyUnitIcons[summary.depth - 1]" size="sm" /></span>{{ companyUnitName(summary.depth) }}</span></td><td class="px-4 py-3 text-right font-mono tabular-nums">{{ summary.member_count }}</td><td class="px-4 py-3 text-right font-mono tabular-nums">{{ cny(summary.recharge_cny_minor) }}</td><td class="px-4 py-3 text-right font-mono tabular-nums">{{ cny(summary.commission_cny_minor) }}</td><td class="px-4 py-3 text-right font-mono tabular-nums text-emerald-600">{{ cny(summary.available_cny_minor) }}</td><td class="px-4 py-3 text-right font-mono tabular-nums text-amber-600">{{ cny(summary.frozen_cny_minor) }}</td></tr></tbody>
                 </table>
               </div>
             </div>
@@ -37,19 +82,45 @@
               <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('finance.distribution.tiers') }}</h2>
               <div class="mt-4 overflow-x-auto"><table class="w-full min-w-[520px] text-sm"><thead class="text-gray-500"><tr><th class="py-2 text-left">{{ t('finance.distribution.tier') }}</th><th class="py-2 text-right">{{ t('finance.distribution.threshold') }}</th><th v-for="(unit, unitIndex) in companyUnits" :key="unitIndex" class="py-2 text-right">{{ unit }}</th></tr></thead><tbody><tr v-for="tier in dashboard.tiers" :key="tier.tier" class="border-t border-gray-100 dark:border-dark-700"><td class="py-2 font-mono">{{ tierDisplay(tier.tier, tier.threshold_cny_minor) }}</td><td class="py-2 text-right font-mono tabular-nums">{{ compactAmount(tier.threshold_cny_minor) }}</td><td v-for="(rate, index) in tier.rates_bps" :key="`${tier.tier}-${index}`" class="py-2 text-right">{{ rate / 100 }}%</td></tr></tbody></table></div>
               <p class="mt-4 text-xs leading-5 text-gray-500">{{ t('finance.distribution.tierStatus', { tier: effectiveTier }) }}</p>
+              <p class="mt-1 text-xs leading-5 text-gray-500">{{ t('finance.distribution.rateSnapshot', { rate: purchaseMultiplier }) }}</p>
             </div>
+          </div>
+          <div class="grid gap-6 lg:grid-cols-2">
+            <section class="border border-gray-200 p-5 dark:border-dark-700">
+              <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('finance.distribution.inviteTitle') }}</h2>
+              <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">{{ t('finance.distribution.inviteSubtitle') }}</p>
+              <div v-if="inviteDetail" class="mt-4 grid gap-3 sm:grid-cols-2">
+                <div class="border border-gray-200 bg-gray-50 p-3 dark:border-dark-700 dark:bg-dark-900"><p class="text-xs text-gray-500">{{ t('finance.distribution.inviteCode') }}</p><div class="mt-2 flex items-center gap-2"><code class="min-w-0 flex-1 truncate font-mono text-sm font-semibold">{{ inviteDetail.aff_code }}</code><button type="button" class="btn btn-secondary btn-sm" @click="copyText(inviteDetail.aff_code)">{{ t('finance.distribution.copy') }}</button></div></div>
+                <div class="border border-gray-200 bg-gray-50 p-3 dark:border-dark-700 dark:bg-dark-900"><p class="text-xs text-gray-500">{{ t('finance.distribution.inviteLink') }}</p><div class="mt-2 flex items-center gap-2"><code class="min-w-0 flex-1 truncate font-mono text-xs">{{ inviteLink }}</code><button type="button" class="btn btn-secondary btn-sm" @click="copyText(inviteLink)">{{ t('finance.distribution.copy') }}</button></div></div>
+              </div>
+              <p v-if="inviteDetail" class="mt-4 text-xs text-gray-500">{{ t('finance.distribution.historicalBalance', { amount: historicalBalance(inviteDetail.aff_quota) }) }}</p>
+              <button v-if="inviteDetail && inviteDetail.aff_quota > 0" type="button" class="btn btn-secondary btn-sm mt-3" :disabled="transferringHistory" @click="transferHistorical">{{ transferringHistory ? t('common.saving') : t('finance.distribution.transferHistorical') }}</button>
+            </section>
+            <section class="border border-gray-200 p-5 dark:border-dark-700">
+              <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('finance.distribution.walletRules') }}</h2>
+              <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3"><div><dt class="text-gray-500">{{ t('finance.distribution.freezePeriod') }}</dt><dd class="mt-1 font-mono font-medium">{{ dashboard.commission_freeze_hours }}h</dd></div><div><dt class="text-gray-500">{{ t('finance.distribution.minimumWithdrawal') }}</dt><dd class="mt-1 font-mono font-medium">{{ cny(dashboard.withdrawal_min_cny_minor) }}</dd></div><div><dt class="text-gray-500">{{ t('finance.distribution.dailyWithdrawalLimit') }}</dt><dd class="mt-1 font-mono font-medium">{{ dashboard.withdrawal_daily_limit }}</dd></div></dl>
+            </section>
           </div>
         </section>
 
         <section v-if="activeTab === 'team'" class="space-y-4">
+          <ComputeCompanyTeamChart :segments="teamSegments" :total="teamChartTotal" @select="selectTeamSegment" />
           <div class="flex flex-wrap items-center gap-3"><input v-model="search" class="input min-w-[240px] flex-1" :placeholder="t('common.search')" @keyup.enter="() => loadTeam()" /><button v-if="teamParent" class="btn btn-secondary btn-sm" @click="loadTeam()">{{ t('finance.distribution.backToTeam') }}</button><button class="btn btn-secondary btn-sm" @click="loadTeam(teamParent)">{{ t('common.search') }}</button></div>
-          <div class="overflow-x-auto border border-gray-200 dark:border-dark-700"><table class="w-full min-w-[820px] text-sm"><thead class="bg-gray-50 text-gray-500 dark:bg-dark-800"><tr><th class="px-4 py-3 text-left">{{ t('finance.distribution.member') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.directChildren') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.teamVolume') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.autoTier') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.effectiveTier') }}</th><th class="px-4 py-3 text-left">{{ t('common.actions') }}</th></tr></thead><tbody><tr v-for="node in team" :key="node.user_id" class="border-t border-gray-100 dark:border-dark-700"><td class="px-4 py-3"><span class="block font-medium text-gray-900 dark:text-white">{{ node.username || node.email_masked }}</span><span class="text-xs text-gray-500">{{ node.email_masked }}</span></td><td class="px-4 py-3 text-right font-mono tabular-nums">{{ node.direct_children }}</td><td class="px-4 py-3 text-right font-mono tabular-nums">{{ cny(node.team_volume_cny_minor) }}</td><td class="px-4 py-3 text-right">{{ tierDisplay(node.auto_tier, tierThreshold(node.auto_tier)) }}</td><td class="px-4 py-3 text-right">{{ tierDisplay(node.effective_tier, tierThreshold(node.effective_tier)) }}<span v-if="node.tier_override" class="ml-1 text-xs text-amber-600">{{ t('finance.distribution.manual') }}</span></td><td class="px-4 py-3"><button v-if="node.direct_children" class="font-medium text-gray-700 underline decoration-gray-300 underline-offset-4 dark:text-gray-200" @click="expandNode(node)">{{ t('finance.distribution.viewTeam') }}</button><span v-else class="text-gray-400">-</span></td></tr><tr v-if="team.length === 0"><td colspan="6" class="px-4 py-10 text-center text-gray-500">{{ t('common.noData') }}</td></tr></tbody></table></div>
+          <div class="overflow-x-auto border border-gray-200 dark:border-dark-700"><table class="w-full min-w-[820px] text-sm"><thead class="bg-gray-50 text-gray-500 dark:bg-dark-800"><tr><th class="px-4 py-3 text-left">{{ t('finance.distribution.member') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.directChildren') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.teamVolume') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.autoTier') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.effectiveTier') }}</th><th class="px-4 py-3 text-left">{{ t('common.actions') }}</th></tr></thead><tbody><tr v-for="node in team" :key="node.user_id" class="border-t border-gray-100 dark:border-dark-700"><td class="px-4 py-3"><span class="block font-medium text-gray-900 dark:text-white">{{ node.username || node.email_masked }}</span><span class="text-xs text-gray-500">{{ node.email_masked }}</span></td><td class="px-4 py-3 text-right font-mono tabular-nums">{{ node.direct_children }}</td><td class="px-4 py-3 text-right font-mono tabular-nums">{{ cny(node.team_volume_cny_minor) }}</td><td class="px-4 py-3 text-right">{{ tierDisplay(node.auto_tier, tierThreshold(node.auto_tier)) }}</td><td class="px-4 py-3 text-right">{{ tierDisplay(node.effective_tier, tierThreshold(node.effective_tier)) }}<span v-if="node.tier_override !== undefined" class="ml-1 text-xs text-amber-600">{{ t('finance.distribution.manual') }}</span></td><td class="px-4 py-3"><button v-if="node.direct_children" class="font-medium text-gray-700 underline decoration-gray-300 underline-offset-4 dark:text-gray-200" @click="expandNode(node)">{{ t('finance.distribution.viewTeam') }}</button><span v-else class="text-gray-400">-</span></td></tr><tr v-if="team.length === 0"><td colspan="6" class="px-4 py-10 text-center text-gray-500">{{ t('common.noData') }}</td></tr></tbody></table></div>
         </section>
 
-        <section v-if="activeTab === 'ledger'" class="overflow-x-auto border border-gray-200 dark:border-dark-700"><table class="w-full min-w-[760px] text-sm"><thead class="bg-gray-50 text-gray-500 dark:bg-dark-800"><tr><th class="px-4 py-3 text-left">{{ t('finance.distribution.order') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.companyUnit') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.rate') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.commission') }}</th><th class="px-4 py-3 text-left">{{ t('common.status') }}</th></tr></thead><tbody><tr v-for="item in ledger" :key="item.id" class="border-t border-gray-100 dark:border-dark-700"><td class="px-4 py-3">#{{ item.source_order_id }}</td><td class="px-4 py-3 text-right">{{ companyUnitName(item.depth) }}</td><td class="px-4 py-3 text-right">{{ item.rate_bps / 100 }}%</td><td class="px-4 py-3 text-right font-mono font-medium tabular-nums text-emerald-600">{{ cny(item.amount_cny_minor) }}</td><td class="px-4 py-3">{{ item.status }}</td></tr><tr v-if="ledger.length === 0"><td colspan="5" class="px-4 py-10 text-center text-gray-500">{{ t('common.noData') }}</td></tr></tbody></table></section>
+        <section v-if="activeTab === 'ledger'" class="space-y-6">
+          <section class="border border-gray-200 bg-white p-5 dark:border-dark-700 dark:bg-dark-900">
+            <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('finance.distribution.analyticsTitle') }}</h2><p class="mt-1 text-xs text-gray-500 dark:text-dark-400">{{ t('finance.distribution.analyticsHint') }}</p></div><div class="inline-flex border border-gray-200 bg-gray-50 p-0.5 dark:border-dark-700 dark:bg-dark-800" role="group" :aria-label="t('finance.distribution.analyticsTitle')"><button v-for="range in analyticsRanges" :key="`ledger-${range}`" type="button" class="px-2.5 py-1 text-xs font-medium transition-colors" :class="analyticsRange === range ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:text-dark-400 dark:hover:text-white'" @click="changeAnalyticsRange(range)">{{ t(`finance.distribution.range${range === '7d' ? '7d' : range === '90d' ? '90d' : '30d'}`) }}</button></div></div>
+            <ComputeCompanyTrendChart class="mt-4" :series="analytics?.series || []" :loading="analyticsLoading" />
+            <div class="mt-2"><h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('finance.distribution.analyticsForecast') }}</h3><p class="mt-1 text-xs text-gray-500 dark:text-dark-400">{{ t('finance.distribution.analyticsForecastHint') }}</p></div>
+            <ComputeCompanyForecastCards class="mt-3" :forecast="analytics?.forecast" />
+          </section>
+          <div class="overflow-x-auto border border-gray-200 dark:border-dark-700"><table class="w-full min-w-[760px] text-sm"><thead class="bg-gray-50 text-gray-500 dark:bg-dark-800"><tr><th class="px-4 py-3 text-left">{{ t('finance.distribution.order') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.companyUnit') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.rate') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.commission') }}</th><th class="px-4 py-3 text-left">{{ t('common.status') }}</th></tr></thead><tbody><tr v-for="item in ledger" :key="item.id" class="border-t border-gray-100 dark:border-dark-700"><td class="px-4 py-3">#{{ item.source_order_id }}</td><td class="px-4 py-3 text-right">{{ companyUnitName(item.depth) }}</td><td class="px-4 py-3 text-right">{{ item.rate_bps / 100 }}%</td><td class="px-4 py-3 text-right font-mono font-medium tabular-nums text-emerald-600">{{ cny(item.amount_cny_minor) }}</td><td class="px-4 py-3">{{ item.status }}</td></tr><tr v-if="ledger.length === 0"><td colspan="5" class="px-4 py-10 text-center text-gray-500">{{ t('common.noData') }}</td></tr></tbody></table></div>
+        </section>
 
         <section v-if="activeTab === 'withdraw'" class="space-y-6">
-          <div class="grid gap-6 lg:grid-cols-2"><form class="border border-gray-200 p-5 dark:border-dark-700" @submit.prevent="saveAccount"><h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('finance.distribution.payout') }}</h2><div v-if="payout" class="mt-4 text-sm text-gray-600 dark:text-gray-300">{{ payout.real_name_mask }} · {{ payout.account_mask }}</div><div class="mt-4 grid gap-3 sm:grid-cols-2"><input v-model="realName" class="input" :placeholder="t('finance.distribution.realName')" /><input v-model="alipay" class="input" :placeholder="t('finance.distribution.alipay')" /></div><button class="btn btn-primary mt-4">{{ t('common.save') }}</button></form><form class="border border-gray-200 p-5 dark:border-dark-700" @submit.prevent="withdraw"><h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('finance.distribution.withdraw') }}</h2><p class="mt-3 text-sm text-gray-500">{{ t('common.available') }}: {{ cny(dashboard.available_cny_minor) }}</p><input v-model="withdrawAmount" class="input mt-4 w-full" inputmode="decimal" placeholder="100.00" /><button class="btn btn-primary mt-4">{{ t('finance.distribution.submitWithdrawal') }}</button></form></div>
+          <div class="grid gap-6 lg:grid-cols-3"><form class="border border-gray-200 p-5 dark:border-dark-700 lg:col-span-1" @submit.prevent="saveAccount"><h2 class="text-base font-semibold text-gray-900 dark:text-white"><span class="inline-flex items-center gap-2"><Icon name="creditCard" size="sm" class="text-primary-600 dark:text-primary-400" />{{ t('finance.distribution.payout') }}</span></h2><div v-if="payout" class="mt-4 text-sm text-gray-600 dark:text-gray-300">{{ payout.real_name_mask }} · {{ payout.account_mask }}</div><div class="mt-4 grid gap-3"><input v-model="realName" class="input" :placeholder="t('finance.distribution.realName')" /><input v-model="alipay" class="input" :placeholder="t('finance.distribution.alipay')" /></div><button class="btn btn-primary mt-4">{{ t('common.save') }}</button></form><form class="border border-gray-200 p-5 dark:border-dark-700" @submit.prevent="withdraw"><h2 class="text-base font-semibold text-gray-900 dark:text-white"><span class="inline-flex items-center gap-2"><Icon name="arrowUp" size="sm" class="text-primary-600 dark:text-primary-400" />{{ t('finance.distribution.withdraw') }}</span></h2><p class="mt-3 text-sm text-gray-500">{{ t('common.available') }}: {{ cny(dashboard.available_cny_minor) }}</p><input v-model="withdrawAmount" class="input mt-4 w-full" inputmode="decimal" :disabled="previewDataEnabled" :placeholder="(dashboard.withdrawal_min_cny_minor / 100).toFixed(2)" /><p class="mt-2 text-xs text-gray-500">{{ t('finance.distribution.withdrawRuleHint', { hours: dashboard.commission_freeze_hours, minimum: cny(dashboard.withdrawal_min_cny_minor), dailyLimit: dashboard.withdrawal_daily_limit }) }}</p><button class="btn btn-primary mt-4" :disabled="previewDataEnabled">{{ t('finance.distribution.submitWithdrawal') }}</button></form><form class="border border-gray-200 p-5 dark:border-dark-700" @submit.prevent="convertBalance"><h2 class="text-base font-semibold text-gray-900 dark:text-white"><span class="inline-flex items-center gap-2"><Icon name="swap" size="sm" class="text-primary-600 dark:text-primary-400" />{{ t('finance.distribution.convertTitle') }}</span></h2><p class="mt-3 text-sm text-gray-500">{{ t('finance.distribution.convertRate', { rate: purchaseMultiplier }) }}</p><input v-model="convertAmount" class="input mt-4 w-full" inputmode="decimal" :disabled="previewDataEnabled" :placeholder="(dashboard.withdrawal_min_cny_minor / 100).toFixed(2)" /><p class="mt-2 text-xs text-gray-500">{{ t('finance.distribution.convertHint') }}</p><p v-if="convertPreview" class="mt-2 font-mono text-sm font-medium text-gray-900 dark:text-white">{{ t('finance.distribution.convertPreview', { amount: convertPreview }) }}</p><button class="btn btn-secondary mt-4" :disabled="previewDataEnabled || converting">{{ converting ? t('common.saving') : t('finance.distribution.convertButton') }}</button></form></div>
           <div class="overflow-x-auto border border-gray-200 dark:border-dark-700"><table class="w-full min-w-[760px] text-sm"><thead class="bg-gray-50 text-gray-500 dark:bg-dark-800"><tr><th class="px-4 py-3 text-left">ID</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.withdraw') }}</th><th class="px-4 py-3 text-right">{{ t('finance.vouchers.fee') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.net') }}</th><th class="px-4 py-3 text-left">{{ t('common.status') }}</th><th class="px-4 py-3 text-left">{{ t('finance.admin.reference') }}</th></tr></thead><tbody><tr v-for="item in withdrawals" :key="item.id" class="border-t border-gray-100 dark:border-dark-700"><td class="px-4 py-3">#{{ item.id }}</td><td class="px-4 py-3 text-right font-mono tabular-nums">{{ cny(item.amount_cny_minor) }}</td><td class="px-4 py-3 text-right font-mono tabular-nums">{{ cny(item.fee_cny_minor) }}</td><td class="px-4 py-3 text-right font-mono font-medium tabular-nums">{{ cny(item.amount_cny_minor - item.fee_cny_minor) }}</td><td class="px-4 py-3">{{ item.status }}<p v-if="item.reject_reason" class="mt-1 text-xs text-rose-600">{{ item.reject_reason }}</p></td><td class="px-4 py-3">{{ item.payment_reference || '-' }}</td></tr><tr v-if="withdrawals.length === 0"><td colspan="6" class="px-4 py-8 text-center text-gray-500">{{ t('common.noData') }}</td></tr></tbody></table></div>
         </section>
       </template>
@@ -61,7 +132,15 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import { createWithdrawal, getDistributionDashboard, getDistributionLedger, getDistributionTree, getPayoutAccount, listWithdrawals, savePayoutAccount, type Commission, type DistributionDashboard, type PayoutAccount, type TeamNode, type Withdrawal } from '@/api/financial'
+import Icon from '@/components/icons/Icon.vue'
+import ComputeCompanyShareCard from '@/components/user/ComputeCompanyShareCard.vue'
+import ComputeCompanyForecastCards from '@/components/charts/ComputeCompanyForecastCards.vue'
+import ComputeCompanyTeamChart from '@/components/charts/ComputeCompanyTeamChart.vue'
+import ComputeCompanyTrendChart from '@/components/charts/ComputeCompanyTrendChart.vue'
+import { convertToPlatformBalance, createWithdrawal, getDistributionAnalytics, getDistributionDashboard, getDistributionLedger, getDistributionTree, getPayoutAccount, listWithdrawals, savePayoutAccount, type Commission, type DistributionAnalytics, type DistributionDashboard, type PayoutAccount, type TeamNode, type Withdrawal } from '@/api/financial'
+import userAPI from '@/api/user'
+import type { UserAffiliateDetail } from '@/types'
+import { useClipboard } from '@/composables/useClipboard'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { COMPUTE_COMPANY_UNIT_KEYS } from '@/constants/distribution'
@@ -70,6 +149,9 @@ const { t } = useI18n()
 const app = useAppStore()
 const activeTab = ref('overview')
 const dashboard = ref<DistributionDashboard>()
+const analytics = ref<DistributionAnalytics>()
+const analyticsLoading = ref(false)
+const analyticsRange = ref<'7d' | '30d' | '90d'>('30d')
 const team = ref<TeamNode[]>([])
 const ledger = ref<Commission[]>([])
 const withdrawals = ref<Withdrawal[]>([])
@@ -79,14 +161,44 @@ const teamParent = ref<number>()
 const realName = ref('')
 const alipay = ref('')
 const withdrawAmount = ref('')
+const convertAmount = ref('')
+const converting = ref(false)
+const transferringHistory = ref(false)
+const inviteDetail = ref<UserAffiliateDetail>()
+const { copyToClipboard } = useClipboard()
+const PUBLIC_SITE_ORIGIN = 'https://3api.shop'
+const previewDataEnabled = import.meta.env.DEV && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('preview') === 'compute-company'
 const companyUnitKeys = COMPUTE_COMPANY_UNIT_KEYS
+const companyUnitIcons = ['server', 'link', 'terminal', 'globe', 'shield'] as const
 const companyUnits = computed(() => companyUnitKeys.map(key => t(`finance.distribution.companyUnits.${key}`)))
-const tabs = computed(() => [{ id: 'overview', label: t('finance.distribution.overview') }, { id: 'team', label: t('finance.distribution.team') }, { id: 'ledger', label: t('finance.distribution.ledger') }, { id: 'withdraw', label: t('finance.distribution.withdraw') }])
+const tabs = computed(() => [{ id: 'overview', label: t('finance.distribution.overview'), icon: 'chartBar' as const }, { id: 'team', label: t('finance.distribution.team'), icon: 'users' as const }, { id: 'ledger', label: t('finance.distribution.ledger'), icon: 'document' as const }, { id: 'withdraw', label: t('finance.distribution.withdraw'), icon: 'swap' as const }])
 const companySummaries = computed(() => dashboard.value?.levels?.length ? dashboard.value.levels : Array.from({ length: companyUnitKeys.length }, (_, index) => ({ depth: index + 1, member_count: dashboard.value?.level_counts[index + 1] || 0, recharge_cny_minor: 0, commission_cny_minor: 0, available_cny_minor: 0, frozen_cny_minor: 0 })))
 const effectiveTier = computed(() => dashboard.value?.current_tier || 0)
+const purchaseMultiplier = computed(() => dashboard.value?.balance_recharge_multiplier || '1')
+const convertPreview = computed(() => {
+  const amount = Number(convertAmount.value)
+  const multiplier = Number(purchaseMultiplier.value)
+  if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(multiplier) || multiplier <= 0) return ''
+  return (amount * multiplier).toFixed(2)
+})
+const inviteLink = computed(() => inviteDetail.value ? `${PUBLIC_SITE_ORIGIN}/register?aff=${encodeURIComponent(inviteDetail.value.aff_code)}` : '')
 const companyMemberCount = computed(() => companySummaries.value.reduce((total, summary) => total + summary.member_count, 0))
 const activeCompanyUnitCount = computed(() => companySummaries.value.filter(summary => summary.member_count > 0 || summary.recharge_cny_minor > 0).length)
-const stats = computed(() => dashboard.value ? [{ label: t('finance.distribution.companyMembers'), value: formatCount(companyMemberCount.value) }, { label: t('finance.distribution.activeUnits'), value: `${activeCompanyUnitCount.value}/${companyUnitKeys.length}` }, { label: t('finance.distribution.teamVolume'), value: cny(dashboard.value.team_volume_cny_minor) }, { label: t('finance.distribution.effectiveTier'), value: tierDisplay(effectiveTier.value, tierThreshold(effectiveTier.value)) }, { label: t('finance.distribution.lifetimeEarned'), value: cny(dashboard.value.lifetime_earned_cny_minor) }, { label: t('common.available'), value: cny(dashboard.value.available_cny_minor) }, { label: t('common.frozenBalance'), value: cny(dashboard.value.frozen_cny_minor) }, { label: t('finance.distribution.withdrawing'), value: cny(dashboard.value.withdrawing_cny_minor) }, ...(dashboard.value.debt_cny_minor > 0 ? [{ label: t('finance.distribution.debt'), value: cny(dashboard.value.debt_cny_minor) }] : [])] : [])
+const stats = computed(() => dashboard.value ? [{ label: t('finance.distribution.companyMembers'), value: formatCount(companyMemberCount.value), icon: 'users' as const }, { label: t('finance.distribution.activeUnits'), value: `${activeCompanyUnitCount.value}/${companyUnitKeys.length}`, icon: 'server' as const }, { label: t('finance.distribution.teamVolume'), value: cny(dashboard.value.team_volume_cny_minor), icon: 'trendingUp' as const }, { label: t('finance.distribution.effectiveTier'), value: tierDisplay(effectiveTier.value, tierThreshold(effectiveTier.value)), icon: 'badge' as const }, { label: t('finance.distribution.lifetimeEarned'), value: cny(dashboard.value.lifetime_earned_cny_minor), icon: 'dollar' as const }, { label: t('common.available'), value: cny(dashboard.value.available_cny_minor), icon: 'creditCard' as const }, { label: t('common.frozenBalance'), value: cny(dashboard.value.frozen_cny_minor), icon: 'clock' as const }, { label: t('finance.distribution.withdrawing'), value: cny(dashboard.value.withdrawing_cny_minor), icon: 'arrowUp' as const }, ...(dashboard.value.debt_cny_minor > 0 ? [{ label: t('finance.distribution.debt'), value: cny(dashboard.value.debt_cny_minor), icon: 'exclamationTriangle' as const }] : [])] : [])
+const teamSegments = computed(() => {
+  const labels = [
+    t('finance.distribution.teamSegmentDirect'),
+    t('finance.distribution.teamSegmentExpanded'),
+    t('finance.distribution.teamSegmentCollaboration'),
+    t('finance.distribution.teamSegmentEcosystem'),
+    t('finance.distribution.teamSegmentSupport'),
+  ]
+  const counts = labels.map((_, index) => Number(dashboard.value?.level_counts[index + 1] || companySummaries.value[index]?.member_count || 0))
+  const max = Math.max(...counts, 1)
+  return labels.map((label, index) => ({ key: `segment-${index + 1}`, label, count: counts[index], percent: (counts[index] / max) * 100 }))
+})
+const teamChartTotal = computed(() => teamSegments.value.reduce((total, segment) => total + segment.count, 0))
+const analyticsRanges = ['7d', '30d', '90d'] as const
 function cny(minor: number) { return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'CNY' }).format(minor / 100) }
 function formatCount(value: number) { return new Intl.NumberFormat().format(value) }
 function compactAmount(minor: number) {
@@ -98,17 +210,50 @@ function compactAmount(minor: number) {
 function tierThreshold(tier: number) { return dashboard.value?.tiers.find(candidate => candidate.tier === tier)?.threshold_cny_minor || 0 }
 function tierDisplay(tier: number, _thresholdMinor: number) { return `T${tier}` }
 function companyUnitName(depth: number) { return companyUnits.value[depth - 1] || `${t('finance.distribution.companyUnit')} ${depth}` }
+function signedPercent(value: number) { return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%` }
+type DistributionPreviewModule = typeof import('./distributionPreviewData')
+let previewModule: DistributionPreviewModule | undefined
+async function loadPreviewModule() {
+  if (!import.meta.env.DEV) return undefined
+  previewModule ||= await import('./distributionPreviewData')
+  return previewModule
+}
+async function loadAnalytics(range = analyticsRange.value) {
+  analyticsLoading.value = true
+  try {
+    const preview = previewDataEnabled ? await loadPreviewModule() : undefined
+    analytics.value = preview ? preview.createPreviewAnalytics(Number(range.slice(0, -1))) : await getDistributionAnalytics(range)
+  } catch (error) {
+    const preview = previewDataEnabled ? await loadPreviewModule() : undefined
+    if (preview) analytics.value = preview.createPreviewAnalytics(Number(range.slice(0, -1)))
+    else app.showError(extractApiErrorMessage(error))
+  } finally { analyticsLoading.value = false }
+}
+async function changeAnalyticsRange(range: typeof analyticsRange.value) { analyticsRange.value = range; await loadAnalytics(range) }
+async function selectTeamSegment() { activeTab.value = 'team'; await loadTeam() }
 async function load() {
-  try { dashboard.value = await getDistributionDashboard() } catch (error) { app.showError(extractApiErrorMessage(error)); return }
-  const [ledgerResult, withdrawalsResult, payoutResult] = await Promise.allSettled([getDistributionLedger(), listWithdrawals(), getPayoutAccount()])
-  if (ledgerResult.status === 'fulfilled') ledger.value = ledgerResult.value.items
+  const preview = previewDataEnabled ? await loadPreviewModule() : undefined
+  try { dashboard.value = preview ? preview.usePreviewDashboard(await getDistributionDashboard()) : await getDistributionDashboard() } catch (error) {
+    if (!previewDataEnabled) { app.showError(extractApiErrorMessage(error)); return }
+    dashboard.value = preview?.usePreviewDashboard()
+  }
+  const [ledgerResult, withdrawalsResult, payoutResult, inviteResult] = await Promise.allSettled([getDistributionLedger(), listWithdrawals(), getPayoutAccount(), userAPI.getAffiliateDetail()])
+  if (ledgerResult.status === 'fulfilled') ledger.value = preview ? preview.previewLedger : ledgerResult.value.items
   if (withdrawalsResult.status === 'fulfilled') withdrawals.value = withdrawalsResult.value.items
   if (payoutResult.status === 'fulfilled') payout.value = payoutResult.value
-  await loadTeam()
+  if (inviteResult.status === 'fulfilled') inviteDetail.value = inviteResult.value
+  if (previewDataEnabled && !inviteDetail.value) inviteDetail.value = { user_id: 0, aff_code: 'N5TGUUDY3QZU', aff_count: 64, aff_quota: 0, aff_frozen_quota: 0, aff_history_quota: 0, effective_rebate_rate_percent: 10, invitees: [] }
+  if (!previewDataEnabled) await loadTeam()
+  await loadAnalytics()
 }
-async function loadTeam(parent?: number) { try { teamParent.value = parent; team.value = (await getDistributionTree(parent, search.value)).items } catch (error) { app.showError(extractApiErrorMessage(error)) } }
+async function loadTeam(parent?: number) { if (previewDataEnabled) { const preview = await loadPreviewModule(); teamParent.value = parent; team.value = parent ? [] : (preview?.previewTeam || []); return } try { teamParent.value = parent; team.value = (await getDistributionTree(parent, search.value)).items } catch (error) { app.showError(extractApiErrorMessage(error)) } }
 async function expandNode(node: TeamNode) { if (node.direct_children) await loadTeam(node.user_id) }
 async function saveAccount() { try { payout.value = await savePayoutAccount(alipay.value, realName.value); alipay.value = ''; realName.value = ''; app.showSuccess(t('common.saved')) } catch (error) { app.showError(extractApiErrorMessage(error)) } }
-async function withdraw() { try { const minor = Math.round(Number(withdrawAmount.value) * 100); await createWithdrawal(minor); withdrawAmount.value = ''; dashboard.value = await getDistributionDashboard(); withdrawals.value = (await listWithdrawals()).items; app.showSuccess(t('common.success')) } catch (error) { app.showError(extractApiErrorMessage(error)) } }
+async function withdraw() { if (previewDataEnabled) { app.showInfo(t('finance.distribution.previewDataReadOnly')); return } try { const minor = Math.round(Number(withdrawAmount.value) * 100); await createWithdrawal(minor); withdrawAmount.value = ''; dashboard.value = await getDistributionDashboard(); withdrawals.value = (await listWithdrawals()).items; app.showSuccess(t('common.success')) } catch (error) { app.showError(extractApiErrorMessage(error)) } }
+function historicalBalance(value: number) { return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(value) }
+async function copyText(value: string) { if (value) await copyToClipboard(value, t('finance.distribution.copied')) }
+async function transferHistorical() { if (!inviteDetail.value || inviteDetail.value.aff_quota <= 0 || transferringHistory.value) return; transferringHistory.value = true; try { await userAPI.transferAffiliateQuota(); inviteDetail.value = await userAPI.getAffiliateDetail(); app.showSuccess(t('common.success')) } catch (error) { app.showError(extractApiErrorMessage(error)) } finally { transferringHistory.value = false } }
+function createIdempotencyKey() { return typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `distribution-convert-${Date.now()}-${Math.random().toString(36).slice(2)}` }
+async function convertBalance() { if (previewDataEnabled) { app.showInfo(t('finance.distribution.previewDataReadOnly')); return } if (converting.value) return; converting.value = true; try { const minor = Math.round(Number(convertAmount.value) * 100); const result = await convertToPlatformBalance(minor, createIdempotencyKey()); convertAmount.value = ''; dashboard.value = await getDistributionDashboard(); app.showSuccess(t('finance.distribution.converted', { amount: result.usd_amount })) } catch (error) { app.showError(extractApiErrorMessage(error)) } finally { converting.value = false } }
 onMounted(load)
 </script>

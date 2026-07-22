@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <div
-      class="pointer-events-none fixed right-4 top-4 z-[9999] space-y-3"
+      class="toast-stack pointer-events-none fixed z-[9999] space-y-3"
       aria-live="polite"
       aria-atomic="true"
     >
@@ -17,7 +17,7 @@
           v-for="toast in toasts"
           :key="toast.id"
           :class="[
-            'pointer-events-auto min-w-[320px] max-w-md overflow-hidden rounded-lg shadow-lg',
+            'pointer-events-auto w-full min-w-0 max-w-md overflow-hidden rounded-lg shadow-lg sm:min-w-[320px]',
             'bg-white dark:bg-dark-800',
             'border-l-4',
             getBorderColor(toast.type)
@@ -135,6 +135,19 @@ const removeToast = (id: string) => {
 </script>
 
 <style scoped>
+.toast-stack {
+  top: max(0.75rem, env(safe-area-inset-top));
+  right: max(0.75rem, env(safe-area-inset-right));
+  left: max(0.75rem, env(safe-area-inset-left));
+}
+
+@media (min-width: 640px) {
+  .toast-stack {
+    left: auto;
+    right: max(1rem, env(safe-area-inset-right));
+  }
+}
+
 .toast-progress {
   width: 100%;
   animation-name: toast-progress-shrink;

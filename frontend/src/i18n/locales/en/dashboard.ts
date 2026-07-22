@@ -549,6 +549,9 @@ export default {
   redeem: {
     title: 'Redeem Code',
     description: 'Enter your redeem code to add balance or increase concurrency',
+    modeSwitcherLabel: 'Credit operation mode',
+    redeemMode: 'Redeem credit',
+    createMode: 'Generate credit voucher',
     currentBalance: 'Current Balance',
     concurrency: 'Concurrency',
     requests: 'requests',

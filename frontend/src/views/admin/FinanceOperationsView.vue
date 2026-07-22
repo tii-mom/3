@@ -8,7 +8,6 @@
         </div>
         <div class="flex flex-wrap gap-2">
           <button class="btn btn-secondary btn-sm" @click="toggleDistribution">{{ t('nav.distribution') }}: {{ distributionEnabled ? t('common.enabled') : t('common.disabled') }}</button>
-          <button class="btn btn-secondary btn-sm" @click="toggleLegacyStack">{{ t('finance.admin.legacyStack') }}: {{ stackLegacy ? t('common.enabled') : t('common.disabled') }}</button>
           <button class="btn btn-secondary btn-sm" @click="toggleVouchers">{{ t('nav.balanceVouchers') }}: {{ vouchersEnabled ? t('common.enabled') : t('common.disabled') }}</button>
           <button class="btn btn-secondary btn-sm" @click="toggleBucketEnforcement">{{ bucketEnforced ? t('finance.admin.bucketEnforced') : t('finance.admin.bucketShadow') }}</button>
         </div>
@@ -27,14 +26,15 @@
         <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('finance.admin.policy') }}</h2><span class="text-sm text-gray-500">{{ t('finance.admin.version') }} {{ policyVersion }}</span></div>
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
           <label class="text-xs font-medium text-gray-500">{{ t('finance.admin.freezeHours') }}<input v-model.number="policy.commission_freeze_hours" class="input mt-1 w-full" type="number" min="0" /></label>
-          <label class="text-xs font-medium text-gray-500">{{ t('finance.distribution.threshold') }}<input v-model.number="policy.withdrawal_min_cny_minor" class="input mt-1 w-full" type="number" min="1" /></label>
+          <label class="text-xs font-medium text-gray-500">{{ t('finance.admin.minimumWithdrawal') }}<input v-model.number="policy.withdrawal_min_cny_minor" class="input mt-1 w-full" type="number" min="1" /></label>
           <label class="text-xs font-medium text-gray-500">{{ t('finance.admin.dailyLimit') }}<input v-model.number="policy.withdrawal_daily_limit" class="input mt-1 w-full" type="number" min="1" /></label>
           <label class="text-xs font-medium text-gray-500">{{ t('finance.admin.feeBps') }}<input v-model.number="policy.withdrawal_fee_bps" class="input mt-1 w-full" type="number" min="0" max="9999" /></label>
           <label class="text-xs font-medium text-gray-500">{{ t('finance.admin.bonusBps') }}<input v-model.number="policy.first_recharge_bonus_bps" class="input mt-1 w-full" type="number" min="0" max="10000" /></label>
           <label class="text-xs font-medium text-gray-500">{{ t('finance.admin.bonusCap') }}<input v-model="policy.first_recharge_bonus_cap_usd" class="input mt-1 w-full" inputmode="decimal" /></label>
+          <div class="border border-primary-200 bg-primary-50 px-3 py-2 dark:border-primary-900/60 dark:bg-primary-950/20"><p class="text-xs font-medium text-primary-700 dark:text-primary-300">{{ t('finance.admin.purchaseRatio') }}</p><p class="mt-1 font-mono text-sm font-semibold text-gray-900 dark:text-white">1 CNY = {{ purchaseMultiplier }} USD</p></div>
         </div>
-        <div class="overflow-x-auto"><table class="w-full min-w-[1060px] text-sm"><thead class="bg-gray-50 text-gray-500 dark:bg-dark-800"><tr><th class="px-3 py-2 text-left">{{ t('finance.distribution.tier') }}</th><th class="px-3 py-2 text-right">{{ t('finance.distribution.threshold') }}</th><th v-for="(unit, unitIndex) in companyUnits" :key="unitIndex" class="px-3 py-2 text-right">{{ unit }} bps</th></tr></thead><tbody><tr v-for="tier in policy.tiers" :key="tier.tier" class="border-t border-gray-100 dark:border-dark-700"><td class="px-3 py-2 font-mono">{{ tierDisplay(tier.tier, tier.threshold_cny_minor) }}</td><td class="px-3 py-2"><input v-model.number="tier.threshold_cny_minor" class="input ml-auto w-32 text-right" type="number" min="1" :aria-label="`${tierDisplay(tier.tier, tier.threshold_cny_minor)} ${t('finance.distribution.threshold')}`" /></td><td v-for="(_, rateIndex) in tier.rates_bps" :key="rateIndex" class="px-3 py-2"><input v-model.number="tier.rates_bps[rateIndex]" class="input ml-auto w-24 text-right" type="number" min="0" max="10000" :aria-label="`${companyUnits[rateIndex]} bps`" /></td></tr></tbody></table></div>
-        <div class="flex justify-end"><button class="btn btn-primary" :disabled="publishingPolicy">{{ t('finance.admin.publishPolicy') }}</button></div>
+        <div class="overflow-x-auto"><table class="w-full min-w-[1060px] text-sm"><thead class="bg-gray-50 text-gray-500 dark:bg-dark-800"><tr><th class="px-3 py-2 text-left">{{ t('finance.distribution.tier') }}</th><th class="px-3 py-2 text-right">{{ t('finance.distribution.threshold') }}</th><th v-for="(unit, unitIndex) in companyUnits" :key="unitIndex" class="px-3 py-2 text-right">{{ unit }} bps</th></tr></thead><tbody><tr v-for="tier in policy.tiers" :key="tier.tier" class="border-t border-gray-100 dark:border-dark-700"><td class="px-3 py-2 font-mono">{{ tierDisplay(tier.tier, tier.threshold_cny_minor) }}</td><td class="px-3 py-2"><div class="flex items-center justify-end gap-2"><span class="text-xs text-gray-500" :title="`${tier.threshold_cny_minor} ${t('finance.admin.thresholdMinor')}`">{{ compactAmount(tier.threshold_cny_minor) }}</span><input v-model.number="tier.threshold_cny_minor" class="input ml-auto w-32 text-right" type="number" :min="tier.tier === 0 ? 0 : 1" :aria-label="`${tierDisplay(tier.tier, tier.threshold_cny_minor)} ${t('finance.distribution.threshold')}`" /></div></td><td v-for="(_, rateIndex) in tier.rates_bps" :key="rateIndex" class="px-3 py-2"><input v-model.number="tier.rates_bps[rateIndex]" class="input ml-auto w-24 text-right" type="number" min="0" max="10000" :aria-label="`${companyUnits[rateIndex]} bps`" /></td></tr></tbody></table></div>
+        <div class="flex flex-wrap items-center justify-between gap-3"><p class="text-xs text-gray-500">{{ t('finance.admin.purchaseRatioHint', { rate: purchaseMultiplier }) }}</p><button class="btn btn-primary" :disabled="publishingPolicy">{{ t('finance.admin.publishPolicy') }}</button></div>
       </form>
 
       <nav class="overflow-x-auto">
@@ -49,7 +49,7 @@
           <button class="btn btn-secondary btn-sm" :disabled="tierLoading" @click="loadTierMembers">{{ t('common.search') }}</button>
           <p class="w-full text-xs text-gray-500">{{ t('finance.admin.tierAssignmentHint') }}</p>
         </div>
-        <div class="overflow-x-auto border border-gray-200 dark:border-dark-700"><table class="w-full min-w-[1080px] text-sm"><thead class="bg-gray-50 text-gray-500 dark:bg-dark-800"><tr><th class="px-4 py-3 text-left">{{ t('finance.admin.user') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.teamVolume') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.autoTier') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.manualTier') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.threshold') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.effectiveTier') }}</th><th class="px-4 py-3 text-left">{{ t('common.actions') }}</th></tr></thead><tbody><tr v-for="item in tierMembers" :key="item.user_id" class="border-t border-gray-100 dark:border-dark-700"><td class="px-4 py-3"><span class="block font-medium text-gray-900 dark:text-white">{{ item.email }}</span><span v-if="item.username" class="text-xs text-gray-500">{{ item.username }} · #{{ item.user_id }}</span></td><td class="px-4 py-3 text-right font-mono tabular-nums">{{ cny(item.team_volume_cny_minor) }}</td><td class="px-4 py-3 text-right">{{ tierDisplay(item.auto_tier, tierThreshold(item.auto_tier)) }}</td><td class="px-4 py-3 text-right"><select v-model="tierDrafts[item.user_id]" class="input min-w-28" :aria-label="`${item.email} tier`"><option :value="null">{{ t('finance.admin.automatic') }}</option><option :value="1">{{ tierDisplay(1, tierThreshold(1)) }}</option><option :value="2">{{ tierDisplay(2, tierThreshold(2)) }}</option><option :value="3">{{ tierDisplay(3, tierThreshold(3)) }}</option></select></td><td class="px-4 py-3 text-right font-mono tabular-nums">{{ compactAmount(tierThreshold(tierDrafts[item.user_id] ?? item.effective_tier)) }}</td><td class="px-4 py-3 text-right">{{ tierDisplay(item.effective_tier, tierThreshold(item.effective_tier)) }}<span v-if="item.tier_override" class="ml-1 text-xs text-amber-600">{{ t('finance.distribution.manual') }}</span></td><td class="px-4 py-3"><button class="btn btn-primary btn-sm" :disabled="tierSaving === item.user_id" @click="saveTier(item.user_id)">{{ t('common.save') }}</button></td></tr><tr v-if="tierMembers.length === 0"><td colspan="7" class="px-4 py-10 text-center text-gray-500">{{ t('common.noData') }}</td></tr></tbody></table></div>
+        <div class="overflow-x-auto border border-gray-200 dark:border-dark-700"><table class="w-full min-w-[1080px] text-sm"><thead class="bg-gray-50 text-gray-500 dark:bg-dark-800"><tr><th class="px-4 py-3 text-left">{{ t('finance.admin.user') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.teamVolume') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.autoTier') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.manualTier') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.threshold') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.effectiveTier') }}</th><th class="px-4 py-3 text-left">{{ t('common.actions') }}</th></tr></thead><tbody><tr v-for="item in tierMembers" :key="item.user_id" class="border-t border-gray-100 dark:border-dark-700"><td class="px-4 py-3"><span class="block font-medium text-gray-900 dark:text-white">{{ item.email }}</span><span v-if="item.username" class="text-xs text-gray-500">{{ item.username }} · #{{ item.user_id }}</span></td><td class="px-4 py-3 text-right font-mono tabular-nums">{{ cny(item.team_volume_cny_minor) }}</td><td class="px-4 py-3 text-right">{{ tierDisplay(item.auto_tier, tierThreshold(item.auto_tier)) }}</td><td class="px-4 py-3 text-right"><select v-model="tierDrafts[item.user_id]" class="input min-w-28" :aria-label="`${item.email} tier`"><option :value="null">{{ t('finance.admin.automatic') }}</option><option v-for="tier in policy.tiers" :key="tier.tier" :value="tier.tier">{{ tierDisplay(tier.tier, tier.threshold_cny_minor) }}</option></select></td><td class="px-4 py-3 text-right font-mono tabular-nums">{{ compactAmount(tierThreshold(tierDrafts[item.user_id] ?? item.effective_tier)) }}</td><td class="px-4 py-3 text-right">{{ tierDisplay(item.effective_tier, tierThreshold(item.effective_tier)) }}<span v-if="item.tier_override !== undefined" class="ml-1 text-xs text-amber-600">{{ t('finance.distribution.manual') }}</span></td><td class="px-4 py-3"><button class="btn btn-primary btn-sm" :disabled="tierSaving === item.user_id" @click="saveTier(item.user_id)">{{ t('common.save') }}</button></td></tr><tr v-if="tierMembers.length === 0"><td colspan="7" class="px-4 py-10 text-center text-gray-500">{{ t('common.noData') }}</td></tr></tbody></table></div>
       </section>
 
       <section v-else-if="active === 'withdrawals'" class="overflow-x-auto border border-gray-200 dark:border-dark-700">
@@ -77,10 +77,14 @@
         </tbody></table>
       </section>
 
-      <section v-else class="overflow-x-auto border border-gray-200 dark:border-dark-700">
+      <section v-else-if="active === 'relations'" class="overflow-x-auto border border-gray-200 dark:border-dark-700">
         <table class="w-full min-w-[680px] text-sm"><thead class="bg-gray-50 text-gray-500 dark:bg-dark-800"><tr><th class="px-4 py-3 text-left">Ancestor</th><th class="px-4 py-3 text-left">Descendant</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.companyUnit') }}</th><th class="px-4 py-3 text-left">Created</th></tr></thead><tbody>
           <tr v-for="(item, index) in relations" :key="`${item.ancestor_user_id}-${item.descendant_user_id}-${index}`" class="border-t border-gray-100 dark:border-dark-700"><td class="px-4 py-3">#{{ item.ancestor_user_id }}</td><td class="px-4 py-3">#{{ item.descendant_user_id }}</td><td class="px-4 py-3 text-right">{{ companyUnitName(item.depth) }}</td><td class="px-4 py-3">{{ date(item.created_at) }}</td></tr>
         </tbody></table>
+      </section>
+
+      <section v-else-if="active === 'conversions'" class="overflow-x-auto border border-gray-200 dark:border-dark-700">
+        <table class="w-full min-w-[1040px] text-sm"><thead class="bg-gray-50 text-gray-500 dark:bg-dark-800"><tr><th class="px-4 py-3 text-left">ID</th><th class="px-4 py-3 text-right">{{ t('finance.admin.user') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.cnyAmount') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.usdAmount') }}</th><th class="px-4 py-3 text-right">{{ t('finance.distribution.exchangeRate') }}</th><th class="px-4 py-3 text-left">{{ t('finance.admin.rateSource') }}</th><th class="px-4 py-3 text-right">{{ t('finance.admin.version') }}</th><th class="px-4 py-3 text-left">{{ t('finance.distribution.createdAt') }}</th></tr></thead><tbody><tr v-for="item in conversions" :key="item.id" class="border-t border-gray-100 dark:border-dark-700"><td class="px-4 py-3">#{{ item.id }}</td><td class="px-4 py-3 text-right">#{{ item.user_id }}</td><td class="px-4 py-3 text-right font-mono tabular-nums">{{ cny(item.amount_cny_minor) }}</td><td class="px-4 py-3 text-right font-mono tabular-nums">${{ item.usd_amount }}</td><td class="px-4 py-3 text-right font-mono tabular-nums">{{ item.cny_to_usd_rate ? `1 CNY = ${item.cny_to_usd_rate} USD` : `1 USD = ¥${item.usd_to_cny_rate}` }}</td><td class="px-4 py-3 text-left text-xs text-gray-500">{{ item.rate_source || 'legacy' }}</td><td class="px-4 py-3 text-right">v{{ item.config_version }}</td><td class="px-4 py-3">{{ date(item.created_at) }}</td></tr><tr v-if="conversions.length === 0"><td colspan="8" class="px-4 py-10 text-center text-gray-500">{{ t('common.noData') }}</td></tr></tbody></table>
       </section>
     </div>
   </AppLayout>
@@ -90,7 +94,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import { createDistributionPolicyVersion, getDistributionConfig, getFinancialRuntimeConfig, getVoucherConfig, getWithdrawalPayoutDetails, listAdminCommissions, listAdminVouchers, listAdminWithdrawals, listDistributionRelations, listDistributionTierMembers, listRechargeEvents, reverseRechargeEvent, setDistributionTierOverride, setVoucherRiskLock, transitionWithdrawal, updateDistributionConfig, updateFinancialRuntimeConfig, updateVoucherConfig, type AdminCommission, type DistributionPolicyInput, type DistributionRelation, type DistributionTierMember, type PayoutDetails, type RechargeEvent } from '@/api/admin/finance'
+import { createDistributionPolicyVersion, getDistributionConfig, getFinancialRuntimeConfig, getVoucherConfig, getWithdrawalPayoutDetails, listAdminCommissions, listAdminVouchers, listAdminWithdrawals, listDistributionConversions, listDistributionRelations, listDistributionTierMembers, listRechargeEvents, reverseRechargeEvent, setDistributionTierOverride, setVoucherRiskLock, transitionWithdrawal, updateDistributionConfig, updateFinancialRuntimeConfig, updateVoucherConfig, type AdminCommission, type DistributionConversionAudit, type DistributionPolicyInput, type DistributionRelation, type DistributionTierMember, type PayoutDetails, type RechargeEvent } from '@/api/admin/finance'
 import type { Voucher, Withdrawal } from '@/api/financial'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
@@ -98,13 +102,14 @@ import { COMPUTE_COMPANY_UNIT_KEYS } from '@/constants/distribution'
 
 const { t } = useI18n()
 const app = useAppStore()
-const tabs = ['tierAssignments', 'withdrawals', 'vouchers', 'commissions', 'recharges', 'relations'] as const
+const tabs = ['tierAssignments', 'withdrawals', 'vouchers', 'commissions', 'recharges', 'relations', 'conversions'] as const
 const active = ref<(typeof tabs)[number]>('withdrawals')
 const withdrawals = ref<Withdrawal[]>([])
 const vouchers = ref<Voucher[]>([])
 const commissions = ref<AdminCommission[]>([])
 const recharges = ref<RechargeEvent[]>([])
 const relations = ref<DistributionRelation[]>([])
+const conversions = ref<DistributionConversionAudit[]>([])
 const tierMembers = ref<DistributionTierMember[]>([])
 const tierSearch = ref('')
 const tierLoading = ref(false)
@@ -113,12 +118,12 @@ const tierDrafts = reactive<Record<number, number | null>>({})
 const security = reactive({ totp: '', reference: '', reason: '' })
 const payoutDetails = ref<PayoutDetails>()
 const distributionEnabled = ref(false)
-const stackLegacy = ref(false)
 const vouchersEnabled = ref(false)
 const bucketEnforced = ref(false)
 const policyVersion = ref(1)
 const publishingPolicy = ref(false)
-const policy = reactive<Omit<DistributionPolicyInput, 'totp_code'>>({ commission_freeze_hours: 168, withdrawal_min_cny_minor: 10000, withdrawal_daily_limit: 1, withdrawal_fee_bps: 0, first_recharge_bonus_bps: 1000, first_recharge_bonus_cap_usd: '10000', tiers: [] })
+const policy = reactive<Omit<DistributionPolicyInput, 'totp_code'>>({ commission_freeze_hours: 168, withdrawal_min_cny_minor: 2000, withdrawal_daily_limit: 1, withdrawal_fee_bps: 0, first_recharge_bonus_bps: 1000, first_recharge_bonus_cap_usd: '10000', tiers: [] })
+const purchaseMultiplier = ref('1')
 const companyUnitKeys = COMPUTE_COMPANY_UNIT_KEYS
 const companyUnits = computed(() => companyUnitKeys.map(key => t(`finance.distribution.companyUnits.${key}`)))
 const cny = (minor: number) => new Intl.NumberFormat(undefined, { style: 'currency', currency: 'CNY' }).format(minor / 100)
@@ -141,20 +146,20 @@ async function load() {
     commissions.value = commissionPage.items
     recharges.value = rechargePage.items
     relations.value = relationPage.items
+    try { conversions.value = (await listDistributionConversions()).items } catch { conversions.value = [] }
     tierMembers.value = tierPage.items
     tierPage.items.forEach(item => { tierDrafts[item.user_id] = item.tier_override ?? null })
     distributionEnabled.value = distributionConfig.enabled
-    stackLegacy.value = distributionConfig.stack_with_legacy
     vouchersEnabled.value = voucherConfig.enabled
     bucketEnforced.value = runtimeConfig.credit_bucket_enforce_enabled
     policyVersion.value = distributionConfig.current_config_version
+    purchaseMultiplier.value = distributionConfig.balance_recharge_multiplier || '1'
     Object.assign(policy, { commission_freeze_hours: distributionConfig.commission_freeze_hours, withdrawal_min_cny_minor: distributionConfig.withdrawal_min_cny_minor, withdrawal_daily_limit: distributionConfig.withdrawal_daily_limit, withdrawal_fee_bps: distributionConfig.withdrawal_fee_bps, first_recharge_bonus_bps: distributionConfig.first_recharge_bonus_bps, first_recharge_bonus_cap_usd: distributionConfig.first_recharge_bonus_cap_usd, tiers: distributionConfig.tiers.map(tier => ({ ...tier, rates_bps: [...tier.rates_bps] as [number, number, number, number, number] })) })
   } catch (error) { app.showError(extractApiErrorMessage(error)) }
 }
 async function loadTierMembers() { tierLoading.value = true; try { const result = await listDistributionTierMembers(tierSearch.value); tierMembers.value = result.items; result.items.forEach(item => { tierDrafts[item.user_id] = item.tier_override ?? null }) } catch (error) { app.showError(extractApiErrorMessage(error)) } finally { tierLoading.value = false } }
 async function saveTier(userId: number) { if (!security.totp) return app.showError('TOTP required'); tierSaving.value = userId; try { const item = await setDistributionTierOverride(userId, tierDrafts[userId] ?? null, security.reason, security.totp); const index = tierMembers.value.findIndex(candidate => candidate.user_id === userId); if (index >= 0) tierMembers.value[index] = item; tierDrafts[userId] = item.tier_override ?? null; app.showSuccess(t('common.saved')) } catch (error) { app.showError(extractApiErrorMessage(error)) } finally { tierSaving.value = undefined } }
-async function toggleDistribution() { if (!security.totp) return app.showError('TOTP required'); try { await updateDistributionConfig(!distributionEnabled.value, stackLegacy.value, security.totp); distributionEnabled.value = !distributionEnabled.value } catch (error) { app.showError(extractApiErrorMessage(error)) } }
-async function toggleLegacyStack() { if (!security.totp) return app.showError('TOTP required'); try { await updateDistributionConfig(distributionEnabled.value, !stackLegacy.value, security.totp); stackLegacy.value = !stackLegacy.value } catch (error) { app.showError(extractApiErrorMessage(error)) } }
+async function toggleDistribution() { if (!security.totp) return app.showError('TOTP required'); try { await updateDistributionConfig(!distributionEnabled.value, security.totp); distributionEnabled.value = !distributionEnabled.value } catch (error) { app.showError(extractApiErrorMessage(error)) } }
 async function toggleVouchers() { if (!security.totp) return app.showError('TOTP required'); try { await updateVoucherConfig(!vouchersEnabled.value, security.totp); vouchersEnabled.value = !vouchersEnabled.value } catch (error) { app.showError(extractApiErrorMessage(error)) } }
 async function toggleBucketEnforcement() { if (!security.totp) return app.showError('TOTP required'); try { await updateFinancialRuntimeConfig(!bucketEnforced.value, security.totp); bucketEnforced.value = !bucketEnforced.value } catch (error) { app.showError(extractApiErrorMessage(error)) } }
 async function publishPolicy() { if (!security.totp) return app.showError('TOTP required'); publishingPolicy.value = true; try { const result = await createDistributionPolicyVersion({ ...policy, tiers: policy.tiers.map(tier => ({ ...tier, rates_bps: [...tier.rates_bps] as [number, number, number, number, number] })), totp_code: security.totp }); policyVersion.value = result.config_version; app.showSuccess(t('common.saved')); await load() } catch (error) { app.showError(extractApiErrorMessage(error)) } finally { publishingPolicy.value = false } }

@@ -8,7 +8,7 @@
 
     <!-- Main Content Area -->
     <div
-      class="app-main-redesign relative min-h-screen transition-all duration-300"
+      class="app-main-redesign relative min-h-screen min-w-0 transition-all duration-300"
       :class="[sidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-64']"
     >
       <!-- Header -->

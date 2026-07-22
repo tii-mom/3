@@ -24,11 +24,82 @@ func TestFinancialOutboxRetryDelayIsBounded(t *testing.T) {
 }
 
 func TestTierForVolumeUsesCurrentOrderBoundary(t *testing.T) {
-	tiers := []DistributionTier{{Tier: 1, Threshold: 100000}, {Tier: 2, Threshold: 1000000}, {Tier: 3, Threshold: 10000000}}
+	tiers := []DistributionTier{{Tier: 0, Threshold: 0}, {Tier: 1, Threshold: 100000}, {Tier: 2, Threshold: 1000000}, {Tier: 3, Threshold: 10000000}}
+	require.Equal(t, 0, tierForVolume(tiers, 0))
 	require.Equal(t, 0, tierForVolume(tiers, 99999))
 	require.Equal(t, 1, tierForVolume(tiers, 100000))
+	require.Equal(t, 1, tierForVolume(tiers, 999999))
 	require.Equal(t, 2, tierForVolume(tiers, 1000000))
+	require.Equal(t, 2, tierForVolume(tiers, 9999999))
 	require.Equal(t, 3, tierForVolume(tiers, 10000000))
+}
+
+func TestCommissionTierUsesPreRechargeVolumeAtPromotionBoundary(t *testing.T) {
+	tiers := []DistributionTier{
+		{Tier: 0, Threshold: 0},
+		{Tier: 1, Threshold: 100000},
+		{Tier: 2, Threshold: 1000000},
+		{Tier: 3, Threshold: 10000000},
+	}
+	// A recharge that moves a member from T1 to T2 must still use T1 for
+	// that order; T2 applies to subsequent orders.
+	require.Equal(t, 1, commissionTierForRecharge(tiers, 999999, nil))
+	require.Equal(t, 2, tierForVolume(tiers, 1000000))
+	override := 3
+	require.Equal(t, 3, commissionTierForRecharge(tiers, 0, &override))
+}
+
+func TestComputeCompanyTierRatesCoverAllFiveDepartments(t *testing.T) {
+	tiers := []DistributionTier{
+		{Tier: 0, Threshold: 0, RatesBPS: [5]int64{1000, 0, 0, 0, 0}},
+		{Tier: 1, Threshold: 100000, RatesBPS: [5]int64{1000, 400, 300, 200, 100}},
+		{Tier: 2, Threshold: 1000000, RatesBPS: [5]int64{1500, 600, 400, 300, 200}},
+		{Tier: 3, Threshold: 10000000, RatesBPS: [5]int64{2000, 800, 600, 400, 200}},
+	}
+	require.Equal(t, [5]int64{1000, 0, 0, 0, 0}, tiers[0].RatesBPS)
+	require.Equal(t, [5]int64{1000, 400, 300, 200, 100}, tiers[1].RatesBPS)
+	require.Equal(t, [5]int64{1500, 600, 400, 300, 200}, tiers[2].RatesBPS)
+	require.Equal(t, [5]int64{2000, 800, 600, 400, 200}, tiers[3].RatesBPS)
+	base := int64(100000)
+	require.Equal(t, []int64{10000, 4000, 3000, 2000, 1000}, commissionVector(base, tiers[1].RatesBPS))
+	require.Equal(t, []int64{15000, 6000, 4000, 3000, 2000}, commissionVector(base, tiers[2].RatesBPS))
+	require.Equal(t, []int64{20000, 8000, 6000, 4000, 2000}, commissionVector(base, tiers[3].RatesBPS))
+	require.Equal(t, []int64{10000, 0, 0, 0, 0}, commissionVector(base, tiers[0].RatesBPS))
+}
+
+func TestDistributionForecastRequiresRecentActivity(t *testing.T) {
+	series := make([]DistributionAnalyticsPoint, 30)
+	for index := range series {
+		series[index].Date = time.Now().UTC().AddDate(0, 0, index-29).Format("2006-01-02")
+	}
+	forecast := forecastHorizon(series, 30, 14)
+	require.False(t, forecast.Eligible)
+	require.Equal(t, "insufficient_activity", forecast.Reason)
+}
+
+func TestDistributionForecastProjectsPositiveTrend(t *testing.T) {
+	series := make([]DistributionAnalyticsPoint, 30)
+	for index := range series {
+		series[index] = DistributionAnalyticsPoint{
+			Date:            time.Now().UTC().AddDate(0, 0, index-29).Format("2006-01-02"),
+			RechargeMinor:   int64(1000 + index*100),
+			CommissionMinor: int64(100 + index*10),
+		}
+	}
+	forecast := forecastHorizon(series, 7, 7)
+	require.True(t, forecast.Eligible)
+	require.Greater(t, forecast.EstimatedRechargeMinor, int64(0))
+	require.Greater(t, forecast.EstimatedCommissionMinor, int64(0))
+	require.Greater(t, forecast.RechargeGrowthPercent, float64(0))
+	require.Greater(t, forecast.CommissionGrowthPercent, float64(0))
+}
+
+func commissionVector(base int64, rates [5]int64) []int64 {
+	result := make([]int64, len(rates))
+	for index, rate := range rates {
+		result[index] = calculateCommissionMinor(base, rate)
+	}
+	return result
 }
 
 func TestFirstRechargeBonusCapsRewardNotRecharge(t *testing.T) {
@@ -44,9 +115,10 @@ func TestWithdrawalFeeUsesMinorUnitsAndRoundsOnce(t *testing.T) {
 
 func TestDistributionPolicyValidation(t *testing.T) {
 	input := DistributionPolicyInput{
-		CommissionFreezeHours: 168, WithdrawalMinMinor: 10000, WithdrawalDailyLimit: 1,
+		CommissionFreezeHours: 168, WithdrawalMinMinor: 2000, WithdrawalDailyLimit: 1,
 		WithdrawalFeeBPS: 0, FirstRechargeBonusBPS: 1000, FirstRechargeBonusCap: "10000",
 		Tiers: []DistributionTier{
+			{Tier: 0, Threshold: 0, RatesBPS: [5]int64{1000, 0, 0, 0, 0}},
 			{Tier: 1, Threshold: 100000, RatesBPS: [5]int64{1000, 400, 300, 200, 100}},
 			{Tier: 2, Threshold: 1000000, RatesBPS: [5]int64{1500, 600, 400, 300, 200}},
 			{Tier: 3, Threshold: 10000000, RatesBPS: [5]int64{2000, 800, 600, 400, 200}},
@@ -56,7 +128,12 @@ func TestDistributionPolicyValidation(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, capAmount.Equal(decimal.NewFromInt(10000)))
 
-	input.Tiers[1].Threshold = input.Tiers[0].Threshold
+	input.Tiers[2].Threshold = input.Tiers[1].Threshold
+	_, err = validateDistributionPolicy(input)
+	require.Error(t, err)
+
+	input.Tiers[2].Threshold = 1000000
+	input.Tiers[0].RatesBPS[1] = 1
 	_, err = validateDistributionPolicy(input)
 	require.Error(t, err)
 }

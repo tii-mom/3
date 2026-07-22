@@ -7,6 +7,8 @@
           @click="toggleMobileSidebar"
           class="btn-ghost btn-icon lg:hidden"
           aria-label="Toggle Menu"
+          aria-controls="app-sidebar"
+          :aria-expanded="mobileOpen"
         >
           <Icon name="menu" size="md" />
         </button>
@@ -260,6 +262,7 @@ const adminSettingsStore = useAdminSettingsStore()
 const onboardingStore = useOnboardingStore()
 
 const user = computed(() => authStore.user)
+const mobileOpen = computed(() => appStore.mobileOpen)
 const dropdownOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
 const contactInfo = computed(() => appStore.contactInfo)
