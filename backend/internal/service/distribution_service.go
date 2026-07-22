@@ -321,22 +321,6 @@ func (s *DistributionService) balanceRechargeMultiplier(ctx context.Context) (de
 	return multiplier, nil
 }
 
-func (s *DistributionService) usdToCNYRate(ctx context.Context) (decimal.Decimal, error) {
-	var raw string
-	err := s.db.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = 'distribution_usd_to_cny_rate'`).Scan(&raw)
-	if errors.Is(err, sql.ErrNoRows) {
-		return decimal.RequireFromString("7.15"), nil
-	}
-	if err != nil {
-		return decimal.Zero, err
-	}
-	rate, err := decimal.NewFromString(strings.TrimSpace(raw))
-	if err != nil || !rate.IsPositive() || rate.GreaterThan(decimal.NewFromInt(1000)) {
-		return decimal.Zero, infraerrors.BadRequest("DISTRIBUTION_EXCHANGE_RATE_INVALID", "distribution USD to CNY rate is invalid")
-	}
-	return rate, nil
-}
-
 func (s *DistributionService) UpdateUSDToCNYRate(ctx context.Context, rate decimal.Decimal) error {
 	if !rate.IsPositive() || rate.GreaterThan(decimal.NewFromInt(1000)) || rate.Exponent() < -10 {
 		return infraerrors.BadRequest("DISTRIBUTION_EXCHANGE_RATE_INVALID", "distribution USD to CNY rate is invalid")
