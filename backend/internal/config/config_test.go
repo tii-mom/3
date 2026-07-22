@@ -45,6 +45,7 @@ func TestLoadHTTPIngressSafetyDefaults(t *testing.T) {
 	require.True(t, cfg.APIKeyAuth.InvalidAbuse.Enabled)
 	require.Equal(t, 120, cfg.APIKeyAuth.InvalidAbuse.Threshold)
 	require.Equal(t, 16384, cfg.APIKeyAuth.InvalidAbuse.Capacity)
+	require.Equal(t, 20, cfg.Default.UserConcurrency)
 }
 
 func TestLoadForBootstrapAllowsMissingJWTSecret(t *testing.T) {
@@ -2209,17 +2210,20 @@ func TestLoad_DefaultGatewayImageStreamConfig(t *testing.T) {
 	if cfg.Gateway.ImageNonstreamKeepaliveInterval != 0 {
 		t.Fatalf("image_nonstream_keepalive_interval = %d, want 0", cfg.Gateway.ImageNonstreamKeepaliveInterval)
 	}
-	if cfg.Gateway.ImageConcurrency.Enabled {
-		t.Fatalf("image_concurrency.enabled = true, want false")
+	if !cfg.Gateway.CodexImageGenerationBridgeEnabled {
+		t.Fatal("codex_image_generation_bridge_enabled = false, want true")
 	}
-	if cfg.Gateway.ImageConcurrency.MaxConcurrentRequests != 0 {
-		t.Fatalf("image_concurrency.max_concurrent_requests = %d, want 0", cfg.Gateway.ImageConcurrency.MaxConcurrentRequests)
+	if !cfg.Gateway.ImageConcurrency.Enabled {
+		t.Fatal("image_concurrency.enabled = false, want true")
 	}
-	if cfg.Gateway.ImageConcurrency.OverflowMode != ImageConcurrencyOverflowModeReject {
-		t.Fatalf("image_concurrency.overflow_mode = %q, want %q", cfg.Gateway.ImageConcurrency.OverflowMode, ImageConcurrencyOverflowModeReject)
+	if cfg.Gateway.ImageConcurrency.MaxConcurrentRequests != 10 {
+		t.Fatalf("image_concurrency.max_concurrent_requests = %d, want 10", cfg.Gateway.ImageConcurrency.MaxConcurrentRequests)
 	}
-	if cfg.Gateway.ImageConcurrency.WaitTimeoutSeconds != 30 {
-		t.Fatalf("image_concurrency.wait_timeout_seconds = %d, want 30", cfg.Gateway.ImageConcurrency.WaitTimeoutSeconds)
+	if cfg.Gateway.ImageConcurrency.OverflowMode != ImageConcurrencyOverflowModeWait {
+		t.Fatalf("image_concurrency.overflow_mode = %q, want %q", cfg.Gateway.ImageConcurrency.OverflowMode, ImageConcurrencyOverflowModeWait)
+	}
+	if cfg.Gateway.ImageConcurrency.WaitTimeoutSeconds != 60 {
+		t.Fatalf("image_concurrency.wait_timeout_seconds = %d, want 60", cfg.Gateway.ImageConcurrency.WaitTimeoutSeconds)
 	}
 	if cfg.Gateway.ImageConcurrency.MaxWaitingRequests != 100 {
 		t.Fatalf("image_concurrency.max_waiting_requests = %d, want 100", cfg.Gateway.ImageConcurrency.MaxWaitingRequests)
