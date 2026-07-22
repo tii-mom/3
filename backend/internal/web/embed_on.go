@@ -7,6 +7,7 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	htmlpkg "html"
 	"io"
 	"io/fs"
@@ -46,6 +47,9 @@ type FrontendServer struct {
 
 // NewFrontendServer creates a new frontend server with settings injection
 func NewFrontendServer(settingsProvider PublicSettingsProvider) (*FrontendServer, error) {
+	if settingsProvider == nil {
+		return nil, errors.New("public settings provider is required")
+	}
 	distFS, err := fs.Sub(frontendFS, "dist")
 	if err != nil {
 		return nil, err
