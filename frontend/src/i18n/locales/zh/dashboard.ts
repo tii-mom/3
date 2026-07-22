@@ -552,7 +552,7 @@ export default {
 
   // Redeem
   redeem: {
-    title: '兑换码',
+    title: '兑换额度',
     description: '输入兑换码以充值余额或增加并发数',
     modeSwitcherLabel: '额度操作模式',
     redeemMode: '兑换额度',

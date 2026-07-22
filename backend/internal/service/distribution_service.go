@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -37,25 +38,63 @@ type DistributionProcessResult struct {
 }
 
 type DistributionDashboard struct {
-	Enabled               bool                       `json:"enabled"`
-	BalanceRechargeMultiplier string                  `json:"balance_recharge_multiplier"`
-	USDToCNYRate          string                     `json:"usd_to_cny_rate"`
-	CommissionFreezeHours int                        `json:"commission_freeze_hours"`
-	WithdrawalMinMinor    int64                      `json:"withdrawal_min_cny_minor"`
-	WithdrawalDailyLimit  int                        `json:"withdrawal_daily_limit"`
-	TeamVolumeMinor       int64                      `json:"team_volume_cny_minor"`
-	CurrentTier           int                        `json:"current_tier"`
-	AutoTier              int                        `json:"auto_tier"`
-	TierOverride          *int                       `json:"tier_override,omitempty"`
-	NextThreshold         int64                      `json:"next_threshold_cny_minor"`
-	LevelCounts           map[int]int64              `json:"level_counts"`
-	Levels                []DistributionLevelSummary `json:"levels"`
-	AvailableMinor        int64                      `json:"available_cny_minor"`
-	FrozenMinor           int64                      `json:"frozen_cny_minor"`
-	WithdrawingMinor      int64                      `json:"withdrawing_cny_minor"`
-	DebtMinor             int64                      `json:"debt_cny_minor"`
-	LifetimeMinor         int64                      `json:"lifetime_earned_cny_minor"`
-	Tiers                 []DistributionTier         `json:"tiers"`
+	Enabled                   bool                       `json:"enabled"`
+	BalanceRechargeMultiplier string                     `json:"balance_recharge_multiplier"`
+	USDToCNYRate              string                     `json:"usd_to_cny_rate"`
+	CommissionFreezeHours     int                        `json:"commission_freeze_hours"`
+	WithdrawalMinMinor        int64                      `json:"withdrawal_min_cny_minor"`
+	WithdrawalDailyLimit      int                        `json:"withdrawal_daily_limit"`
+	TeamVolumeMinor           int64                      `json:"team_volume_cny_minor"`
+	CurrentTier               int                        `json:"current_tier"`
+	AutoTier                  int                        `json:"auto_tier"`
+	TierOverride              *int                       `json:"tier_override,omitempty"`
+	NextThreshold             int64                      `json:"next_threshold_cny_minor"`
+	LevelCounts               map[int]int64              `json:"level_counts"`
+	Levels                    []DistributionLevelSummary `json:"levels"`
+	AvailableMinor            int64                      `json:"available_cny_minor"`
+	FrozenMinor               int64                      `json:"frozen_cny_minor"`
+	WithdrawingMinor          int64                      `json:"withdrawing_cny_minor"`
+	DebtMinor                 int64                      `json:"debt_cny_minor"`
+	LifetimeMinor             int64                      `json:"lifetime_earned_cny_minor"`
+	Tiers                     []DistributionTier         `json:"tiers"`
+}
+
+type DistributionAnalyticsPoint struct {
+	Date            string `json:"date"`
+	RechargeMinor   int64  `json:"recharge_cny_minor"`
+	CommissionMinor int64  `json:"commission_cny_minor"`
+}
+
+type DistributionAnalyticsSummary struct {
+	RechargeMinor           int64   `json:"recharge_cny_minor"`
+	CommissionMinor         int64   `json:"commission_cny_minor"`
+	PreviousRechargeMinor   int64   `json:"previous_recharge_cny_minor"`
+	PreviousCommissionMinor int64   `json:"previous_commission_cny_minor"`
+	RechargeGrowthPercent   float64 `json:"recharge_growth_percent"`
+	CommissionGrowthPercent float64 `json:"commission_growth_percent"`
+}
+
+type DistributionForecastHorizon struct {
+	Eligible                 bool    `json:"eligible"`
+	Reason                   string  `json:"reason,omitempty"`
+	EstimatedRechargeMinor   int64   `json:"estimated_recharge_cny_minor"`
+	EstimatedCommissionMinor int64   `json:"estimated_commission_cny_minor"`
+	RechargeGrowthPercent    float64 `json:"recharge_growth_percent"`
+	CommissionGrowthPercent  float64 `json:"commission_growth_percent"`
+}
+
+type DistributionForecast struct {
+	Method     string                      `json:"method"`
+	SevenDays  DistributionForecastHorizon `json:"seven_days"`
+	ThirtyDays DistributionForecastHorizon `json:"thirty_days"`
+}
+
+type DistributionAnalytics struct {
+	AsOf      time.Time                    `json:"as_of"`
+	RangeDays int                          `json:"range_days"`
+	Series    []DistributionAnalyticsPoint `json:"series"`
+	Summary   DistributionAnalyticsSummary `json:"summary"`
+	Forecast  DistributionForecast         `json:"forecast"`
 }
 
 type DistributionLevelSummary struct {
@@ -871,6 +910,168 @@ GROUP BY depth`, programID, userID)
 		}
 	}
 	return dashboard, tierRows.Close()
+}
+
+func (s *DistributionService) Analytics(ctx context.Context, userID int64, days int) (*DistributionAnalytics, error) {
+	if days != 7 && days != 30 && days != 90 {
+		days = 30
+	}
+	var programID int64
+	if err := s.db.QueryRowContext(ctx, `SELECT id FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company'`).Scan(&programID); err != nil {
+		return nil, err
+	}
+
+	end := time.Now().UTC().Truncate(24 * time.Hour).Add(24 * time.Hour)
+	start := end.Add(-time.Duration(days*2) * 24 * time.Hour)
+	rows, err := s.db.QueryContext(ctx, `
+WITH day_grid AS (
+    SELECT generate_series($2::timestamptz, $3::timestamptz - INTERVAL '1 day', INTERVAL '1 day')::date AS day
+), recharge_totals AS (
+    SELECT (e.created_at AT TIME ZONE 'UTC')::date AS day,
+           COALESCE(SUM(e.base_cny_minor), 0)::bigint AS recharge_cny_minor
+    FROM distribution_recharge_events e
+    JOIN distribution_relations r
+      ON r.program_id = e.program_id
+     AND r.descendant_user_id = e.user_id
+     AND r.ancestor_user_id = $4
+     AND r.depth BETWEEN 1 AND 5
+    WHERE e.program_id = $1
+      AND e.status = 'APPLIED'
+      AND e.created_at >= $2
+      AND e.created_at < $3
+    GROUP BY 1
+), commission_totals AS (
+    SELECT (c.created_at AT TIME ZONE 'UTC')::date AS day,
+           COALESCE(SUM(CASE WHEN c.status <> 'REVERSED' THEN c.amount_cny_minor ELSE 0 END), 0)::bigint AS commission_cny_minor
+    FROM distribution_commissions c
+    WHERE c.program_id = $1
+      AND c.beneficiary_user_id = $4
+      AND c.created_at >= $2
+      AND c.created_at < $3
+    GROUP BY 1
+)
+SELECT TO_CHAR(g.day, 'YYYY-MM-DD'),
+       COALESCE(r.recharge_cny_minor, 0),
+       COALESCE(c.commission_cny_minor, 0)
+FROM day_grid g
+LEFT JOIN recharge_totals r ON r.day = g.day
+LEFT JOIN commission_totals c ON c.day = g.day
+ORDER BY g.day`, programID, start, end, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	allSeries := make([]DistributionAnalyticsPoint, 0, days*2)
+	for rows.Next() {
+		var point DistributionAnalyticsPoint
+		if err := rows.Scan(&point.Date, &point.RechargeMinor, &point.CommissionMinor); err != nil {
+			return nil, err
+		}
+		allSeries = append(allSeries, point)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(allSeries) < days {
+		return nil, fmt.Errorf("distribution analytics returned incomplete date series")
+	}
+	current := allSeries[len(allSeries)-days:]
+	previous := allSeries[:len(allSeries)-days]
+	summary := DistributionAnalyticsSummary{}
+	for _, point := range current {
+		summary.RechargeMinor += point.RechargeMinor
+		summary.CommissionMinor += point.CommissionMinor
+	}
+	for _, point := range previous {
+		summary.PreviousRechargeMinor += point.RechargeMinor
+		summary.PreviousCommissionMinor += point.CommissionMinor
+	}
+	summary.RechargeGrowthPercent = growthPercent(summary.RechargeMinor, summary.PreviousRechargeMinor)
+	summary.CommissionGrowthPercent = growthPercent(summary.CommissionMinor, summary.PreviousCommissionMinor)
+	return &DistributionAnalytics{
+		AsOf:      time.Now().UTC(),
+		RangeDays: days,
+		Series:    append([]DistributionAnalyticsPoint(nil), current...),
+		Summary:   summary,
+		Forecast: DistributionForecast{
+			Method:     "weighted_recent_trend_v1",
+			SevenDays:  forecastHorizon(current, 7, 7),
+			ThirtyDays: forecastHorizon(current, 30, 14),
+		},
+	}, nil
+}
+
+func growthPercent(current, previous int64) float64 {
+	if previous == 0 {
+		if current == 0 {
+			return 0
+		}
+		return 100
+	}
+	return (float64(current-previous) / float64(previous)) * 100
+}
+
+func forecastHorizon(series []DistributionAnalyticsPoint, horizon, minimumActiveDays int) DistributionForecastHorizon {
+	activeDays := 0
+	for _, point := range series {
+		if point.RechargeMinor > 0 || point.CommissionMinor > 0 {
+			activeDays++
+		}
+	}
+	if len(series) < horizon {
+		return DistributionForecastHorizon{Reason: "insufficient_history"}
+	}
+	if activeDays < minimumActiveDays {
+		return DistributionForecastHorizon{Reason: "insufficient_activity"}
+	}
+	recentWindow := 7
+	if horizon > 7 {
+		recentWindow = 14
+	}
+	if recentWindow > len(series) {
+		recentWindow = len(series)
+	}
+	recharge, rechargeGrowth := projectMetric(series, recentWindow, horizon, func(point DistributionAnalyticsPoint) int64 { return point.RechargeMinor })
+	commission, commissionGrowth := projectMetric(series, recentWindow, horizon, func(point DistributionAnalyticsPoint) int64 { return point.CommissionMinor })
+	return DistributionForecastHorizon{
+		Eligible:                 true,
+		EstimatedRechargeMinor:   recharge,
+		EstimatedCommissionMinor: commission,
+		RechargeGrowthPercent:    rechargeGrowth,
+		CommissionGrowthPercent:  commissionGrowth,
+	}
+}
+
+func projectMetric(series []DistributionAnalyticsPoint, recentWindow, horizon int, value func(DistributionAnalyticsPoint) int64) (int64, float64) {
+	start := len(series) - recentWindow
+	var recentTotal, previousTotal int64
+	for index := start; index < len(series); index++ {
+		recentTotal += value(series[index])
+	}
+	previousStart := start - recentWindow
+	if previousStart < 0 {
+		previousStart = 0
+	}
+	for index := previousStart; index < start; index++ {
+		previousTotal += value(series[index])
+	}
+	recentAverage := float64(recentTotal) / float64(recentWindow)
+	previousCount := start - previousStart
+	previousAverage := recentAverage
+	if previousCount > 0 {
+		previousAverage = float64(previousTotal) / float64(previousCount)
+	}
+	slope := (recentAverage - previousAverage) / float64(recentWindow)
+	var projected float64
+	for step := 1; step <= horizon; step++ {
+		projected += math.Max(0, recentAverage+slope*float64(step))
+	}
+	baseline := recentAverage * float64(horizon)
+	growth := 0.0
+	if baseline > 0 {
+		growth = ((projected / baseline) - 1) * 100
+	}
+	return int64(math.Round(projected)), growth
 }
 
 func (s *DistributionService) Tree(ctx context.Context, ownerUserID, parentUserID int64, search string, page, pageSize int) ([]DistributionTreeNode, int64, error) {

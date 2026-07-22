@@ -124,6 +124,7 @@ func RegisterUserRoutes(
 		distribution := authenticated.Group("/distribution")
 		{
 			distribution.GET("/dashboard", h.Distribution.Dashboard)
+			distribution.GET("/analytics", h.Distribution.Analytics)
 			distribution.GET("/tree", h.Distribution.Tree)
 			distribution.GET("/ledger", h.Distribution.Ledger)
 			distribution.GET("/payout-account", h.Distribution.GetPayoutAccount)

@@ -29,12 +29,17 @@ export interface Commission { id: number; source_order_id: number; source_user_i
 export interface PayoutAccount { account_type: string; account_mask: string; real_name_mask: string }
 export interface Withdrawal { id: number; amount_cny_minor: number; fee_cny_minor: number; fee_rate_bps: number; config_version: number; status: string; reject_reason?: string; payment_reference?: string; submitted_at: string }
 export interface DistributionConversion { id: number; amount_cny_minor: number; usd_amount: string; cny_to_usd_rate?: string; rate_source?: string; usd_to_cny_rate: string; config_version: number; created_at: string }
+export interface DistributionAnalyticsPoint { date: string; recharge_cny_minor: number; commission_cny_minor: number }
+export interface DistributionAnalyticsSummary { recharge_cny_minor: number; commission_cny_minor: number; previous_recharge_cny_minor: number; previous_commission_cny_minor: number; recharge_growth_percent: number; commission_growth_percent: number }
+export interface DistributionForecastHorizon { eligible: boolean; reason?: 'insufficient_history' | 'insufficient_activity'; estimated_recharge_cny_minor: number; estimated_commission_cny_minor: number; recharge_growth_percent: number; commission_growth_percent: number }
+export interface DistributionAnalytics { as_of: string; range_days: number; series: DistributionAnalyticsPoint[]; summary: DistributionAnalyticsSummary; forecast: { method: string; seven_days: DistributionForecastHorizon; thirty_days: DistributionForecastHorizon } }
 
 export async function createVoucher(amount: string, totpCode = ''): Promise<Voucher> { return (await apiClient.post<Voucher>('/user/vouchers', { amount, totp_code: totpCode })).data }
 export async function listVouchers(page = 1): Promise<Paginated<Voucher>> { return (await apiClient.get<Paginated<Voucher>>('/user/vouchers', { params: { page } })).data }
 export async function cancelVoucher(id: number): Promise<Voucher> { return (await apiClient.post<Voucher>(`/user/vouchers/${id}/cancel`)).data }
 export async function getVoucherAvailability(): Promise<VoucherAvailability> { return (await apiClient.get<VoucherAvailability>('/user/vouchers/availability')).data }
 export async function getDistributionDashboard(): Promise<DistributionDashboard> { return (await apiClient.get<DistributionDashboard>('/distribution/dashboard')).data }
+export async function getDistributionAnalytics(range: '7d' | '30d' | '90d' = '30d'): Promise<DistributionAnalytics> { return (await apiClient.get<DistributionAnalytics>('/distribution/analytics', { params: { range } })).data }
 export async function getDistributionTree(parentUserId?: number, search = '', page = 1): Promise<Paginated<TeamNode>> { return (await apiClient.get<Paginated<TeamNode>>('/distribution/tree', { params: { parent_user_id: parentUserId, search, page } })).data }
 export async function getDistributionLedger(page = 1): Promise<Paginated<Commission>> { return (await apiClient.get<Paginated<Commission>>('/distribution/ledger', { params: { page } })).data }
 export async function getPayoutAccount(): Promise<PayoutAccount> { return (await apiClient.get<PayoutAccount>('/distribution/payout-account')).data }

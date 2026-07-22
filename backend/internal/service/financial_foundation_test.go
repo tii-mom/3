@@ -67,6 +67,33 @@ func TestComputeCompanyTierRatesCoverAllFiveDepartments(t *testing.T) {
 	require.Equal(t, []int64{10000, 0, 0, 0, 0}, commissionVector(base, tiers[0].RatesBPS))
 }
 
+func TestDistributionForecastRequiresRecentActivity(t *testing.T) {
+	series := make([]DistributionAnalyticsPoint, 30)
+	for index := range series {
+		series[index].Date = time.Now().UTC().AddDate(0, 0, index-29).Format("2006-01-02")
+	}
+	forecast := forecastHorizon(series, 30, 14)
+	require.False(t, forecast.Eligible)
+	require.Equal(t, "insufficient_activity", forecast.Reason)
+}
+
+func TestDistributionForecastProjectsPositiveTrend(t *testing.T) {
+	series := make([]DistributionAnalyticsPoint, 30)
+	for index := range series {
+		series[index] = DistributionAnalyticsPoint{
+			Date:            time.Now().UTC().AddDate(0, 0, index-29).Format("2006-01-02"),
+			RechargeMinor:   int64(1000 + index*100),
+			CommissionMinor: int64(100 + index*10),
+		}
+	}
+	forecast := forecastHorizon(series, 7, 7)
+	require.True(t, forecast.Eligible)
+	require.Greater(t, forecast.EstimatedRechargeMinor, int64(0))
+	require.Greater(t, forecast.EstimatedCommissionMinor, int64(0))
+	require.Greater(t, forecast.RechargeGrowthPercent, float64(0))
+	require.Greater(t, forecast.CommissionGrowthPercent, float64(0))
+}
+
 func commissionVector(base int64, rates [5]int64) []int64 {
 	result := make([]int64, len(rates))
 	for index, rate := range rates {

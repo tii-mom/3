@@ -9,7 +9,7 @@
       <div class="max-w-xl">
         <div class="flex items-center gap-2 text-primary-300">
           <Icon name="users" size="sm" :stroke-width="1.8" />
-          <span class="text-[11px] font-semibold uppercase tracking-[0.18em]">3API / COMPUTE COMPANY</span>
+          <span class="text-[11px] font-semibold tracking-[0.12em]">3API / 算力公司</span>
         </div>
         <h2 class="mt-3 text-xl font-semibold tracking-tight sm:text-2xl">{{ t('finance.distribution.shareCardTitle') }}</h2>
         <p class="mt-2 max-w-lg text-sm leading-6 text-gray-300">{{ t('finance.distribution.shareCardSubtitle') }}</p>
@@ -36,7 +36,7 @@
       <div class="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-y-auto border border-gray-200 bg-white shadow-2xl dark:border-dark-600 dark:bg-dark-900">
         <div class="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-dark-700">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-primary-600 dark:text-primary-400">3API / SHARE CARD</p>
+            <p class="text-xs font-semibold tracking-[0.12em] text-primary-600 dark:text-primary-400">3API / 分享海报</p>
             <h3 class="mt-1 text-lg font-semibold text-gray-950 dark:text-white">{{ t('finance.distribution.shareCardPreview') }}</h3>
           </div>
           <button type="button" class="btn btn-secondary btn-sm !px-2" :aria-label="t('common.close')" @click="close">
@@ -113,8 +113,9 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 function wrapCopy() {
-  if (locale.value.startsWith('zh')) return ['我开了一家神奇的', '算力公司，欢迎领导', '视察工作～']
-  return ['I started a remarkable', 'compute company.', 'Leaders, welcome to inspect.']
+  // The share image is intentionally Chinese-first so the invitation keeps a
+  // consistent brand voice even when the surrounding console uses another locale.
+  return ['我开了一家神奇的', '算力公司，欢迎领导', '视察工作～']
 }
 
 async function renderPoster() {
@@ -145,7 +146,7 @@ async function renderPoster() {
     ctx.fillText('3API', 102, 84)
     ctx.fillStyle = 'rgba(255,255,255,0.52)'
     ctx.font = '500 18px Arial, sans-serif'
-    ctx.fillText('COMPUTE COMPANY / INVITATION', 102, 116)
+    ctx.fillText('算力公司 / 邀请', 102, 116)
 
     ctx.fillStyle = '#ffffff'
     ctx.font = '600 56px Arial, sans-serif'
@@ -174,8 +175,8 @@ async function renderPoster() {
     ctx.textAlign = 'left'
     ctx.fillStyle = 'rgba(255,255,255,0.52)'
     ctx.font = '400 18px Arial, sans-serif'
-    ctx.fillText('3API / 3API.COM', 72, 1340)
-    ctx.fillText('POWERED BY PRECISION INFRASTRUCTURE', 72, 1374)
+    ctx.fillText('3API / 3API.SHOP', 72, 1340)
+    ctx.fillText('专业算力基础设施', 72, 1374)
     posterDataUrl.value = canvas.toDataURL('image/png')
   } finally {
     generating.value = false
