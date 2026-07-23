@@ -115,6 +115,8 @@ if [[ ! -s "$backup_path" ]]; then
   exit 1
 fi
 backup_sha256=$(sha256_file "$backup_path")
+printf 'Backup created before candidate validation: %s\n' "$backup_path"
+printf 'Backup SHA-256: %s\n' "$backup_sha256"
 
 docker pull "$TARGET_IMAGE" >/dev/null
 docker pull "$RESTORE_IMAGE" >/dev/null
@@ -149,11 +151,19 @@ if [[ "$restored_user_count" != "$user_count" || "$restored_migration_count" != 
   exit 1
 fi
 
-docker run --rm --network "$restore_network" --entrypoint /app/financialgate \
+if ! docker run --rm --network "$restore_network" --entrypoint /app/financialgate \
   -e FINANCIAL_GATE_ALLOW_NON_LOCAL=true \
   "$TARGET_IMAGE" \
   -database-url "postgres://preflight:$restore_password@$restore_container:5432/sub2api_restore?sslmode=disable" \
-  -timeout 10m > "$report_path"
+  -timeout 10m > "$report_path"; then
+  printf 'Financial gate failed against the isolated restore. Production was not modified.\n' >&2
+  printf 'Credit bucket mismatch details (isolated restore only):\n' >&2
+  docker exec "$restore_container" psql -X -U preflight -d sub2api_restore \
+    -c "SELECT u.id AS user_id, u.balance AS legacy_balance, a.transferable_credit, a.non_transferable_credit, a.debt, u.balance - (a.transferable_credit + a.non_transferable_credit - a.debt) AS difference FROM users u JOIN user_credit_accounts a ON a.user_id = u.id WHERE u.balance <> a.transferable_credit + a.non_transferable_credit - a.debt ORDER BY u.id LIMIT 20" \
+    >&2 || true
+  printf 'Backup retained at %s (SHA-256: %s).\n' "$backup_path" "$backup_sha256" >&2
+  exit 1
+fi
 
 if ! jq -e '.reconciliation | to_entries | all(.value == 0)' "$report_path" >/dev/null; then
   printf 'Financial reconciliation failed; report retained at %s.\n' "$report_path" >&2
