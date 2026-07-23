@@ -108,6 +108,8 @@
             :src="embeddedUrl"
             class="custom-embed-frame"
             allowfullscreen
+            sandbox="allow-scripts allow-forms allow-popups"
+            referrerpolicy="no-referrer"
           ></iframe>
         </div>
       </div>

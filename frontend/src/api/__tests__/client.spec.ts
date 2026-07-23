@@ -260,6 +260,46 @@ describe('API Client', () => {
       )
     })
 
+    it('502 HTML 错误页转换为友好上游错误', async () => {
+      const adapter = vi.fn().mockRejectedValue({
+        response: {
+          status: 502,
+          data: '<html><body>Bad Gateway</body></html>',
+          headers: { 'content-type': 'text/html; charset=utf-8' },
+        },
+        config: { url: '/groups/available' },
+      })
+      apiClient.defaults.adapter = adapter
+
+      await expect(apiClient.get('/groups/available')).rejects.toEqual(
+        expect.objectContaining({
+          status: 502,
+          code: 'UPSTREAM_BAD_GATEWAY',
+          message: '上游服务暂时不可用，请稍后重试。',
+        })
+      )
+    })
+
+    it('504 JSON 错误不被 HTML 兼容逻辑覆盖', async () => {
+      const adapter = vi.fn().mockRejectedValue({
+        response: {
+          status: 504,
+          data: { code: 'UPSTREAM_TIMEOUT', message: 'gateway timeout' },
+          headers: { 'content-type': 'application/json' },
+        },
+        config: { url: '/groups/available' },
+      })
+      apiClient.defaults.adapter = adapter
+
+      await expect(apiClient.get('/groups/available')).rejects.toEqual(
+        expect.objectContaining({
+          status: 504,
+          code: 'UPSTREAM_TIMEOUT',
+          message: 'gateway timeout',
+        })
+      )
+    })
+
     it('部署与运营合规未确认时广播事件且保留登录态', async () => {
       localStorage.setItem('auth_token', 'admin-token')
       const listener = vi.fn()
