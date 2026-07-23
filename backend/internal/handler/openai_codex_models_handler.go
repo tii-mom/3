@@ -39,6 +39,7 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 	failedAccountIDs := make(map[int64]struct{})
 	switchCount := 0
 	var lastUpstreamErr error
+	clientETag := c.GetHeader("If-None-Match")
 
 	for {
 		account, err := h.gatewayService.SelectAccountForModelWithExclusions(c.Request.Context(), apiKey.GroupID, "", "", failedAccountIDs)
@@ -54,6 +55,12 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 			return
 		}
 
+		imageGenerationAllowed := service.GroupAllowsImageGeneration(apiKey.Group)
+		if imageGenerationAllowed {
+			// The injected model has a gateway-owned ETag. Do not let the
+			// upstream ETag produce a 304 before we can augment the body.
+			c.Request.Header.Del("If-None-Match")
+		}
 		manifest, err := h.gatewayService.FetchCodexModelsManifest(c.Request.Context(), account, c.Query("client_version"), c.GetHeader("If-None-Match"))
 		if err != nil {
 			if c.Request.Context().Err() != nil {
@@ -72,12 +79,26 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 			return
 		}
 
-		if manifest.ETag != "" {
-			c.Header("ETag", manifest.ETag)
-		}
 		if manifest.NotModified {
 			c.Status(http.StatusNotModified)
 			return
+		}
+		if imageGenerationAllowed {
+			augmentedBody, augmentedETag, augmentErr := service.InjectCodexImageGenerationModel(manifest.Body, manifest.ETag)
+			if augmentErr != nil {
+				h.errorResponse(c, http.StatusBadGateway, "upstream_error", augmentErr.Error())
+				return
+			}
+			manifest.Body = augmentedBody
+			manifest.ETag = augmentedETag
+			if service.CodexModelsManifestETagMatches(clientETag, manifest.ETag) {
+				c.Header("ETag", manifest.ETag)
+				c.Status(http.StatusNotModified)
+				return
+			}
+		}
+		if manifest.ETag != "" {
+			c.Header("ETag", manifest.ETag)
 		}
 		c.Data(http.StatusOK, "application/json", manifest.Body)
 		return

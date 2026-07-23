@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -198,6 +199,43 @@ func TestFetchCodexModelsManifestPassthrough(t *testing.T) {
 	}
 	if gotClientVersion != "0.137.0" {
 		t.Errorf("client_version query: got %q", gotClientVersion)
+	}
+}
+
+func TestInjectCodexImageGenerationModel(t *testing.T) {
+	body := []byte(`{"models":[{"slug":"gpt-5.6","display_name":"GPT-5.6"}]}`)
+	augmented, etag, err := InjectCodexImageGenerationModel(body, `W/"upstream"`)
+	if err != nil {
+		t.Fatalf("InjectCodexImageGenerationModel returned error: %v", err)
+	}
+	if string(augmented) == string(body) {
+		t.Fatal("manifest was not augmented")
+	}
+	if etag == `W/"upstream"` || etag == "" {
+		t.Fatalf("expected derived ETag, got %q", etag)
+	}
+	var envelope struct {
+		Models []struct {
+			Slug        string `json:"slug"`
+			DisplayName string `json:"display_name"`
+		} `json:"models"`
+	}
+	if err := json.Unmarshal(augmented, &envelope); err != nil {
+		t.Fatalf("decode augmented manifest: %v", err)
+	}
+	if got := envelope.Models[len(envelope.Models)-1]; got.Slug != "gpt-image-2" || got.DisplayName != "GPT Image 2" {
+		t.Fatalf("injected model: %+v", got)
+	}
+}
+
+func TestInjectCodexImageGenerationModelIsIdempotent(t *testing.T) {
+	body := []byte(`{"models":[{"slug":"gpt-image-2","display_name":"GPT Image 2"}]}`)
+	augmented, etag, err := InjectCodexImageGenerationModel(body, `W/"upstream"`)
+	if err != nil {
+		t.Fatalf("InjectCodexImageGenerationModel returned error: %v", err)
+	}
+	if string(augmented) != string(body) || etag != `W/"upstream"` {
+		t.Fatalf("existing image model was rewritten: body=%q etag=%q", augmented, etag)
 	}
 }
 

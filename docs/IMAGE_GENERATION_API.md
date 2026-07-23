@@ -89,6 +89,10 @@ curl https://api.3api.shop/v1/images/generations \
 - Responses Lite 或会自行过滤工具的客户端不会自动触发生图，需要改用完整 Responses 请求。
 - 管理后台仍需保持分组的“允许当前分组生图”权限，并确保账号/渠道有可用的图片模型；否则会返回模型或权限错误。
 
+## CCS / Codex 模型选择
+
+对于开启“允许当前分组生图”的 OpenAI 分组，网关会在 Codex `/models` 清单和标准 `/v1/models` 清单中动态加入 `gpt-image-2`。客户端选择该模型后，网关会把请求转换为 Responses 文本模型加 `image_generation` 工具调用；无需在 CCS 中新增 API Key 或单独配置生图接口。显式自定义模型列表仍以管理员配置为准。
+
 ## 快速自检
 
 ```bash

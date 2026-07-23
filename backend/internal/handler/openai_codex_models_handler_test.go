@@ -50,6 +50,7 @@ type codexModelsFailoverHTTPUpstream struct {
 	firstErr    error
 	firstStatus int
 	firstBody   string
+	etag        string
 	statuses    map[int64]int
 }
 
@@ -67,7 +68,7 @@ func (u *codexModelsFailoverHTTPUpstream) Do(_ *http.Request, _ string, accountI
 			return &http.Response{
 				StatusCode: http.StatusOK,
 				Status:     "200 OK",
-				Header:     make(http.Header),
+				Header:     responseHeaders(u.etag),
 				Body:       io.NopCloser(strings.NewReader(u.firstBody)),
 			}, nil
 		}
@@ -89,7 +90,7 @@ func (u *codexModelsFailoverHTTPUpstream) Do(_ *http.Request, _ string, accountI
 	return &http.Response{
 		StatusCode: http.StatusOK,
 		Status:     "200 OK",
-		Header:     make(http.Header),
+		Header:     responseHeaders(u.etag),
 		Body:       io.NopCloser(strings.NewReader(`{"models":[{"slug":"gpt-5.6-sol"}]}`)),
 	}, nil
 }
@@ -139,6 +140,54 @@ func TestCodexModelsFailsOverFromRetryableUpstreamStatus(t *testing.T) {
 				t.Fatalf("body: got %q, want %q", got, want)
 			}
 		})
+	}
+}
+
+func TestCodexModelsInjectsImageModelForAllowedGroup(t *testing.T) {
+	handler, _, groupID := newCodexModelsFailoverTestHandler(http.StatusServiceUnavailable)
+	recorder := performCodexModelsRequestWithImageAccess(t, handler, groupID, true)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status: got %d; body=%s", recorder.Code, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), `"slug":"gpt-image-2"`) {
+		t.Fatalf("image model missing from manifest: %s", recorder.Body.String())
+	}
+	if got := recorder.Header().Get("ETag"); !strings.Contains(got, "codex-image-") {
+		t.Fatalf("expected gateway ETag, got %q", got)
+	}
+}
+
+func TestCodexModelsDoesNotInjectImageModelForDisallowedGroup(t *testing.T) {
+	handler, _, groupID := newCodexModelsFailoverTestHandler(http.StatusServiceUnavailable)
+	recorder := performCodexModelsRequest(t, handler, groupID)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status: got %d; body=%s", recorder.Code, recorder.Body.String())
+	}
+	if strings.Contains(recorder.Body.String(), `"slug":"gpt-image-2"`) {
+		t.Fatalf("image model must not be injected for a disallowed group: %s", recorder.Body.String())
+	}
+}
+
+func TestCodexModelsReturnsNotModifiedForInjectedETag(t *testing.T) {
+	handler, upstream, groupID := newCodexModelsFailoverTestHandler(http.StatusServiceUnavailable)
+	upstream.etag = `W/"upstream"`
+
+	first := performCodexModelsRequestWithImageAccess(t, handler, groupID, true)
+	if first.Code != http.StatusOK {
+		t.Fatalf("first status: got %d; body=%s", first.Code, first.Body.String())
+	}
+	derivedETag := first.Header().Get("ETag")
+	if derivedETag == "" {
+		t.Fatal("first response did not include derived ETag")
+	}
+	second := performCodexModelsRequestWithImageAccessAndETag(t, handler, groupID, true, derivedETag)
+	if second.Code != http.StatusNotModified {
+		t.Fatalf("second status: got %d; want %d; first_etag=%q second_etag=%q body=%s", second.Code, http.StatusNotModified, derivedETag, second.Header().Get("ETag"), second.Body.String())
+	}
+	if got := second.Header().Get("ETag"); got != derivedETag {
+		t.Fatalf("second ETag: got %q; want %q", got, derivedETag)
 	}
 }
 
@@ -287,17 +336,37 @@ func newCodexModelsFailoverTestHandlerWithAccountCount(firstStatus, accountCount
 }
 
 func performCodexModelsRequest(t *testing.T, handler *OpenAIGatewayHandler, groupID int64) *httptest.ResponseRecorder {
+	return performCodexModelsRequestWithImageAccess(t, handler, groupID, false)
+}
+
+func performCodexModelsRequestWithImageAccess(t *testing.T, handler *OpenAIGatewayHandler, groupID int64, allowImageGeneration bool) *httptest.ResponseRecorder {
+	return performCodexModelsRequestWithImageAccessAndETag(t, handler, groupID, allowImageGeneration, "")
+}
+
+func performCodexModelsRequestWithImageAccessAndETag(t *testing.T, handler *OpenAIGatewayHandler, groupID int64, allowImageGeneration bool, etag string) *httptest.ResponseRecorder {
 	t.Helper()
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = httptest.NewRequest(http.MethodGet, "/v1/models?client_version=0.144.0", nil)
+	if etag != "" {
+		c.Request.Header.Set("If-None-Match", etag)
+	}
 	c.Set(string(middleware2.ContextKeyAPIKey), &service.APIKey{
 		GroupID: &groupID,
-		Group:   &service.Group{ID: groupID, Platform: service.PlatformOpenAI},
+		Group:   &service.Group{ID: groupID, Platform: service.PlatformOpenAI, AllowImageGeneration: allowImageGeneration},
 	})
 
 	handler.CodexModels(c)
+	c.Writer.WriteHeaderNow()
 	return recorder
+}
+
+func responseHeaders(etag string) http.Header {
+	header := make(http.Header)
+	if etag != "" {
+		header.Set("ETag", etag)
+	}
+	return header
 }
 
 func equalInt64Slices(got, want []int64) bool {
