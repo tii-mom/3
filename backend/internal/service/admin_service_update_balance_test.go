@@ -14,6 +14,7 @@ type balanceUserRepoStub struct {
 	*userRepoStub
 	updateErr error
 	updated   []*User
+	adjusted  []float64
 }
 
 func (s *balanceUserRepoStub) Update(ctx context.Context, user *User) error {
@@ -27,6 +28,17 @@ func (s *balanceUserRepoStub) Update(ctx context.Context, user *User) error {
 	s.updated = append(s.updated, &clone)
 	if s.userRepoStub != nil {
 		s.userRepoStub.user = &clone
+	}
+	return nil
+}
+
+func (s *balanceUserRepoStub) UpdateBalance(_ context.Context, _ int64, amount float64) error {
+	if s.updateErr != nil {
+		return s.updateErr
+	}
+	s.adjusted = append(s.adjusted, amount)
+	if s.userRepoStub != nil && s.userRepoStub.user != nil {
+		s.userRepoStub.user.Balance += amount
 	}
 	return nil
 }
@@ -101,6 +113,7 @@ func TestAdminService_UpdateUserBalance_InvalidatesAuthCache(t *testing.T) {
 	_, err := svc.UpdateUserBalance(context.Background(), 7, 5, "add", "")
 	require.NoError(t, err)
 	require.Equal(t, []int64{7}, invalidator.userIDs)
+	require.Equal(t, []float64{5}, repo.adjusted)
 	require.Len(t, redeemRepo.created, 1)
 }
 
@@ -118,6 +131,7 @@ func TestAdminService_UpdateUserBalance_NoChangeNoInvalidate(t *testing.T) {
 	_, err := svc.UpdateUserBalance(context.Background(), 7, 10, "set", "")
 	require.NoError(t, err)
 	require.Empty(t, invalidator.userIDs)
+	require.Empty(t, repo.adjusted)
 	require.Empty(t, redeemRepo.created)
 }
 

@@ -13,6 +13,7 @@ import (
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
 	"github.com/Wei-Shaw/sub2api/ent/authidentitychannel"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/creditctx"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
@@ -499,24 +500,33 @@ func (s *adminServiceImpl) UpdateUserBalance(ctx context.Context, userID int64, 
 	}
 
 	oldBalance := user.Balance
+	newBalance := oldBalance
 
 	switch operation {
 	case "set":
-		user.Balance = balance
+		newBalance = balance
 	case "add":
-		user.Balance += balance
+		newBalance += balance
 	case "subtract":
-		user.Balance -= balance
+		newBalance -= balance
 	}
 
-	if user.Balance < 0 {
-		return nil, fmt.Errorf("balance cannot be negative, current balance: %.2f, requested operation would result in: %.2f", oldBalance, user.Balance)
+	if newBalance < 0 {
+		return nil, fmt.Errorf("balance cannot be negative, current balance: %.2f, requested operation would result in: %.2f", oldBalance, newBalance)
 	}
 
-	if err := s.userRepo.Update(ctx, user); err != nil {
-		return nil, err
+	balanceDiff := newBalance - oldBalance
+	if balanceDiff != 0 {
+		adjustmentCtx := creditctx.WithMetadata(ctx, creditctx.Metadata{
+			EntryType:  "admin_balance",
+			SourceType: "admin_balance_adjustment",
+			Attributes: map[string]any{"operation": operation, "notes": notes},
+		})
+		if err := s.userRepo.UpdateBalance(adjustmentCtx, userID, balanceDiff); err != nil {
+			return nil, err
+		}
+		user.Balance = newBalance
 	}
-	balanceDiff := user.Balance - oldBalance
 	if s.authCacheInvalidator != nil && balanceDiff != 0 {
 		s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, userID)
 	}
