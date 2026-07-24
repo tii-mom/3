@@ -314,6 +314,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 			}); err != nil {
 				reqLog.Error("gateway.cc.record_usage_failed",
 					zap.Int64("account_id", account.ID),
+					zap.String("request_id", result.RequestID),
 					zap.Error(err),
 				)
 			}

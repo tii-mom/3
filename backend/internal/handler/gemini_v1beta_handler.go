@@ -552,6 +552,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 					zap.Any("group_id", apiKey.GroupID),
 					zap.String("model", modelName),
 					zap.Int64("account_id", account.ID),
+					zap.String("request_id", result.RequestID),
 				).Error("gemini.record_usage_failed", zap.Error(err))
 			}
 		})

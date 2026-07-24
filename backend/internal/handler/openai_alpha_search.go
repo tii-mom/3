@@ -261,6 +261,7 @@ func (h *OpenAIGatewayHandler) recordAlphaSearchUsage(
 				zap.Any("group_id", apiKey.GroupID),
 				zap.String("model", requestedModel),
 				zap.Int64("account_id", account.ID),
+				zap.String("request_id", result.RequestID),
 			).Error("openai_alpha_search.record_usage_failed", zap.Error(err))
 		}
 	})

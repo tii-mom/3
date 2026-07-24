@@ -552,6 +552,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 						zap.Any("group_id", apiKey.GroupID),
 						zap.String("model", reqModel),
 						zap.Int64("account_id", account.ID),
+						zap.String("request_id", result.RequestID),
 					).Error("gateway.record_usage_failed", zap.Error(err))
 				}
 			})
@@ -984,6 +985,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 						zap.Any("group_id", currentAPIKey.GroupID),
 						zap.String("model", reqModel),
 						zap.Int64("account_id", account.ID),
+						zap.String("request_id", result.RequestID),
 					).Error("gateway.record_usage_failed", zap.Error(err))
 				}
 			})

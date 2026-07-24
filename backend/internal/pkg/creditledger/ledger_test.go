@@ -53,3 +53,19 @@ func TestApplyPrincipalReversalDebitsTransferableFirstAndDecrementsRecharge(t *t
 	require.True(t, account.Debt.IsZero())
 	require.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestRecordReconciliationIssueCastsEntryTypeParameter(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	mock.ExpectExec(`(?s)INSERT INTO financial_reconciliation_issues.*jsonb_build_object\('entry_type', \$6::text\)`).
+		WithArgs(int64(42), "api_request", nil, "8", "7", "usage_debit").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	err = recordReconciliationIssue(context.Background(), db, 42, creditctx.Metadata{
+		EntryType: "usage_debit", SourceType: "api_request",
+	}, decimal.NewFromInt(8), decimal.NewFromInt(7))
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
+}

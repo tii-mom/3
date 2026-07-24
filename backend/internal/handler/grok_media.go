@@ -499,6 +499,7 @@ func recordGrokMediaUsage(
 				zap.Any("group_id", apiKey.GroupID),
 				zap.String("model", requestModel),
 				zap.Int64("account_id", account.ID),
+				zap.String("request_id", result.RequestID),
 			).Error("grok_media.record_usage_failed", zap.Error(err))
 			reqLog.Debug("grok_media.record_usage_failed", zap.Error(err))
 		}

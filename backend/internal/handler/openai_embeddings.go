@@ -261,6 +261,7 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 					zap.Any("group_id", apiKey.GroupID),
 					zap.String("model", reqModel),
 					zap.Int64("account_id", account.ID),
+					zap.String("request_id", result.RequestID),
 				).Error("openai_embeddings.record_usage_failed", zap.Error(err))
 			}
 		})
