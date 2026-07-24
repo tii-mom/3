@@ -93,6 +93,7 @@ func RegisterPaymentRoutes(
 		plans := adminGroup.Group("/plans")
 		{
 			plans.GET("", adminPaymentHandler.ListPlans)
+			plans.POST("/sync", adminPaymentHandler.SyncSubscriptionPlans)
 			plans.POST("", adminPaymentHandler.CreatePlan)
 			plans.PUT("/:id", adminPaymentHandler.UpdatePlan)
 			plans.DELETE("/:id", adminPaymentHandler.DeletePlan)

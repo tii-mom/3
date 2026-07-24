@@ -24,6 +24,7 @@ type UsageBillingCommand struct {
 	WholesaleTenantID   *int64
 	AccountID           int64
 	SubscriptionID      *int64
+	BalanceFallback     bool
 	AccountType         string
 	Model               string
 	ServiceTier         string
@@ -59,7 +60,7 @@ func buildUsageBillingFingerprint(c *UsageBillingCommand) string {
 		return ""
 	}
 	raw := fmt.Sprintf(
-		"%d|%d|%d|%d|%s|%s|%s|%s|%d|%d|%d|%d|%d|%d|%s|%d|%0.10f|%0.10f|%0.10f|%0.10f|%0.10f|%0.10f",
+		"%d|%d|%d|%d|%s|%s|%s|%s|%d|%d|%d|%d|%d|%d|%s|%d|%t|%0.10f|%0.10f|%0.10f|%0.10f|%0.10f|%0.10f",
 		c.UserID,
 		c.AccountID,
 		c.APIKeyID,
@@ -76,6 +77,7 @@ func buildUsageBillingFingerprint(c *UsageBillingCommand) string {
 		c.ImageCount,
 		strings.TrimSpace(c.MediaType),
 		valueOrZero(c.SubscriptionID),
+		c.BalanceFallback,
 		c.BalanceCost,
 		c.WholesaleCost,
 		c.SubscriptionCost,
@@ -123,6 +125,8 @@ type UsageBillingApplyResult struct {
 	NewWholesaleBalance  *float64
 	BalanceOverdrafted   bool               // true when the sufficient-balance guard missed and debt was still recorded
 	QuotaState           *AccountQuotaState // post-increment quota state (nil = no quota increment)
+	SubscriptionCost     float64            // actual amount consumed from subscription quota
+	BalanceCost          float64            // actual amount deducted from wallet balance
 }
 
 // BatchImageBalanceHoldCommand describes an idempotent balance hold operation.

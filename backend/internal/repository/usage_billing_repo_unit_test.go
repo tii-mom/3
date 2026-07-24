@@ -105,3 +105,60 @@ func TestCaptureUsageBillingBatchImageBalance_RejectsActualCostOverHold(t *testi
 	})
 	require.ErrorIs(t, err, service.ErrBatchImageSettlementCostExceedsHold)
 }
+
+func TestApplySubscriptionFirstBillingSplitsAcrossRemainingWindow(t *testing.T) {
+	ctx := context.Background()
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	mock.ExpectBegin()
+	tx, err := db.BeginTx(ctx, nil)
+	require.NoError(t, err)
+	mock.ExpectQuery(`SELECT us\.daily_usage_usd::text`).
+		WithArgs(int64(9)).
+		WillReturnRows(sqlmock.NewRows([]string{"daily", "weekly", "monthly", "daily_limit", "weekly_limit", "monthly_limit"}).
+			AddRow("8", "10", "10", "10", "50", "100"))
+	mock.ExpectExec(`UPDATE user_subscriptions us`).
+		WithArgs(2.0, int64(9)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	subscriptionCost, balanceCost, err := applySubscriptionFirstBilling(ctx, tx, &service.UsageBillingCommand{
+		SubscriptionID:  &[]int64{9}[0],
+		SubscriptionCost: 5,
+		BalanceFallback: true,
+	})
+	require.NoError(t, err)
+	require.InDelta(t, 2, subscriptionCost, 0.000001)
+	require.InDelta(t, 3, balanceCost, 0.000001)
+	require.NoError(t, tx.Commit())
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestApplySubscriptionFirstBillingUsesBalanceWhenSubscriptionIsExhausted(t *testing.T) {
+	ctx := context.Background()
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	mock.ExpectBegin()
+	tx, err := db.BeginTx(ctx, nil)
+	require.NoError(t, err)
+	mock.ExpectQuery(`SELECT us\.daily_usage_usd::text`).
+		WithArgs(int64(9)).
+		WillReturnRows(sqlmock.NewRows([]string{"daily", "weekly", "monthly", "daily_limit", "weekly_limit", "monthly_limit"}).
+			AddRow("10", "10", "10", "10", "50", "100"))
+	mock.ExpectCommit()
+
+	subscriptionCost, balanceCost, err := applySubscriptionFirstBilling(ctx, tx, &service.UsageBillingCommand{
+		SubscriptionID:    &[]int64{9}[0],
+		SubscriptionCost:  5,
+		BalanceFallback:   true,
+	})
+	require.NoError(t, err)
+	require.Zero(t, subscriptionCost)
+	require.InDelta(t, 5, balanceCost, 0.000001)
+	require.NoError(t, tx.Commit())
+	require.NoError(t, mock.ExpectationsWereMet())
+}

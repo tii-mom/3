@@ -823,7 +823,7 @@ func TestApiKeyAuthWithSubscriptionGoogle_TouchesLastUsedInStandardMode(t *testi
 	require.Equal(t, 1, touchCalls)
 }
 
-func TestApiKeyAuthWithSubscriptionGoogle_SubscriptionLimitExceededReturns429(t *testing.T) {
+func TestApiKeyAuthWithSubscriptionGoogle_SubscriptionLimitExceededFallsBackToBilling(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	limit := 1.0
@@ -897,10 +897,5 @@ func TestApiKeyAuthWithSubscriptionGoogle_SubscriptionLimitExceededReturns429(t 
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
-	require.Equal(t, http.StatusTooManyRequests, rec.Code)
-	var resp googleErrorResponse
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
-	require.Equal(t, http.StatusTooManyRequests, resp.Error.Code)
-	require.Equal(t, "RESOURCE_EXHAUSTED", resp.Error.Status)
-	require.Contains(t, resp.Error.Message, "daily usage limit exceeded")
+	require.Equal(t, http.StatusOK, rec.Code)
 }

@@ -537,6 +537,7 @@ export default {
       allBillingTypes: 'All Billing Types',
       billingTypeBalance: 'Balance',
       billingTypeSubscription: 'Subscription',
+      billingTypeMixed: 'Mixed',
       billingMode: 'Billing Mode',
       billingModeToken: 'Token',
       billingModePerRequest: 'Per Request',

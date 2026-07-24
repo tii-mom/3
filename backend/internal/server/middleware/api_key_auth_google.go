@@ -177,32 +177,38 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 				apiKey.Group.ID,
 			)
 			if err != nil {
-				abortWithGoogleError(c, 403, "No active subscription found for this group")
-				return
-			}
-
-			needsMaintenance, err := subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
-			if needsMaintenance {
-				refreshed, maintenanceErr := subscriptionService.EnsureWindowMaintenance(c.Request.Context(), subscription)
-				if maintenanceErr != nil {
-					abortWithGoogleError(c, 500, "Failed to maintain subscription usage windows")
+				if !errors.Is(err, service.ErrSubscriptionNotFound) {
+					abortWithGoogleError(c, 500, "Failed to load subscription")
 					return
 				}
-				subscription = refreshed
-				_, err = subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
-			}
-			if err != nil {
-				status := 403
-				if errors.Is(err, service.ErrDailyLimitExceeded) ||
-					errors.Is(err, service.ErrWeeklyLimitExceeded) ||
-					errors.Is(err, service.ErrMonthlyLimitExceeded) {
-					status = 429
+				// No active subscription: let the unified billing pre-check
+				// decide whether wallet balance can fund this request.
+			} else {
+				needsMaintenance, validateErr := subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
+				if needsMaintenance {
+					refreshed, maintenanceErr := subscriptionService.EnsureWindowMaintenance(c.Request.Context(), subscription)
+					if maintenanceErr != nil {
+						abortWithGoogleError(c, 500, "Failed to maintain subscription usage windows")
+						return
+					}
+					subscription = refreshed
+					_, validateErr = subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
 				}
-				abortWithGoogleError(c, status, err.Error())
-				return
+				if validateErr != nil {
+					if !errors.Is(validateErr, service.ErrDailyLimitExceeded) &&
+						!errors.Is(validateErr, service.ErrWeeklyLimitExceeded) &&
+						!errors.Is(validateErr, service.ErrMonthlyLimitExceeded) &&
+						!errors.Is(validateErr, service.ErrSubscriptionInvalid) {
+						abortWithGoogleError(c, 403, validateErr.Error())
+						return
+					}
+					// Exhausted/invalid subscriptions fall back to wallet balance.
+					subscription = nil
+				}
 			}
-
-			c.Set(string(ContextKeySubscription), subscription)
+			if subscription != nil {
+				c.Set(string(ContextKeySubscription), subscription)
+			}
 		} else {
 			if apiKey.KeyType == "tenant_wholesale" && apiKey.WholesaleBalance <= 0 {
 				abortWithGoogleError(c, 403, "Tenant wholesale balance is insufficient")

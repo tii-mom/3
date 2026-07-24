@@ -136,6 +136,11 @@ export const adminPaymentAPI = {
     return apiClient.get<SubscriptionPlan[]>('/admin/payment/plans')
   },
 
+  /** Create missing draft plans from active subscription groups */
+  syncPlans() {
+    return apiClient.post<{ created: SubscriptionPlan[]; created_count: number }>('/admin/payment/plans/sync')
+  },
+
   /** Create a subscription plan */
   createPlan(data: Record<string, unknown>) {
     return apiClient.post<SubscriptionPlan>('/admin/payment/plans', data)

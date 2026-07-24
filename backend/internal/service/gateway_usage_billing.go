@@ -261,6 +261,7 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 	if p.IsSubscriptionBill && p.Subscription != nil && p.Cost.TotalCost > 0 {
 		cmd.SubscriptionID = &p.Subscription.ID
 		cmd.SubscriptionCost = p.Cost.ActualCost
+		cmd.BalanceFallback = true
 	} else if p.Cost.ActualCost > 0 {
 		if p.APIKey.KeyType == "tenant_wholesale" && p.APIKey.TenantID != nil {
 			cmd.WholesaleTenantID = p.APIKey.TenantID
@@ -307,6 +308,16 @@ func applyUsageBilling(ctx context.Context, requestID string, usageLog *UsageLog
 		deps.deferredService.ScheduleLastUsedUpdate(p.Account.ID)
 		return false, nil
 	}
+	if usageLog != nil && (result.SubscriptionCost > 0 || result.BalanceCost > 0) {
+		switch {
+		case result.SubscriptionCost > 0 && result.BalanceCost > 0:
+			usageLog.BillingType = BillingTypeMixed
+		case result.SubscriptionCost > 0:
+			usageLog.BillingType = BillingTypeSubscription
+		default:
+			usageLog.BillingType = BillingTypeBalance
+		}
+	}
 
 	if result.APIKeyQuotaExhausted {
 		if invalidator, ok := p.APIKeyService.(apiKeyAuthCacheInvalidator); ok && p.APIKey != nil && p.APIKey.Key != "" {
@@ -323,12 +334,18 @@ func finalizePostUsageBilling(ctx context.Context, p *postUsageBillingParams, de
 		return
 	}
 
-	if p.IsSubscriptionBill {
+	if result.SubscriptionCost > 0 && p.User != nil && p.APIKey != nil && p.APIKey.GroupID != nil {
+		deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, *p.APIKey.GroupID, result.SubscriptionCost)
+	}
+	if result.BalanceCost > 0 && p.User != nil && p.APIKey != nil && p.APIKey.KeyType != "tenant_wholesale" {
+		syncBalanceCacheAfterDeduction(ctx, p, deps, result)
+	}
+	// Legacy repository implementations may not return split amounts. Preserve their
+	// previous cache behavior until all callers use the unified repository result.
+	if result.SubscriptionCost <= 0 && result.BalanceCost <= 0 && p.IsSubscriptionBill {
 		if p.Cost.ActualCost > 0 && p.User != nil && p.APIKey != nil && p.APIKey.GroupID != nil {
 			deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, *p.APIKey.GroupID, p.Cost.ActualCost)
 		}
-	} else if p.Cost.ActualCost > 0 && p.User != nil && p.APIKey.KeyType != "tenant_wholesale" {
-		syncBalanceCacheAfterDeduction(ctx, p, deps, result)
 	}
 
 	if p.Cost.ActualCost > 0 && p.APIKey != nil && p.APIKey.HasRateLimits() {
@@ -392,7 +409,11 @@ func syncBalanceCacheAfterDeduction(ctx context.Context, p *postUsageBillingPara
 		}
 		return
 	}
-	deps.billingCacheService.QueueDeductBalance(p.User.ID, p.Cost.ActualCost)
+	deducted := p.Cost.ActualCost
+	if result != nil && result.BalanceCost > 0 {
+		deducted = result.BalanceCost
+	}
+	deps.billingCacheService.QueueDeductBalance(p.User.ID, deducted)
 }
 
 // notifyBalanceLow sends balance low notification after deduction.
@@ -404,7 +425,11 @@ func notifyBalanceLow(p *postUsageBillingParams, deps *billingDeps, result *Usag
 			slog.Error("panic in notifyBalanceLow", "recover", r)
 		}
 	}()
-	if p.IsSubscriptionBill || p.Cost.ActualCost <= 0 || p.User == nil || deps.balanceNotifyService == nil {
+	balanceCost := p.Cost.ActualCost
+	if result != nil && result.BalanceCost > 0 {
+		balanceCost = result.BalanceCost
+	}
+	if (p.IsSubscriptionBill && balanceCost <= 0) || balanceCost <= 0 || p.User == nil || deps.balanceNotifyService == nil {
 		slog.Debug("notifyBalanceLow: skipped",
 			"is_subscription", p.IsSubscriptionBill,
 			"actual_cost", p.Cost.ActualCost,
@@ -418,19 +443,23 @@ func notifyBalanceLow(p *postUsageBillingParams, deps *billingDeps, result *Usag
 	slog.Debug("notifyBalanceLow: calling CheckBalanceAfterDeduction",
 		"user_id", p.User.ID,
 		"old_balance", oldBalance,
-		"cost", p.Cost.ActualCost,
+		"cost", balanceCost,
 		"notify_enabled", p.User.BalanceNotifyEnabled,
 		"threshold", p.User.BalanceNotifyThreshold,
 		"result_has_new_balance", result != nil && result.NewBalance != nil,
 	)
-	deps.balanceNotifyService.CheckBalanceAfterDeduction(context.Background(), p.User, oldBalance, p.Cost.ActualCost)
+	deps.balanceNotifyService.CheckBalanceAfterDeduction(context.Background(), p.User, oldBalance, balanceCost)
 }
 
 // resolveOldBalance returns the pre-deduction balance.
 // Prefers the DB transaction result (newBalance + cost) over snapshot.
 func resolveOldBalance(p *postUsageBillingParams, result *UsageBillingApplyResult) float64 {
 	if result != nil && result.NewBalance != nil {
-		return *result.NewBalance + p.Cost.ActualCost
+		balanceCost := p.Cost.ActualCost
+		if result.BalanceCost > 0 {
+			balanceCost = result.BalanceCost
+		}
+		return *result.NewBalance + balanceCost
 	}
 	// Legacy fallback: snapshot balance from request context
 	return p.User.Balance

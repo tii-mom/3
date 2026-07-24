@@ -6,6 +6,10 @@
         <button @click="loadPlans" :disabled="plansLoading" class="btn btn-secondary" :title="t('common.refresh')">
           <Icon name="refresh" size="md" :class="plansLoading ? 'animate-spin' : ''" />
         </button>
+        <button @click="syncPlans" :disabled="plansLoading || syncingPlans" class="btn btn-secondary" :title="t('payment.admin.syncPlansHint')">
+          <Icon name="sync" size="md" :class="syncingPlans ? 'animate-spin' : ''" />
+          <span>{{ t('payment.admin.syncPlans') }}</span>
+        </button>
         <button @click="openPlanEdit(null)" class="btn btn-primary">{{ t('payment.admin.createPlan') }}</button>
       </div>
 
@@ -131,6 +135,7 @@ function getPlanNameClass(groupId: number): string {
 // ==================== Plans ====================
 
 const plansLoading = ref(false)
+const syncingPlans = ref(false)
 const plans = ref<SubscriptionPlan[]>([])
 const showPlanDialog = ref(false)
 const showDeletePlanDialog = ref(false)
@@ -162,6 +167,19 @@ async function loadPlans() {
   }
   catch (err: unknown) { appStore.showError(extractI18nErrorMessage(err, t, 'payment.errors', t('common.error'))) }
   finally { plansLoading.value = false }
+}
+
+async function syncPlans() {
+  syncingPlans.value = true
+  try {
+    const res = await adminPaymentAPI.syncPlans()
+    appStore.showSuccess(t('payment.admin.syncPlansResult', { count: res.data?.created_count ?? 0 }))
+    await loadPlans()
+  } catch (err: unknown) {
+    appStore.showError(extractI18nErrorMessage(err, t, 'payment.errors', t('common.error')))
+  } finally {
+    syncingPlans.value = false
+  }
 }
 
 function openPlanEdit(plan: SubscriptionPlan | null) {
