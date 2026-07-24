@@ -125,9 +125,9 @@ func TestApplySubscriptionFirstBillingSplitsAcrossRemainingWindow(t *testing.T) 
 	mock.ExpectCommit()
 
 	subscriptionCost, balanceCost, err := applySubscriptionFirstBilling(ctx, tx, &service.UsageBillingCommand{
-		SubscriptionID:  &[]int64{9}[0],
+		SubscriptionID:   &[]int64{9}[0],
 		SubscriptionCost: 5,
-		BalanceFallback: true,
+		BalanceFallback:  true,
 	})
 	require.NoError(t, err)
 	require.InDelta(t, 2, subscriptionCost, 0.000001)
@@ -152,9 +152,9 @@ func TestApplySubscriptionFirstBillingUsesBalanceWhenSubscriptionIsExhausted(t *
 	mock.ExpectCommit()
 
 	subscriptionCost, balanceCost, err := applySubscriptionFirstBilling(ctx, tx, &service.UsageBillingCommand{
-		SubscriptionID:    &[]int64{9}[0],
-		SubscriptionCost:  5,
-		BalanceFallback:   true,
+		SubscriptionID:   &[]int64{9}[0],
+		SubscriptionCost: 5,
+		BalanceFallback:  true,
 	})
 	require.NoError(t, err)
 	require.Zero(t, subscriptionCost)
