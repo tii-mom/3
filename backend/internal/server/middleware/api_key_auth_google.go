@@ -170,8 +170,10 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 		}
 
 		isSubscriptionType := apiKey.KeyType != "tenant_wholesale" && apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
+		var subscription *service.UserSubscription
 		if isSubscriptionType && subscriptionService != nil {
-			subscription, err := subscriptionService.GetActiveSubscription(
+			var err error
+			subscription, err = subscriptionService.GetActiveSubscription(
 				c.Request.Context(),
 				apiKey.User.ID,
 				apiKey.Group.ID,
