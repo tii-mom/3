@@ -383,7 +383,7 @@ func (s *VoucherService) SetRiskLock(ctx context.Context, voucherID int64, locke
 	if !locked {
 		action = "RISK_UNLOCKED"
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO balance_voucher_ledger (voucher_id, tenant_id, user_id, action, face_value, fee_amount, metadata) VALUES ($1, $2, $3, $4, $5, $6, jsonb_build_object('reason', $7))`, voucher.ID, voucherTenantID, voucher.IssuerUserID, action, face.String(), fee.String(), reason); err != nil {
+	if err := insertVoucherRiskLedger(ctx, tx, voucher.ID, voucher.IssuerUserID, action, face.String(), fee.String(), reason); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -391,6 +391,17 @@ func (s *VoucherService) SetRiskLock(ctx context.Context, voucherID int64, locke
 	}
 	voucher.Status = target
 	return voucher, nil
+}
+
+const voucherRiskLedgerInsertSQL = `INSERT INTO balance_voucher_ledger (voucher_id, tenant_id, user_id, action, face_value, fee_amount, metadata) VALUES ($1, $2, $3, $4, $5, $6, jsonb_build_object('reason', $7::text))`
+
+type voucherRiskLedgerExecer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+func insertVoucherRiskLedger(ctx context.Context, tx voucherRiskLedgerExecer, voucherID, userID int64, action, faceValue, feeAmount, reason string) error {
+	_, err := tx.ExecContext(ctx, voucherRiskLedgerInsertSQL, voucherID, voucherTenantID, userID, action, faceValue, feeAmount, reason)
+	return err
 }
 
 func (s *VoucherService) Cancel(ctx context.Context, userID, voucherID int64) (*Voucher, error) {

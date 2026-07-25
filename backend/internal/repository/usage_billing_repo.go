@@ -177,13 +177,19 @@ func (r *usageBillingRepository) applyBatchImageBalanceHold(
 
 func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, tx *sql.Tx, cmd *service.UsageBillingCommand, result *service.UsageBillingApplyResult) error {
 	if cmd.SubscriptionCost > 0 && cmd.SubscriptionID != nil {
-		if err := incrementUsageBillingSubscription(ctx, tx, *cmd.SubscriptionID, cmd.SubscriptionCost); err != nil {
+		subscriptionCost, balanceCost, err := applySubscriptionFirstBilling(ctx, tx, cmd)
+		if err != nil {
 			return err
 		}
+		result.SubscriptionCost = subscriptionCost
+		result.BalanceCost = balanceCost
 	}
 
-	if cmd.BalanceCost > 0 {
-		newBalance, sufficient, err := deductUsageBillingBalance(ctx, tx, cmd.UserID, cmd.BalanceCost, cmd.APIKeyID, cmd.RequestID)
+	if cmd.SubscriptionCost <= 0 && cmd.BalanceCost > 0 {
+		result.BalanceCost = cmd.BalanceCost
+	}
+	if result.BalanceCost > 0 {
+		newBalance, sufficient, err := deductUsageBillingBalance(ctx, tx, cmd.UserID, result.BalanceCost, cmd.APIKeyID, cmd.RequestID)
 		if err != nil {
 			return err
 		}
@@ -222,6 +228,87 @@ func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, t
 	}
 
 	return nil
+}
+
+// applySubscriptionFirstBilling locks the subscription row and calculates the amount
+// remaining across all configured windows before applying the split in the same tx.
+func applySubscriptionFirstBilling(ctx context.Context, tx *sql.Tx, cmd *service.UsageBillingCommand) (float64, float64, error) {
+	requested := decimal.NewFromFloat(cmd.SubscriptionCost).Round(8)
+	if !requested.IsPositive() || cmd.SubscriptionID == nil {
+		return 0, 0, nil
+	}
+	if !cmd.BalanceFallback {
+		subCost, _ := requested.Float64()
+		if err := incrementUsageBillingSubscription(ctx, tx, *cmd.SubscriptionID, subCost); err != nil {
+			return 0, 0, err
+		}
+		return subCost, 0, nil
+	}
+
+	var dailyUsage, weeklyUsage, monthlyUsage, dailyLimit, weeklyLimit, monthlyLimit sql.NullString
+	err := tx.QueryRowContext(ctx, `
+		SELECT us.daily_usage_usd::text, us.weekly_usage_usd::text, us.monthly_usage_usd::text,
+		       g.daily_limit_usd::text, g.weekly_limit_usd::text, g.monthly_limit_usd::text
+		FROM user_subscriptions us
+		JOIN groups g ON g.id = us.group_id
+		WHERE us.id = $1
+		  AND us.deleted_at IS NULL
+		  AND us.status = 'active'
+		  AND us.expires_at > NOW()
+		  AND g.deleted_at IS NULL
+		  AND g.status = 'active'
+		FOR UPDATE OF us, g
+	`, *cmd.SubscriptionID).Scan(&dailyUsage, &weeklyUsage, &monthlyUsage, &dailyLimit, &weeklyLimit, &monthlyLimit)
+	if errors.Is(err, sql.ErrNoRows) {
+		if cmd.BalanceFallback {
+			balanceCost, _ := requested.Float64()
+			return 0, balanceCost, nil
+		}
+		return 0, 0, service.ErrSubscriptionNotFound
+	}
+	if err != nil {
+		return 0, 0, err
+	}
+
+	remaining := requested
+	for _, pair := range [][2]sql.NullString{
+		{dailyUsage, dailyLimit},
+		{weeklyUsage, weeklyLimit},
+		{monthlyUsage, monthlyLimit},
+	} {
+		if !pair[1].Valid || strings.TrimSpace(pair[1].String) == "" {
+			continue
+		}
+		limit, err := decimal.NewFromString(pair[1].String)
+		if err != nil {
+			return 0, 0, err
+		}
+		used := decimal.Zero
+		if pair[0].Valid && strings.TrimSpace(pair[0].String) != "" {
+			used, err = decimal.NewFromString(pair[0].String)
+			if err != nil {
+				return 0, 0, err
+			}
+		}
+		windowRemaining := limit.Sub(used)
+		if windowRemaining.IsNegative() {
+			windowRemaining = decimal.Zero
+		}
+		if windowRemaining.LessThan(remaining) {
+			remaining = windowRemaining
+		}
+	}
+
+	subscriptionCost := decimal.Min(requested, remaining).Round(8)
+	balanceCost := requested.Sub(subscriptionCost).Round(8)
+	subCost, _ := subscriptionCost.Float64()
+	balCost, _ := balanceCost.Float64()
+	if subCost > 0 {
+		if err := incrementUsageBillingSubscription(ctx, tx, *cmd.SubscriptionID, subCost); err != nil {
+			return 0, 0, err
+		}
+	}
+	return subCost, balCost, nil
 }
 
 func deductWholesaleBalance(ctx context.Context, tx *sql.Tx, tenantID int64, amount float64, requestID string, apiKeyID int64) (float64, error) {

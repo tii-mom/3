@@ -242,7 +242,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed, ref, watch, nextTick, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Select from '@/components/common/Select.vue'
@@ -418,6 +418,7 @@ const startTest = async () => {
 
   abortController = new AbortController()
 
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
   try {
     // Use the configured API base; EventSource does not support POST.
     const url = buildApiUrl(`/admin/accounts/${props.account.id}/test`)
@@ -441,7 +442,7 @@ const startTest = async () => {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
 
-    const reader = response.body?.getReader()
+    reader = response.body?.getReader() || null
     if (!reader) {
       throw new Error('No response body')
     }
@@ -449,28 +450,34 @@ const startTest = async () => {
     const decoder = new TextDecoder()
     let buffer = ''
 
+    const handleLine = (line: string) => {
+      const normalizedLine = line.endsWith('\r') ? line.slice(0, -1) : line
+      if (!normalizedLine.startsWith('data:')) return
+      const jsonStr = normalizedLine.slice(5).trim()
+      if (!jsonStr) return
+      try {
+        handleEvent(JSON.parse(jsonStr))
+      } catch (e) {
+        console.error('Failed to parse SSE event:', e)
+      }
+    }
+
+    const processBuffer = () => {
+      const lines = buffer.split(/\r?\n/)
+      buffer = lines.pop() || ''
+      lines.forEach(handleLine)
+    }
+
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
 
       buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
-
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const jsonStr = line.slice(6).trim()
-          if (jsonStr) {
-            try {
-              const event = JSON.parse(jsonStr)
-              handleEvent(event)
-            } catch (e) {
-              console.error('Failed to parse SSE event:', e)
-            }
-          }
-        }
-      }
+      processBuffer()
     }
+
+    buffer += decoder.decode()
+    if (buffer) handleLine(buffer)
   } catch (error: unknown) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       status.value = 'idle'
@@ -480,8 +487,20 @@ const startTest = async () => {
     const msg = error instanceof Error ? error.message : 'Unknown error'
     errorMessage.value = msg
     addLine(`Error: ${msg}`, 'text-red-400')
+  } finally {
+    if (reader) {
+      try {
+        await reader.cancel()
+      } catch {
+        // The stream may already be closed or aborted.
+      } finally {
+        reader.releaseLock?.()
+      }
+    }
   }
 }
+
+onUnmounted(() => abortStream())
 
 const handleEvent = (event: {
   type: string

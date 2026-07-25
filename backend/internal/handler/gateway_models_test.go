@@ -93,6 +93,60 @@ func TestGatewayModels_GeminiGroupFallsBackToGeminiModels(t *testing.T) {
 	require.NotContains(t, modelIDsForTest(got.Data), "claude-sonnet-4-6")
 }
 
+func TestGatewayModels_OpenAIImageModelFollowsGroupPermission(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	for _, tt := range []struct {
+		name           string
+		allowImage     bool
+		wantImageModel bool
+	}{
+		{name: "allowed group", allowImage: true, wantImageModel: true},
+		{name: "disallowed group", allowImage: false, wantImageModel: false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			groupID := int64(24)
+			h := newGatewayModelsHandlerForTest(
+				&gatewayModelsAccountRepoStub{
+					byGroup: map[int64][]service.Account{
+						groupID: {
+							{
+								ID:       1,
+								Platform: service.PlatformOpenAI,
+								Credentials: map[string]any{
+									"model_mapping": map[string]any{"gpt-5.4": "gpt-5.4"},
+								},
+							},
+						},
+					},
+				},
+			)
+
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			c.Request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+			c.Set(string(middleware2.ContextKeyAPIKey), &service.APIKey{
+				Group: &service.Group{
+					ID:                   groupID,
+					Platform:             service.PlatformOpenAI,
+					AllowImageGeneration: tt.allowImage,
+				},
+			})
+
+			h.Models(c)
+
+			require.Equal(t, http.StatusOK, rec.Code)
+			var got gatewayModelsResponseForTest
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+			if tt.wantImageModel {
+				require.Contains(t, modelIDsForTest(got.Data), "gpt-image-2")
+			} else {
+				require.NotContains(t, modelIDsForTest(got.Data), "gpt-image-2")
+			}
+		})
+	}
+}
+
 func TestGatewayModels_Grok45AdvertisesReasoningEffortForGrokBuild(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

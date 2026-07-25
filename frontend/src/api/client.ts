@@ -142,6 +142,29 @@ apiClient.interceptors.response.use(
 
       // Validate `data` shape to avoid HTML error pages breaking our error handling.
       const apiData = (typeof data === 'object' && data !== null ? data : {}) as Record<string, any>
+      const responseHeaders = error.response.headers as unknown as Record<string, unknown> | undefined
+      const contentType = String(
+        responseHeaders?.['content-type'] ??
+        (typeof (error.response.headers as { get?: (name: string) => string | null } | undefined)?.get === 'function'
+          ? (error.response.headers as { get: (name: string) => string | null }).get('content-type')
+          : '')
+      ).toLowerCase()
+      const isHtmlError = contentType.includes('text/html') ||
+        (typeof data === 'string' && /<\/?html[\s>]/i.test(data))
+
+      // Reverse proxies commonly return an HTML error page for upstream 502/504s.
+      // Do not expose that page or replace structured JSON errors with this message.
+      if ((status === 502 || status === 504) && isHtmlError) {
+        const isZh = getLocale().toLowerCase().startsWith('zh')
+        return Promise.reject({
+          status,
+          code: status === 502 ? 'UPSTREAM_BAD_GATEWAY' : 'UPSTREAM_GATEWAY_TIMEOUT',
+          message: isZh
+            ? status === 502 ? '上游服务暂时不可用，请稍后重试。' : '上游服务响应超时，请稍后重试。'
+            : status === 502 ? 'The upstream service is temporarily unavailable. Please try again.' : 'The upstream service timed out. Please try again.',
+          url
+        })
+      }
 
       // Ops monitoring disabled: treat as feature-flagged 404, and proactively redirect away
       // from ops pages to avoid broken UI states.

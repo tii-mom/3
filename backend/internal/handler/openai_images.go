@@ -364,8 +364,10 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 		quotaPlatform := service.QuotaPlatform(c.Request.Context(), apiKey)
 
 		upstreamModel := ""
+		usageRequestID := ""
 		if result != nil {
 			upstreamModel = result.UpstreamModel
+			usageRequestID = result.RequestID
 		}
 		h.submitMandatoryUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
 			if err := h.gatewayService.RecordUsage(ctx, &service.OpenAIRecordUsageInput{
@@ -390,6 +392,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 					zap.Any("group_id", apiKey.GroupID),
 					zap.String("model", requestModel),
 					zap.Int64("account_id", account.ID),
+					zap.String("request_id", usageRequestID),
 				).Error("openai.images.record_usage_failed", zap.Error(err))
 			}
 		})

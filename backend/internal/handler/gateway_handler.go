@@ -552,6 +552,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 						zap.Any("group_id", apiKey.GroupID),
 						zap.String("model", reqModel),
 						zap.Int64("account_id", account.ID),
+						zap.String("request_id", result.RequestID),
 					).Error("gateway.record_usage_failed", zap.Error(err))
 				}
 			})
@@ -984,6 +985,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 						zap.Any("group_id", currentAPIKey.GroupID),
 						zap.String("model", reqModel),
 						zap.Int64("account_id", account.ID),
+						zap.String("request_id", result.RequestID),
 					).Error("gateway.record_usage_failed", zap.Error(err))
 				}
 			})
@@ -1021,6 +1023,9 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 		writeCustomModelsList(c, platform, availableModels)
 		return
 	}
+	if platform == service.PlatformOpenAI && len(availableModels) > 0 && apiKey != nil && apiKey.Group != nil && service.GroupAllowsImageGeneration(apiKey.Group) {
+		availableModels = appendModelIDIfMissing(availableModels, "gpt-image-2")
+	}
 
 	if len(availableModels) > 0 {
 		writeModelsList(c, platform, availableModels)
@@ -1052,6 +1057,15 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 		"object": "list",
 		"data":   claude.DefaultModels,
 	})
+}
+
+func appendModelIDIfMissing(models []string, modelID string) []string {
+	for _, model := range models {
+		if model == modelID {
+			return models
+		}
+	}
+	return append(models, modelID)
 }
 
 func writeModelsList(c *gin.Context, platform string, modelIDs []string) {

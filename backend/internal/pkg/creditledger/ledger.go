@@ -258,7 +258,7 @@ func recordReconciliationIssue(ctx context.Context, db QueryExecer, userID int64
 	_, err := db.ExecContext(ctx, `
 INSERT INTO financial_reconciliation_issues (
     tenant_id, user_id, source_type, source_id, compatibility_balance, bucket_balance, metadata
-) VALUES (1, $1, $2, $3, $4, $5, jsonb_build_object('entry_type', $6))`,
+) VALUES (1, $1, $2, $3, $4, $5, jsonb_build_object('entry_type', $6::text))`,
 		userID, metadata.SourceType, sourceID, compatibilityBalance.String(), bucketBalance.String(), metadata.EntryType)
 	if err != nil {
 		return fmt.Errorf("record credit reconciliation issue: %w", err)

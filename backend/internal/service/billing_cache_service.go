@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"sync"
@@ -746,7 +747,20 @@ func (s *BillingCacheService) CheckBillingEligibility(ctx context.Context, user 
 
 	if isSubscriptionMode {
 		if err := s.checkSubscriptionEligibility(ctx, user.ID, group, subscription); err != nil {
-			return err
+			// An active subscription may be exhausted while the wallet can still
+			// fund the request. The billing transaction performs the authoritative
+			// split; this check only decides whether to let it proceed.
+			if errors.Is(err, ErrDailyLimitExceeded) ||
+				errors.Is(err, ErrWeeklyLimitExceeded) ||
+				errors.Is(err, ErrMonthlyLimitExceeded) ||
+				errors.Is(err, ErrSubscriptionInvalid) {
+				isSubscriptionMode = false
+				if err := s.checkBalanceEligibility(ctx, user.ID); err != nil {
+					return err
+				}
+			} else {
+				return err
+			}
 		}
 	} else {
 		if err := s.checkBalanceEligibility(ctx, user.ID); err != nil {

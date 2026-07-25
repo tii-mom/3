@@ -106,7 +106,9 @@ describe('AccountTestModal', () => {
       ok: true,
       body: {
         getReader: () => ({
-          read: vi.fn().mockResolvedValue({ done: true, value: undefined })
+          read: vi.fn().mockResolvedValue({ done: true, value: undefined }),
+          cancel: vi.fn().mockResolvedValue(undefined),
+          releaseLock: vi.fn()
         })
       }
     } as any)
@@ -158,11 +160,13 @@ describe('AccountTestModal', () => {
       ok: true,
       body: {
         getReader: () => ({
-          read: vi.fn().mockImplementation(() => Promise.resolve(
+        read: vi.fn().mockImplementation(() => Promise.resolve(
             chunks.length > 0
               ? { done: false, value: chunks.shift() }
               : { done: true, value: undefined }
-          ))
+          )),
+          cancel: vi.fn().mockResolvedValue(undefined),
+          releaseLock: vi.fn()
         })
       }
     } as any)

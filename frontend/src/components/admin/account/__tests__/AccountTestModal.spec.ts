@@ -48,13 +48,15 @@ function createStreamResponse(lines: string[]) {
     ok: true,
     body: {
       getReader: () => ({
-        read: vi.fn().mockImplementation(async () => {
+      read: vi.fn().mockImplementation(async () => {
           if (index < chunks.length) {
             return { done: false, value: chunks[index++] }
           }
           return { done: true, value: undefined }
-        })
-      })
+      }),
+      cancel: vi.fn().mockResolvedValue(undefined),
+      releaseLock: vi.fn()
+    })
     }
   } as Response
 }
@@ -215,5 +217,28 @@ describe('AccountTestModal', () => {
       prompt: '',
       mode: 'compact'
     })
+  })
+
+  it('parses a final SSE event without a trailing newline', async () => {
+    getAvailableModels.mockResolvedValue([
+      { id: 'gpt-5.4', display_name: 'GPT-5.4' }
+    ])
+    global.fetch = vi.fn().mockResolvedValue(
+      createStreamResponse(['data: {"type":"test_complete","success":true}'])
+    ) as any
+
+    const wrapper = mountModal({
+      id: 42,
+      name: 'OpenAI OAuth',
+      platform: 'openai',
+      type: 'oauth',
+      status: 'active'
+    })
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+    await (wrapper.vm as any).startTest()
+    await flushPromises()
+
+    expect((wrapper.vm as any).status).toBe('success')
   })
 })

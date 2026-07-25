@@ -630,6 +630,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 					zap.Any("group_id", apiKey.GroupID),
 					zap.String("model", reqModel),
 					zap.Int64("account_id", account.ID),
+					zap.String("request_id", result.RequestID),
 				).Error("openai.record_usage_failed", zap.Error(err))
 			}
 		})
@@ -1135,6 +1136,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 					zap.Any("group_id", apiKey.GroupID),
 					zap.String("model", reqModel),
 					zap.Int64("account_id", account.ID),
+					zap.String("request_id", result.RequestID),
 				).Error("openai_messages.record_usage_failed", zap.Error(err))
 			}
 		})

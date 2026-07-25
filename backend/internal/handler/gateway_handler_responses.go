@@ -289,6 +289,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 			}); err != nil {
 				reqLog.Error("gateway.responses.record_usage_failed",
 					zap.Int64("account_id", account.ID),
+					zap.String("request_id", result.RequestID),
 					zap.Error(err),
 				)
 			}

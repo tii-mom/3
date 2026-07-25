@@ -8,6 +8,7 @@ import (
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/subscriptionplan"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/payment"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
@@ -132,6 +133,66 @@ func (s *PaymentConfigService) ListPlansForSale(ctx context.Context) ([]*dbent.S
 	return s.entClient.SubscriptionPlan.Query().Where(subscriptionplan.ForSaleEQ(true)).Order(subscriptionplan.BySortOrder()).All(ctx)
 }
 
+// SyncSubscriptionPlans creates one disabled draft plan for each active subscription group
+// that does not have a plan yet. Prices are intentionally left at zero because group quota is
+// not a product price; an administrator must price the draft before putting it on sale.
+func (s *PaymentConfigService) SyncSubscriptionPlans(ctx context.Context) ([]*dbent.SubscriptionPlan, error) {
+	groups, err := s.entClient.Group.Query().
+		Where(
+			group.SubscriptionTypeEQ(domain.SubscriptionTypeSubscription),
+			group.StatusEQ(domain.StatusActive),
+			group.DeletedAtIsNil(),
+		).
+		Order(group.ByID()).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(groups) == 0 {
+		return []*dbent.SubscriptionPlan{}, nil
+	}
+
+	groupIDs := make([]int64, 0, len(groups))
+	for _, g := range groups {
+		groupIDs = append(groupIDs, int64(g.ID))
+	}
+	existing, err := s.entClient.SubscriptionPlan.Query().Where(subscriptionplan.GroupIDIn(groupIDs...)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	existingByGroup := make(map[int64]struct{}, len(existing))
+	for _, plan := range existing {
+		existingByGroup[plan.GroupID] = struct{}{}
+	}
+
+	created := make([]*dbent.SubscriptionPlan, 0)
+	for _, g := range groups {
+		groupID := int64(g.ID)
+		if _, ok := existingByGroup[groupID]; ok {
+			continue
+		}
+		validityDays := g.DefaultValidityDays
+		if validityDays <= 0 {
+			validityDays = 30
+		}
+		plan, err := s.entClient.SubscriptionPlan.Create().
+			SetGroupID(groupID).
+			SetName(g.Name).
+			SetDescription(fmt.Sprintf("%s subscription", g.Name)).
+			SetPrice(0).
+			SetValidityDays(validityDays).
+			SetValidityUnit("day").
+			SetProductName(g.Name).
+			SetForSale(false).
+			SetSortOrder(int(g.ID)).
+			Save(ctx)
+		if err != nil {
+			return nil, err
+		}
+		created = append(created, plan)
+	}
+	return created, nil
+}
+
 func (s *PaymentConfigService) CreatePlan(ctx context.Context, req CreatePlanRequest) (*dbent.SubscriptionPlan, error) {
 	if err := validatePlanRequired(req.Name, req.GroupID, req.Price, req.ValidityDays, req.ValidityUnit, req.OriginalPrice); err != nil {
 		return nil, err
@@ -157,6 +218,15 @@ func (s *PaymentConfigService) CreatePlan(ctx context.Context, req CreatePlanReq
 func (s *PaymentConfigService) UpdatePlan(ctx context.Context, id int64, req UpdatePlanRequest) (*dbent.SubscriptionPlan, error) {
 	if err := validatePlanPatch(req); err != nil {
 		return nil, err
+	}
+	if req.ForSale != nil && *req.ForSale && req.Price == nil {
+		current, err := s.GetPlan(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if current.Price <= 0 {
+			return nil, infraerrors.BadRequest("PLAN_PRICE_REQUIRED_FOR_SALE", "a plan must have a positive price before it can be put on sale")
+		}
 	}
 	u := s.entClient.SubscriptionPlan.UpdateOneID(id)
 	if req.GroupID != nil {

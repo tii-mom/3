@@ -251,6 +251,17 @@ func (h *PaymentHandler) ListPlans(c *gin.Context) {
 	response.Success(c, plans)
 }
 
+// SyncSubscriptionPlans creates missing draft plans for active subscription groups.
+// POST /api/v1/admin/payment/plans/sync
+func (h *PaymentHandler) SyncSubscriptionPlans(c *gin.Context) {
+	plans, err := h.configService.SyncSubscriptionPlans(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"created": plans, "created_count": len(plans)})
+}
+
 // CreatePlan creates a new subscription plan.
 // POST /api/v1/admin/payment/plans
 func (h *PaymentHandler) CreatePlan(c *gin.Context) {

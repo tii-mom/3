@@ -205,11 +205,13 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 				apiKey.Group.ID,
 			)
 			if subErr != nil {
-				if !skipBilling {
-					AbortWithError(c, 403, "SUBSCRIPTION_NOT_FOUND", "No active subscription found for this group")
+				if !errors.Is(subErr, service.ErrSubscriptionNotFound) {
+					AbortWithError(c, 500, "SUBSCRIPTION_LOOKUP_FAILED", "Failed to load subscription")
 					return
 				}
-				// skipBilling: 订阅不存在也放行，handler 会返回可用的数据
+				// No active subscription means the request may use wallet balance.
+				// The billing pre-check and atomic billing transaction decide whether
+				// that fallback is affordable.
 			} else {
 				subscription = sub
 			}
@@ -251,19 +253,22 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 					_, validateErr = subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
 				}
 				if validateErr != nil {
-					code := "SUBSCRIPTION_INVALID"
-					status := 403
 					if errors.Is(validateErr, service.ErrDailyLimitExceeded) ||
 						errors.Is(validateErr, service.ErrWeeklyLimitExceeded) ||
-						errors.Is(validateErr, service.ErrMonthlyLimitExceeded) {
-						code = "USAGE_LIMIT_EXCEEDED"
-						status = 429
+						errors.Is(validateErr, service.ErrMonthlyLimitExceeded) ||
+						errors.Is(validateErr, service.ErrSubscriptionInvalid) {
+						// Let the handler's billing eligibility check fall back to wallet balance.
+						subscription = nil
+					} else {
+						AbortWithError(c, 403, "SUBSCRIPTION_INVALID", validateErr.Error())
+						return
 					}
-					AbortWithError(c, status, code, validateErr.Error())
-					return
 				}
-			} else {
-				// 非订阅模式 或 订阅模式但 subscriptionService 未注入：回退到余额检查
+			}
+
+			if subscription == nil {
+				// 非订阅模式、无可用订阅、或订阅超限/失效后：回退到余额检查。
+				// 余额足够时继续交给 handler 的原子计费事务扣款；余额耗尽时在鉴权层提前拒绝。
 				if apiKey.KeyType == "tenant_wholesale" && apiKey.WholesaleBalance <= 0 {
 					AbortWithError(c, 403, "TENANT_WHOLESALE_BALANCE_INSUFFICIENT", "Tenant wholesale balance is insufficient")
 					return

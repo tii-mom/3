@@ -33,6 +33,7 @@ const (
 	codexModelsManifestCacheTTL              = 30 * time.Second
 	codexModelsManifestCacheStaleTTL         = 5 * time.Minute
 	codexModelsManifestRequestTimeout        = 15 * time.Second
+	codexImageGenerationModelSlug            = "gpt-image-2"
 )
 
 // CodexModelsManifest carries the raw upstream manifest payload plus caching
@@ -41,6 +42,69 @@ type CodexModelsManifest struct {
 	Body        []byte
 	ETag        string
 	NotModified bool
+}
+
+// InjectCodexImageGenerationModel adds the virtual image model exposed by the
+// gateway to an upstream Codex manifest. The upstream manifest is otherwise
+// passed through unchanged. A derived ETag is returned because the injected
+// body is different from the upstream representation.
+func InjectCodexImageGenerationModel(body []byte, etag string) ([]byte, string, error) {
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil, "", fmt.Errorf("decode Codex models manifest: %w", err)
+	}
+	var entries []json.RawMessage
+	if err := json.Unmarshal(envelope["models"], &entries); err != nil {
+		return nil, "", fmt.Errorf("decode Codex models: %w", err)
+	}
+
+	var template map[string]json.RawMessage
+	for _, raw := range entries {
+		var entry map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &entry); err != nil {
+			continue
+		}
+		if template == nil {
+			template = entry
+		}
+		var slug, id string
+		_ = json.Unmarshal(entry["slug"], &slug)
+		_ = json.Unmarshal(entry["id"], &id)
+		if strings.TrimSpace(slug) == codexImageGenerationModelSlug || strings.TrimSpace(id) == codexImageGenerationModelSlug {
+			return body, etag, nil
+		}
+	}
+
+	imageEntry := make(map[string]json.RawMessage, len(template)+4)
+	for key, value := range template {
+		imageEntry[key] = value
+	}
+	imageEntry["slug"] = mustJSONRaw(codexImageGenerationModelSlug)
+	imageEntry["display_name"] = mustJSONRaw("GPT Image 2")
+	imageEntry["description"] = mustJSONRaw("Generate images")
+	imageEntry["visibility"] = mustJSONRaw("list")
+	if _, hasID := template["id"]; hasID {
+		imageEntry["id"] = mustJSONRaw(codexImageGenerationModelSlug)
+	} else {
+		delete(imageEntry, "id")
+	}
+	entries = append(entries, mustJSONRaw(imageEntry))
+	envelope["models"] = mustJSONRaw(entries)
+	augmented, err := json.Marshal(envelope)
+	if err != nil {
+		return nil, "", fmt.Errorf("encode Codex models manifest: %w", err)
+	}
+	hash := sha256.Sum256(augmented)
+	derivedETag := fmt.Sprintf("W/\"codex-image-%x\"", hash[:12])
+	return augmented, derivedETag, nil
+}
+
+func mustJSONRaw(value any) json.RawMessage {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		panic(err)
+	}
+	return encoded
 }
 
 type codexModelsManifestUpstreamError struct {
@@ -547,6 +611,12 @@ func codexModelsManifestETagMatches(ifNoneMatch, etag string) bool {
 		}
 	}
 	return false
+}
+
+// CodexModelsManifestETagMatches applies the same weak-validator matching
+// rules used by the manifest cache to a gateway-generated representation.
+func CodexModelsManifestETagMatches(ifNoneMatch, etag string) bool {
+	return codexModelsManifestETagMatches(ifNoneMatch, etag)
 }
 
 func isOfficialOpenAIModelsBaseURL(raw string) bool {

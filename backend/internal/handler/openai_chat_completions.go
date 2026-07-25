@@ -355,6 +355,7 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 					zap.Any("group_id", apiKey.GroupID),
 					zap.String("model", reqModel),
 					zap.Int64("account_id", account.ID),
+					zap.String("request_id", result.RequestID),
 				).Error("openai_chat_completions.record_usage_failed", zap.Error(err))
 			}
 		})
