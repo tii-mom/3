@@ -209,7 +209,11 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			if subscription != nil {
 				c.Set(string(ContextKeySubscription), subscription)
 			}
-		} else {
+		}
+
+		if subscription == nil {
+			// 非订阅模式、无可用订阅、或订阅超限/失效后：回退到余额检查。
+			// 与主 OpenAI 认证链路保持一致，余额充足才允许进入后续原子计费。
 			if apiKey.KeyType == "tenant_wholesale" && apiKey.WholesaleBalance <= 0 {
 				abortWithGoogleError(c, 403, "Tenant wholesale balance is insufficient")
 				return

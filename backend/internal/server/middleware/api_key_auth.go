@@ -264,8 +264,11 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 						return
 					}
 				}
-			} else {
-				// 非订阅模式 或 订阅模式但 subscriptionService 未注入：回退到余额检查
+			}
+
+			if subscription == nil {
+				// 非订阅模式、无可用订阅、或订阅超限/失效后：回退到余额检查。
+				// 余额足够时继续交给 handler 的原子计费事务扣款；余额耗尽时在鉴权层提前拒绝。
 				if apiKey.KeyType == "tenant_wholesale" && apiKey.WholesaleBalance <= 0 {
 					AbortWithError(c, 403, "TENANT_WHOLESALE_BALANCE_INSUFFICIENT", "Tenant wholesale balance is insufficient")
 					return

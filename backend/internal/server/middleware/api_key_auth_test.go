@@ -154,7 +154,7 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 		}
 	})
 
-	t.Run("standard_mode_revalidates_cas_loser_from_database", func(t *testing.T) {
+	t.Run("standard_mode_revalidates_cas_loser_and_falls_back_to_balance", func(t *testing.T) {
 		cfg := &config.Config{RunMode: config.RunModeStandard}
 		apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 
@@ -198,7 +198,7 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 		req.Header.Set("x-api-key", apiKey.Key)
 		router.ServeHTTP(w, req)
 
-		require.Equal(t, http.StatusTooManyRequests, w.Code)
+		require.Equal(t, http.StatusOK, w.Code)
 	})
 
 	t.Run("simple_mode_bypasses_quota_check", func(t *testing.T) {
@@ -229,7 +229,7 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 		require.Equal(t, http.StatusOK, w.Code)
 	})
 
-	t.Run("standard_mode_enforces_quota_check", func(t *testing.T) {
+	t.Run("standard_mode_subscription_limit_falls_back_to_balance", func(t *testing.T) {
 		cfg := &config.Config{RunMode: config.RunModeStandard}
 		apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 
@@ -265,8 +265,60 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 		req.Header.Set("x-api-key", apiKey.Key)
 		router.ServeHTTP(w, req)
 
-		require.Equal(t, http.StatusTooManyRequests, w.Code)
-		require.Contains(t, w.Body.String(), "USAGE_LIMIT_EXCEEDED")
+		require.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("standard_mode_subscription_limit_rejects_when_balance_exhausted", func(t *testing.T) {
+		cfg := &config.Config{RunMode: config.RunModeStandard}
+		exhaustedUser := *user
+		exhaustedUser.Balance = 0
+		exhaustedAPIKey := *apiKey
+		exhaustedAPIKey.User = &exhaustedUser
+		apiKeyRepo := &stubApiKeyRepo{
+			getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
+				if key != exhaustedAPIKey.Key {
+					return nil, service.ErrAPIKeyNotFound
+				}
+				clone := exhaustedAPIKey
+				return &clone, nil
+			},
+		}
+		apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
+
+		now := time.Now()
+		sub := &service.UserSubscription{
+			ID:               55,
+			UserID:           exhaustedUser.ID,
+			GroupID:          group.ID,
+			Status:           service.SubscriptionStatusActive,
+			ExpiresAt:        now.Add(24 * time.Hour),
+			DailyWindowStart: &now,
+			DailyUsageUSD:    10,
+		}
+		subscriptionRepo := &stubUserSubscriptionRepo{
+			getActive: func(ctx context.Context, userID, groupID int64) (*service.UserSubscription, error) {
+				if userID != sub.UserID || groupID != sub.GroupID {
+					return nil, service.ErrSubscriptionNotFound
+				}
+				clone := *sub
+				return &clone, nil
+			},
+			updateStatus:   func(ctx context.Context, subscriptionID int64, status string) error { return nil },
+			activateWindow: func(ctx context.Context, id int64, start time.Time) error { return nil },
+			resetDaily:     func(ctx context.Context, id int64, start time.Time) error { return nil },
+			resetWeekly:    func(ctx context.Context, id int64, start time.Time) error { return nil },
+			resetMonthly:   func(ctx context.Context, id int64, start time.Time) error { return nil },
+		}
+		subscriptionService := service.NewSubscriptionService(nil, subscriptionRepo, nil, nil, cfg)
+		router := newAuthTestRouter(apiKeyService, subscriptionService, cfg)
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/t", nil)
+		req.Header.Set("x-api-key", exhaustedAPIKey.Key)
+		router.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusForbidden, w.Code)
+		requireAPIKeyAuthError(t, w, "INSUFFICIENT_BALANCE", "Insufficient account balance")
 	})
 }
 
