@@ -29,7 +29,7 @@
         <!-- Hero Section -->
         <section class="home-hero grid grid-cols-1 lg:grid-cols-12 gap-12 items-center mb-24">
           <!-- Hero Left Content -->
-          <div class="lg:col-span-7 max-w-3xl space-y-8 text-left reveal">
+          <div class="lg:col-span-7 max-w-3xl space-y-8 text-left reveal active">
             <!-- Brand Logo & Name directly in Hero -->
             <div class="flex items-center gap-3 mb-6">
               <img v-if="siteLogo" :src="siteLogo" alt="Logo" class="h-8 w-auto rounded-lg" />
@@ -85,7 +85,7 @@
           </div>
 
           <!-- Concentric Double Bezel Terminal Wrapper -->
-          <div class="rounded-4xl p-1.5 bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200/50 dark:border-white/[0.05] shadow-glass shadow-primary-500/2 reveal lg:col-span-5 flex h-fit">
+          <div class="rounded-4xl p-1.5 bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200/50 dark:border-white/[0.05] shadow-glass shadow-primary-500/2 reveal active lg:col-span-5 flex h-fit">
             <div class="home-routing-console rounded-[calc(2rem-0.375rem)] bg-white dark:bg-dark-900 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] overflow-hidden w-full flex flex-col" aria-label="3API routing control preview">
               <div class="home-console-head">
                 <div class="flex items-center gap-2"><span class="home-console-dot"></span><span>3API ROUTING CORE</span></div>
@@ -735,7 +735,14 @@ onMounted(() => {
     })
   }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' })
 
-  revealElements.forEach((el) => observer.observe(el))
+  revealElements.forEach((el) => {
+    const rect = el.getBoundingClientRect()
+    if (rect.top < window.innerHeight * 0.95 && rect.bottom > 0) {
+      el.classList.add('active')
+      return
+    }
+    observer.observe(el)
+  })
 
   codexTaskTimer = setInterval(() => {
     const currentIndex = codexTasks.value.findIndex((task) => task.id === activeCodexTask.value)

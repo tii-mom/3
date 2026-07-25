@@ -13,6 +13,7 @@ function initThemeClass() {
     savedTheme === 'dark' ||
     (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)
   document.documentElement.classList.toggle('dark', shouldUseDark)
+  document.documentElement.style.colorScheme = shouldUseDark ? 'dark' : 'light'
 }
 
 async function bootstrap() {

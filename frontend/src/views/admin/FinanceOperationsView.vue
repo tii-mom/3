@@ -46,7 +46,20 @@
           <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('finance.admin.securityFields') }}</p>
           <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">{{ t('finance.admin.securityHint') }}</p>
         </div>
-        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">TOTP<input v-model="security.totp" class="input mt-1.5 w-full" inputmode="numeric" maxlength="6" placeholder="000000" /></label>
+        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+          TOTP
+          <input
+            ref="totpInput"
+            v-model="security.totp"
+            class="input mt-1.5 w-full"
+            :class="{ 'border-amber-400 ring-2 ring-amber-400/20': totpAttention }"
+            inputmode="numeric"
+            maxlength="6"
+            placeholder="000000"
+            @input="totpAttention = false"
+          />
+          <span v-if="totpAttention" class="mt-1 block text-xs text-amber-600 dark:text-amber-400">{{ t('finance.admin.totpRequiredHint') }}</span>
+        </label>
         <label class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('finance.admin.reference') }}<input v-model="security.reference" class="input mt-1.5 w-full" /></label>
         <label class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('finance.admin.reason') }}<input v-model="security.reason" class="input mt-1.5 w-full" /></label>
         <div v-if="payoutDetails" class="sm:col-span-3 border-l-4 border-emerald-500 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
@@ -124,7 +137,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -150,6 +163,8 @@ const tierLoading = ref(false)
 const tierSaving = ref<number>()
 const tierDrafts = reactive<Record<number, number | null>>({})
 const security = reactive({ totp: '', reference: '', reason: '' })
+const totpInput = ref<HTMLInputElement>()
+const totpAttention = ref(false)
 const payoutDetails = ref<PayoutDetails>()
 const distributionEnabled = ref(false)
 const vouchersEnabled = ref(false)
@@ -198,6 +213,15 @@ const operationsSnapshot = computed(() => [
   { label: t('finance.admin.purchaseRatio'), value: `1 CNY = ${purchaseMultiplier.value} USD`, hint: t('finance.admin.purchaseRatioShortHint'), icon: 'swap' as const }
 ])
 
+async function requireTotp() {
+  if (security.totp.trim()) return true
+  totpAttention.value = true
+  app.showError(t('finance.admin.totpRequiredHint'))
+  await nextTick()
+  totpInput.value?.focus()
+  return false
+}
+
 async function load() {
   try {
     const [withdrawalPage, voucherPage, commissionPage, rechargePage, relationPage, tierPage, distributionConfig, voucherConfig] = await Promise.all([listAdminWithdrawals(), listAdminVouchers(), listAdminCommissions(), listRechargeEvents(), listDistributionRelations(), listDistributionTierMembers(), getDistributionConfig(), getVoucherConfig()])
@@ -217,13 +241,13 @@ async function load() {
   } catch (error) { app.showError(extractApiErrorMessage(error)) }
 }
 async function loadTierMembers() { tierLoading.value = true; try { const result = await listDistributionTierMembers(tierSearch.value); tierMembers.value = result.items; result.items.forEach(item => { tierDrafts[item.user_id] = item.tier_override ?? null }) } catch (error) { app.showError(extractApiErrorMessage(error)) } finally { tierLoading.value = false } }
-async function saveTier(userId: number) { if (!security.totp) return app.showError('TOTP required'); tierSaving.value = userId; try { const item = await setDistributionTierOverride(userId, tierDrafts[userId] ?? null, security.reason, security.totp); const index = tierMembers.value.findIndex(candidate => candidate.user_id === userId); if (index >= 0) tierMembers.value[index] = item; tierDrafts[userId] = item.tier_override ?? null; app.showSuccess(t('common.saved')) } catch (error) { app.showError(extractApiErrorMessage(error)) } finally { tierSaving.value = undefined } }
-async function toggleDistribution() { if (!security.totp) return app.showError('TOTP required'); try { await updateDistributionConfig(!distributionEnabled.value, security.totp); distributionEnabled.value = !distributionEnabled.value } catch (error) { app.showError(extractApiErrorMessage(error)) } }
-async function toggleVouchers() { if (!security.totp) return app.showError('TOTP required'); try { await updateVoucherConfig(!vouchersEnabled.value, security.totp); vouchersEnabled.value = !vouchersEnabled.value } catch (error) { app.showError(extractApiErrorMessage(error)) } }
-async function publishPolicy() { if (!security.totp) return app.showError('TOTP required'); publishingPolicy.value = true; try { const result = await createDistributionPolicyVersion({ ...policy, tiers: policy.tiers.map(tier => ({ ...tier, rates_bps: [...tier.rates_bps] as [number, number, number, number, number] })), totp_code: security.totp }); policyVersion.value = result.config_version; app.showSuccess(t('common.saved')); await load() } catch (error) { app.showError(extractApiErrorMessage(error)) } finally { publishingPolicy.value = false } }
-async function transition(id: number, status: string) { try { await transitionWithdrawal(id, { status, reason: security.reason, payment_reference: security.reference, totp_code: security.totp }); payoutDetails.value = undefined; await load() } catch (error) { app.showError(extractApiErrorMessage(error)) } }
-async function risk(id: number, locked: boolean) { if (!security.totp) return app.showError('TOTP required'); try { await setVoucherRiskLock(id, locked, security.reason, security.totp); await load() } catch (error) { app.showError(extractApiErrorMessage(error)) } }
-async function showPayout(id: number) { try { payoutDetails.value = await getWithdrawalPayoutDetails(id, security.totp) } catch (error) { app.showError(extractApiErrorMessage(error)) } }
-async function reverseRecharge(id: number) { if (!security.totp || !security.reason.trim()) return app.showError(t('finance.admin.reversalSecurityRequired')); if (!window.confirm(t('finance.admin.reverseChargebackConfirm'))) return; try { await reverseRechargeEvent(id, { reversal_type: 'CHARGEBACK', reason: security.reason.trim(), totp_code: security.totp }); await load(); app.showSuccess(t('common.success')) } catch (error) { app.showError(extractApiErrorMessage(error)) } }
+async function saveTier(userId: number) { if (!(await requireTotp())) return; tierSaving.value = userId; try { const item = await setDistributionTierOverride(userId, tierDrafts[userId] ?? null, security.reason, security.totp.trim()); const index = tierMembers.value.findIndex(candidate => candidate.user_id === userId); if (index >= 0) tierMembers.value[index] = item; tierDrafts[userId] = item.tier_override ?? null; app.showSuccess(t('common.saved')) } catch (error) { app.showError(extractApiErrorMessage(error)) } finally { tierSaving.value = undefined } }
+async function toggleDistribution() { if (!(await requireTotp())) return; try { await updateDistributionConfig(!distributionEnabled.value, security.totp.trim()); await load(); app.showSuccess(t('common.saved')) } catch (error) { app.showError(extractApiErrorMessage(error)) } }
+async function toggleVouchers() { if (!(await requireTotp())) return; try { await updateVoucherConfig(!vouchersEnabled.value, security.totp.trim()); await load(); app.showSuccess(t('common.saved')) } catch (error) { app.showError(extractApiErrorMessage(error)) } }
+async function publishPolicy() { if (!(await requireTotp())) return; publishingPolicy.value = true; try { const result = await createDistributionPolicyVersion({ ...policy, tiers: policy.tiers.map(tier => ({ ...tier, rates_bps: [...tier.rates_bps] as [number, number, number, number, number] })), totp_code: security.totp.trim() }); policyVersion.value = result.config_version; app.showSuccess(t('common.saved')); await load() } catch (error) { app.showError(extractApiErrorMessage(error)) } finally { publishingPolicy.value = false } }
+async function transition(id: number, status: string) { if (!(await requireTotp())) return; try { await transitionWithdrawal(id, { status, reason: security.reason, payment_reference: security.reference, totp_code: security.totp.trim() }); payoutDetails.value = undefined; await load() } catch (error) { app.showError(extractApiErrorMessage(error)) } }
+async function risk(id: number, locked: boolean) { if (!(await requireTotp())) return; try { await setVoucherRiskLock(id, locked, security.reason, security.totp.trim()); await load() } catch (error) { app.showError(extractApiErrorMessage(error)) } }
+async function showPayout(id: number) { if (!(await requireTotp())) return; try { payoutDetails.value = await getWithdrawalPayoutDetails(id, security.totp.trim()) } catch (error) { app.showError(extractApiErrorMessage(error)) } }
+async function reverseRecharge(id: number) { if (!(await requireTotp())) return; if (!security.reason.trim()) return app.showError(t('finance.admin.reversalSecurityRequired')); if (!window.confirm(t('finance.admin.reverseChargebackConfirm'))) return; try { await reverseRechargeEvent(id, { reversal_type: 'CHARGEBACK', reason: security.reason.trim(), totp_code: security.totp.trim() }); await load(); app.showSuccess(t('common.success')) } catch (error) { app.showError(extractApiErrorMessage(error)) } }
 onMounted(load)
 </script>
