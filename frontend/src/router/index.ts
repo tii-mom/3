@@ -13,6 +13,7 @@ import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
 import { getSetupStatus } from '@/api/setup'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
 import { resolveRouteDocumentTitle } from './title'
+import { shouldBootstrapAuthForRoute } from './authBootstrap'
 
 /**
  * Route definitions with lazy loading
@@ -816,24 +817,24 @@ router.beforeEach(async (to, _from, next) => {
 
   const authStore = useAuthStore()
 
-	// Restore auth state from localStorage on first navigation (page refresh)
-	if (!authInitialized) {
-		await authStore.checkAuth()
-		authInitialized = true
-	}
-
   // Set page title
   const appStore = useAppStore()
   const adminSettingsStore = useAdminSettingsStore()
+  const requiresAuth = to.meta.requiresAuth !== false // Default to true
+  const requiresAdmin = to.meta.requiresAdmin === true
+
+  // Restore auth only when the target route needs identity. Public marketing
+  // and SEO pages should not probe /auth/csrf for anonymous visitors.
+  if (!authInitialized && shouldBootstrapAuthForRoute(to.path, to.meta, appStore.backendModeEnabled)) {
+    await authStore.checkAuth()
+    authInitialized = true
+  }
+
   const customMenuItems = [
     ...(appStore.cachedPublicSettings?.custom_menu_items ?? []),
     ...(authStore.isAdmin ? adminSettingsStore.customMenuItems : []),
   ]
   document.title = resolveRouteDocumentTitle(to, appStore.siteName, customMenuItems)
-
-  // Check if route requires authentication
-  const requiresAuth = to.meta.requiresAuth !== false // Default to true
-  const requiresAdmin = to.meta.requiresAdmin === true
 
   if (to.path === '/setup') {
     try {
