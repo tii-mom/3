@@ -110,12 +110,13 @@ func (s *VoucherService) AdminConfig(ctx context.Context) (map[string]any, error
 
 func (s *VoucherService) UpdateEnabled(ctx context.Context, enabled bool) error {
 	if enabled {
-		config, err := s.loadConfig(ctx)
-		if err != nil {
+		if err := ensureCreditBucketsReady(ctx, s.db); err != nil {
 			return err
 		}
-		if !config.bucketsEnforced {
-			return ErrCreditBucketsNotEnforced
+		// Keep the technical enforcement switch out of the admin UI while making
+		// the user-facing feature toggle a complete, safe operation.
+		if err := s.settings.Set(ctx, "credit_bucket_enforce_enabled", "true"); err != nil {
+			return err
 		}
 	}
 	return s.settings.Set(ctx, "balance_voucher_enabled", strconv.FormatBool(enabled))

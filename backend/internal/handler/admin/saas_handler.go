@@ -389,6 +389,14 @@ func (h *SaaSHandler) ListPartnerWithdrawals(c *gin.Context) {
 	response.Success(c, items)
 }
 
+type saasWithdrawalTransitionRequest struct {
+	Status           string `json:"status" binding:"required"`
+	Reason           string `json:"reason"`
+	PaymentReference string `json:"payment_reference"`
+	ProofURL         string `json:"proof_url"`
+	TOTPCode         string `json:"totp_code" binding:"required"`
+}
+
 func (h *SaaSHandler) TransitionPartnerWithdrawal(c *gin.Context) {
 	subject, ok := middleware.GetAuthSubjectFromContext(c)
 	if !ok {
@@ -400,7 +408,7 @@ func (h *SaaSHandler) TransitionPartnerWithdrawal(c *gin.Context) {
 		response.BadRequest(c, "Invalid withdrawal id")
 		return
 	}
-	var request withdrawalTransitionRequest
+	var request saasWithdrawalTransitionRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
@@ -417,6 +425,10 @@ func (h *SaaSHandler) TransitionPartnerWithdrawal(c *gin.Context) {
 	response.Success(c, item)
 }
 
+type saasPayoutDetailsRequest struct {
+	TOTPCode string `json:"totp_code" binding:"required"`
+}
+
 func (h *SaaSHandler) PartnerPayoutDetails(c *gin.Context) {
 	subject, ok := middleware.GetAuthSubjectFromContext(c)
 	if !ok {
@@ -428,7 +440,7 @@ func (h *SaaSHandler) PartnerPayoutDetails(c *gin.Context) {
 		response.BadRequest(c, "Invalid withdrawal id")
 		return
 	}
-	var request payoutDetailsRequest
+	var request saasPayoutDetailsRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return

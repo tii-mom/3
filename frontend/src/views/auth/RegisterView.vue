@@ -1,6 +1,6 @@
 <template>
   <AuthLayout>
-    <div class="space-y-6">
+    <div class="auth-register-flow space-y-6">
       <!-- Title -->
       <div class="text-center">
         <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
@@ -9,6 +9,16 @@
         <p class="mt-2 text-sm text-gray-500 dark:text-dark-400">
           {{ t('auth.signUpToStart', { siteName }) }}
         </p>
+      </div>
+
+      <div
+        v-if="errorMessage"
+        class="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
+        role="alert"
+        aria-live="polite"
+      >
+        <Icon name="exclamationCircle" size="md" class="mt-0.5 shrink-0" />
+        <span>{{ errorMessage }}</span>
       </div>
 
       <!-- Registration Disabled Message -->
@@ -27,7 +37,7 @@
       </div>
 
       <!-- Registration Form -->
-      <form v-else @submit.prevent="handleRegister" class="space-y-5">
+      <form v-else @submit.prevent="handleRegister" class="space-y-5" :aria-busy="isLoading">
         <!-- Email Input -->
         <div>
           <label for="email" class="input-label">
@@ -47,9 +57,14 @@
               :disabled="registrationActionDisabled"
               class="input pl-11"
               :class="{ 'input-error': errors.email }"
+              :aria-invalid="Boolean(errors.email)"
+              :aria-describedby="errors.email ? 'register-email-error' : undefined"
               :placeholder="t('auth.emailPlaceholder')"
             />
           </div>
+          <p v-if="errors.email" id="register-email-error" class="mt-1.5 text-xs text-red-600 dark:text-red-400" role="alert">
+            {{ errors.email }}
+          </p>
         </div>
 
         <!-- Password Input -->
@@ -70,6 +85,8 @@
               :disabled="registrationActionDisabled"
               class="input pl-11 pr-11"
               :class="{ 'input-error': errors.password }"
+              :aria-invalid="Boolean(errors.password)"
+              :aria-describedby="errors.password ? 'register-password-error register-password-hint' : 'register-password-hint'"
               :placeholder="t('auth.createPasswordPlaceholder')"
             />
             <button
@@ -78,14 +95,17 @@
               @click="showPassword = !showPassword"
               :aria-label="t(showPassword ? 'auth.hidePassword' : 'auth.showPassword')"
               :aria-pressed="showPassword"
-              class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-dark-300"
+              class="absolute inset-y-0 right-0 flex min-w-11 items-center justify-center text-gray-400 transition-colors hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:hover:text-dark-300"
             >
               <Icon v-if="showPassword" name="eyeOff" size="md" />
               <Icon v-else name="eye" size="md" />
             </button>
           </div>
-          <p class="input-hint">
+          <p id="register-password-hint" class="input-hint">
             {{ t('auth.passwordHint') }}
+          </p>
+          <p v-if="errors.password" id="register-password-error" class="mt-1.5 text-xs text-red-600 dark:text-red-400" role="alert">
+            {{ errors.password }}
           </p>
         </div>
 
@@ -108,6 +128,8 @@
                 'border-green-500 focus:border-green-500 focus:ring-green-500': invitationValidation.valid,
                 'border-red-500 focus:border-red-500 focus:ring-red-500': invitationValidation.invalid || errors.invitation_code
               }"
+              :aria-invalid="invitationValidation.invalid || Boolean(errors.invitation_code)"
+              :aria-describedby="invitationValidation.invalid || errors.invitation_code ? 'register-invitation-error' : undefined"
               :placeholder="t('auth.invitationCodePlaceholder')"
               @input="handleInvitationCodeInput"
             />
@@ -134,6 +156,14 @@
               </span>
             </div>
           </transition>
+          <p
+            v-if="invitationValidation.invalid || errors.invitation_code"
+            id="register-invitation-error"
+            class="mt-1.5 text-xs text-red-600 dark:text-red-400"
+            role="alert"
+          >
+            {{ errors.invitation_code || invitationValidation.message }}
+          </p>
         </div>
 
         <!-- Promo Code Input (Optional) -->
@@ -156,6 +186,8 @@
                 'border-green-500 focus:border-green-500 focus:ring-green-500': promoValidation.valid,
                 'border-red-500 focus:border-red-500 focus:ring-red-500': promoValidation.invalid
               }"
+              :aria-invalid="promoValidation.invalid"
+              :aria-describedby="promoValidation.invalid ? 'register-promo-error' : undefined"
               :placeholder="t('auth.promoCodePlaceholder')"
               @input="handlePromoCodeInput"
             />
@@ -182,6 +214,9 @@
               </span>
             </div>
           </transition>
+          <p v-if="promoValidation.invalid" id="register-promo-error" class="mt-1.5 text-xs text-red-600 dark:text-red-400" role="alert">
+            {{ promoValidation.message }}
+          </p>
         </div>
 
         <!-- Turnstile Widget -->
@@ -211,7 +246,7 @@
         <button
           type="submit"
           :disabled="registrationActionDisabled || (turnstileEnabled && !turnstileToken)"
-          class="btn btn-primary w-full"
+          class="btn btn-primary min-h-11 w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-dark-900"
         >
           <svg
             v-if="isLoading"
@@ -920,6 +955,15 @@ async function handleRegister(): Promise<void> {
 </script>
 
 <style scoped>
+.auth-register-flow :deep(.input) {
+  min-height: 2.875rem;
+}
+
+.auth-register-flow a,
+.auth-register-flow button {
+  text-underline-offset: 3px;
+}
+
 .fade-enter-active,
 .fade-leave-active {
   transition: all 0.3s ease;
@@ -929,5 +973,16 @@ async function handleRegister(): Promise<void> {
 .fade-leave-to {
   opacity: 0;
   transform: translateY(-8px);
+}
+
+@media (max-height: 860px) {
+  .auth-register-flow {
+    max-height: calc(100dvh - 15rem);
+    min-height: 20rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 0.35rem;
+    scrollbar-width: thin;
+  }
 }
 </style>

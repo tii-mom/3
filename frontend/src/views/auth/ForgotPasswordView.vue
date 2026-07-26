@@ -1,6 +1,6 @@
 <template>
   <AuthLayout>
-    <div class="space-y-6">
+    <div class="auth-flow space-y-6">
       <!-- Title -->
       <div class="text-center">
         <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
@@ -9,6 +9,16 @@
         <p class="mt-2 text-sm text-gray-500 dark:text-dark-400">
           {{ t('auth.forgotPasswordHint') }}
         </p>
+      </div>
+
+      <div
+        v-if="errorMessage && !isSubmitted"
+        class="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
+        role="alert"
+        aria-live="polite"
+      >
+        <Icon name="exclamationCircle" size="md" class="mt-0.5 shrink-0" />
+        <span>{{ errorMessage }}</span>
       </div>
 
       <!-- Success State -->
@@ -41,7 +51,7 @@
       </div>
 
       <!-- Form State -->
-      <form v-else @submit.prevent="handleSubmit" class="space-y-5">
+      <form v-else @submit.prevent="handleSubmit" class="space-y-5" :aria-busy="isLoading">
         <!-- Email Input -->
         <div>
           <label for="email" class="input-label">
@@ -61,9 +71,14 @@
               :disabled="isLoading"
               class="input pl-11"
               :class="{ 'input-error': errors.email }"
+              :aria-invalid="Boolean(errors.email)"
+              :aria-describedby="errors.email ? 'forgot-email-error' : undefined"
               :placeholder="t('auth.emailPlaceholder')"
             />
           </div>
+          <p v-if="errors.email" id="forgot-email-error" class="mt-1.5 text-xs text-red-600 dark:text-red-400" role="alert">
+            {{ errors.email }}
+          </p>
         </div>
 
         <!-- Turnstile Widget -->
@@ -81,7 +96,7 @@
         <button
           type="submit"
           :disabled="isLoading || (turnstileEnabled && !turnstileToken)"
-          class="btn btn-primary w-full"
+          class="btn btn-primary min-h-11 w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-dark-900"
         >
           <svg
             v-if="isLoading"
@@ -269,6 +284,15 @@ async function handleSubmit(): Promise<void> {
 </script>
 
 <style scoped>
+.auth-flow :deep(.input) {
+  min-height: 2.875rem;
+}
+
+.auth-flow a,
+.auth-flow button {
+  text-underline-offset: 3px;
+}
+
 .fade-enter-active,
 .fade-leave-active {
   transition: all 0.3s ease;

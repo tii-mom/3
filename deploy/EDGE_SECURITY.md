@@ -1,6 +1,6 @@
 # Edge and HTTP Ingress Security
 
-Sub2API supports long-lived SSE and WebSocket requests. Protect the request
+3API supports long-lived SSE and WebSocket requests. Protect the request
 ingress without imposing a response `WriteTimeout`: a write deadline would
 terminate healthy long generations and streams.
 
@@ -30,7 +30,7 @@ the application's responsibility.
 ## Trusted client IPs
 
 `server.trusted_proxies` must contain only the CIDR/IP addresses that connect
-directly to Sub2API, normally the local Nginx/Caddy address or the private load
+directly to 3API, normally the local Nginx/Caddy address or the private load
 balancer subnet. An empty list disables forwarded-IP trust.
 
 Never trust `CF-Connecting-IP`, `X-Real-IP`, or `X-Forwarded-For` merely because
@@ -135,7 +135,7 @@ api.example.com {
 Replace the documentation ranges with the CDN's published, automatically
 maintained egress ranges. `CF-Connecting-IP` is safe here only because direct
 origin access is blocked and Caddy trusts only those TCP peers. Configure
-Sub2API `server.trusted_proxies` with the Caddy address/private subnet so the
+3API `server.trusted_proxies` with the Caddy address/private subnet so the
 application accepts only Caddy's rewritten headers.
 
 Caddy core does not provide a general request-rate limiter; use a trusted

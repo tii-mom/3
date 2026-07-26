@@ -1,6 +1,6 @@
-# Sub2API Docker Image
+# 3API Docker Image
 
-Sub2API is an AI API Gateway Platform for distributing and managing AI product subscription API quotas.
+3API is an AI API Gateway Platform for distributing and managing AI product subscription API quotas.
 
 ## Quick Start
 

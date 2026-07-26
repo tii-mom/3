@@ -1,12 +1,12 @@
 <template>
-  <div class="flex items-center gap-1.5">
+  <div class="inline-flex min-h-6 items-center gap-1.5 rounded border border-gray-200 bg-gray-50 px-2 dark:border-dark-700 dark:bg-dark-800">
     <span
       :class="[
-        'inline-block h-2 w-2 rounded-full',
+        'inline-block h-1.5 w-1.5 rounded-full',
         variantClass
       ]"
     ></span>
-    <span class="text-sm text-gray-700 dark:text-gray-300">
+    <span class="text-xs font-medium text-gray-700 dark:text-gray-300">
       {{ label }}
     </span>
   </div>
@@ -24,11 +24,11 @@ const variantClass = computed(() => {
   switch (props.status) {
     case 'active':
     case 'success':
-      return 'bg-green-500'
+      return 'bg-emerald-500'
     case 'disabled':
     case 'inactive':
     case 'warning':
-      return 'bg-yellow-500'
+      return 'bg-amber-500'
     case 'error':
     case 'danger':
       return 'bg-red-500'

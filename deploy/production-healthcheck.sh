@@ -60,11 +60,11 @@ else
 fi
 
 if (( ${#failures[@]} > 0 )); then
-  message="Sub2API health check failed: ${failures[*]}"
+	message="3API health check failed: ${failures[*]}"
   logger -p daemon.err -t sub2api-health "$message"
   printf '%s\n' "$message" >&2
   exit 1
 fi
 
-logger -p daemon.info -t sub2api-health "Sub2API health check passed"
-printf 'Sub2API health check passed.\n'
+logger -p daemon.info -t sub2api-health "3API health check passed"
+printf '3API health check passed.\n'

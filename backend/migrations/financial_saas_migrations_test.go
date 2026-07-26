@@ -123,3 +123,17 @@ func TestDistributionConversionUsesPaymentPurchaseMultiplier(t *testing.T) {
 	require.Contains(t, sql, "IF NOT EXISTS (")
 	require.Contains(t, sql, "FROM pg_constraint")
 }
+
+func TestFreshInstallFinancialFeatureDefaultsAreEmptyDatabaseOnly(t *testing.T) {
+	sql := normalizedMigration(t, "192_fresh_install_financial_feature_defaults.sql")
+	require.Contains(t, sql, "SELECT COUNT(*) INTO user_count FROM users")
+	require.Contains(t, sql, "SELECT COUNT(*) INTO payment_order_count FROM payment_orders")
+	require.Contains(t, sql, "SELECT COUNT(*) INTO credit_account_count FROM user_credit_accounts")
+	require.Contains(t, sql, "SELECT COUNT(*) INTO credit_ledger_count FROM user_credit_ledger")
+	require.Contains(t, sql, "SELECT COUNT(*) INTO voucher_count FROM balance_vouchers")
+	require.Contains(t, sql, "value = 'true'")
+	require.Contains(t, sql, "'credit_bucket_enforce_enabled'")
+	require.Contains(t, sql, "'balance_voucher_enabled'")
+	require.Contains(t, sql, "'distribution_enabled'")
+	require.Contains(t, sql, "SET enabled = TRUE")
+}

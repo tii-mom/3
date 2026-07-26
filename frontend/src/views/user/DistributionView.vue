@@ -6,18 +6,18 @@
           <h1 class="text-xl font-semibold text-gray-950 dark:text-white">{{ t('finance.distribution.title') }}</h1>
           <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">{{ t('finance.distribution.subtitle') }}</p>
         </div>
-        <div class="max-w-full overflow-x-auto self-start" role="tablist" :aria-label="t('finance.distribution.title')">
-          <div class="inline-flex h-9 min-w-max border border-gray-200 bg-gray-50 p-0.5 dark:border-dark-700 dark:bg-dark-800">
-          <button v-for="tab in tabs" :key="tab.id" type="button" role="tab" :aria-selected="activeTab === tab.id" :tabindex="activeTab === tab.id ? 0 : -1" class="inline-flex items-center gap-1.5 px-3 text-sm" :class="activeTab === tab.id ? 'bg-white font-medium text-gray-950 shadow-sm dark:bg-dark-700 dark:text-white' : 'text-gray-500'" @click="activeTab = tab.id"><Icon :name="tab.icon" size="xs" />{{ tab.label }}</button>
+        <div class="relative max-w-full self-start after:pointer-events-none after:absolute after:inset-y-0 after:right-0 after:w-7 after:bg-gradient-to-l after:from-white after:to-transparent sm:after:hidden dark:after:from-dark-900" role="tablist" :aria-label="t('finance.distribution.title')">
+          <div class="flex max-w-[calc(100vw-2rem)] snap-x snap-mandatory overflow-x-auto border border-gray-200 bg-gray-50 p-0.5 pr-6 sm:max-w-none sm:pr-0 dark:border-dark-700 dark:bg-dark-800">
+          <button v-for="tab in tabs" :key="tab.id" type="button" role="tab" :aria-selected="activeTab === tab.id" :tabindex="activeTab === tab.id ? 0 : -1" class="inline-flex min-h-10 flex-none snap-start items-center gap-1.5 px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500" :class="activeTab === tab.id ? 'bg-white font-medium text-gray-950 shadow-sm dark:bg-dark-700 dark:text-white' : 'text-gray-500'" @click="activeTab = tab.id"><Icon :name="tab.icon" size="xs" />{{ tab.label }}</button>
           </div>
         </div>
       </section>
 
       <template v-if="dashboard">
-        <section class="grid gap-px overflow-hidden border border-gray-200 bg-gray-200 sm:grid-cols-2 lg:grid-cols-4 dark:border-dark-700 dark:bg-dark-700">
-          <div v-for="stat in stats" :key="stat.label" class="bg-white p-5 dark:bg-dark-900">
-            <div class="flex items-center gap-2 text-gray-500"><Icon :name="stat.icon" size="sm" class="text-primary-600 dark:text-primary-400" /><p class="text-xs font-medium uppercase">{{ stat.label }}</p></div>
-            <p class="mt-2 font-mono text-2xl font-semibold tabular-nums text-gray-950 dark:text-white">{{ stat.value }}</p>
+        <section class="grid grid-cols-2 gap-px overflow-hidden border border-gray-200 bg-gray-200 lg:grid-cols-4 dark:border-dark-700 dark:bg-dark-700">
+          <div v-for="stat in stats" :key="stat.label" class="min-w-0 bg-white p-3 sm:p-5 dark:bg-dark-900">
+            <div class="flex items-center gap-2 text-gray-500"><Icon :name="stat.icon" size="sm" class="flex-none text-primary-600 dark:text-primary-400" /><p class="truncate text-xs font-medium" :title="stat.label">{{ stat.label }}</p></div>
+            <p class="mt-2 truncate font-mono text-lg font-semibold tabular-nums text-gray-950 sm:text-2xl dark:text-white" :title="stat.value">{{ stat.value }}</p>
           </div>
         </section>
 
@@ -26,13 +26,12 @@
             <h2 id="company-unit-overview-title" class="text-base font-semibold text-gray-900 dark:text-white">{{ t('finance.distribution.unitOverview') }}</h2>
             <span v-if="previewDataEnabled" class="inline-flex items-center gap-1.5 border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-200"><Icon name="eye" size="xs" />{{ t('finance.distribution.previewDataBadge') }}</span>
           </div>
-          <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <article v-for="summary in companySummaries" :key="`unit-card-${summary.depth}`" class="group border border-gray-200 bg-white p-4 transition-colors hover:border-primary-300 dark:border-dark-700 dark:bg-dark-900 dark:hover:border-primary-800">
+          <div class="grid grid-cols-2 gap-3 xl:grid-cols-5">
+            <article v-for="summary in companySummaries" :key="`unit-card-${summary.depth}`" class="group min-w-0 border border-gray-200 bg-white p-3 transition-colors hover:border-primary-300 sm:p-4 dark:border-dark-700 dark:bg-dark-900 dark:hover:border-primary-800">
               <div class="flex items-start justify-between gap-3">
                 <span class="flex h-10 w-10 items-center justify-center border border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-900/60 dark:bg-primary-950/30 dark:text-primary-300"><Icon :name="companyUnitIcons[summary.depth - 1]" size="md" /></span>
-                <span class="font-mono text-xs text-gray-400 dark:text-dark-500">D{{ summary.depth }}</span>
               </div>
-              <h3 class="mt-4 text-sm font-semibold text-gray-900 dark:text-white">{{ companyUnitName(summary.depth) }}</h3>
+              <h3 class="mt-3 text-sm font-semibold leading-5 text-gray-900 dark:text-white">{{ companyUnitName(summary.depth) }}</h3>
               <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">{{ formatCount(summary.member_count) }} {{ t('finance.distribution.memberCount') }}</p>
               <dl class="mt-4 space-y-2 border-t border-gray-100 pt-3 text-xs dark:border-dark-700">
                 <div class="flex items-center justify-between gap-2"><dt class="text-gray-500">{{ t('finance.distribution.recharge') }}</dt><dd class="font-mono font-medium tabular-nums text-gray-900 dark:text-white">{{ cny(summary.recharge_cny_minor) }}</dd></div>

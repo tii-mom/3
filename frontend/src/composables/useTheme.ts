@@ -12,6 +12,7 @@ export function useTheme() {
     if (typeof document === 'undefined') return
     isDark.value = !isDark.value
     document.documentElement.classList.toggle('dark', isDark.value)
+    document.documentElement.style.colorScheme = isDark.value ? 'dark' : 'light'
     localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
   }
 

@@ -1,6 +1,6 @@
 <template>
   <AuthLayout>
-    <div class="space-y-6">
+    <div class="auth-flow space-y-6">
       <!-- Title -->
       <div class="text-center">
         <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
@@ -9,6 +9,16 @@
         <p class="mt-2 text-sm text-gray-500 dark:text-dark-400">
           {{ t('auth.resetPasswordHint') }}
         </p>
+      </div>
+
+      <div
+        v-if="errorMessage && !isInvalidLink && !isSuccess"
+        class="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
+        role="alert"
+        aria-live="polite"
+      >
+        <Icon name="exclamationCircle" size="md" class="mt-0.5 shrink-0" />
+        <span>{{ errorMessage }}</span>
       </div>
 
       <!-- Invalid Link State -->
@@ -69,7 +79,7 @@
       </div>
 
       <!-- Form State -->
-      <form v-else @submit.prevent="handleSubmit" class="space-y-5">
+      <form v-else @submit.prevent="handleSubmit" class="space-y-5" :aria-busy="isLoading">
         <!-- Email (readonly) -->
         <div>
           <label for="email" class="input-label">
@@ -108,6 +118,8 @@
               :disabled="isLoading"
               class="input pl-11 pr-11"
               :class="{ 'input-error': errors.password }"
+              :aria-invalid="Boolean(errors.password)"
+              :aria-describedby="errors.password ? 'reset-password-error' : undefined"
               :placeholder="t('auth.newPasswordPlaceholder')"
             />
             <button
@@ -115,12 +127,15 @@
               @click="showPassword = !showPassword"
               :aria-label="t(showPassword ? 'auth.hidePassword' : 'auth.showPassword')"
               :aria-pressed="showPassword"
-              class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-dark-300"
+              class="absolute inset-y-0 right-0 flex min-w-11 items-center justify-center text-gray-400 transition-colors hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:hover:text-dark-300"
             >
               <Icon v-if="showPassword" name="eyeOff" size="md" />
               <Icon v-else name="eye" size="md" />
             </button>
           </div>
+          <p v-if="errors.password" id="reset-password-error" class="mt-1.5 text-xs text-red-600 dark:text-red-400" role="alert">
+            {{ errors.password }}
+          </p>
         </div>
 
         <!-- Confirm Password Input -->
@@ -141,6 +156,8 @@
               :disabled="isLoading"
               class="input pl-11 pr-11"
               :class="{ 'input-error': errors.confirmPassword }"
+              :aria-invalid="Boolean(errors.confirmPassword)"
+              :aria-describedby="errors.confirmPassword ? 'reset-confirm-error' : undefined"
               :placeholder="t('auth.confirmPasswordPlaceholder')"
             />
             <button
@@ -148,19 +165,22 @@
               @click="showConfirmPassword = !showConfirmPassword"
               :aria-label="t(showConfirmPassword ? 'auth.hidePassword' : 'auth.showPassword')"
               :aria-pressed="showConfirmPassword"
-              class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-dark-300"
+              class="absolute inset-y-0 right-0 flex min-w-11 items-center justify-center text-gray-400 transition-colors hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:hover:text-dark-300"
             >
               <Icon v-if="showConfirmPassword" name="eyeOff" size="md" />
               <Icon v-else name="eye" size="md" />
             </button>
           </div>
+          <p v-if="errors.confirmPassword" id="reset-confirm-error" class="mt-1.5 text-xs text-red-600 dark:text-red-400" role="alert">
+            {{ errors.confirmPassword }}
+          </p>
         </div>
 
         <!-- Submit Button -->
         <button
           type="submit"
           :disabled="isLoading"
-          class="btn btn-primary w-full"
+          class="btn btn-primary min-h-11 w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-dark-900"
         >
           <svg
             v-if="isLoading"
@@ -337,6 +357,15 @@ async function handleSubmit(): Promise<void> {
 </script>
 
 <style scoped>
+.auth-flow :deep(.input) {
+  min-height: 2.875rem;
+}
+
+.auth-flow a,
+.auth-flow button {
+  text-underline-offset: 3px;
+}
+
 .fade-enter-active,
 .fade-leave-active {
   transition: all 0.3s ease;

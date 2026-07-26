@@ -127,7 +127,24 @@ export default {
         xs: '2px'
       },
       borderRadius: {
-        '4xl': '2rem'
+        none: '0',
+        sm: '4px',
+        DEFAULT: '4px',
+        md: '5px',
+        lg: '6px',
+        xl: '7px',
+        '2xl': '8px',
+        '3xl': '8px',
+        '4xl': '8px',
+        full: '9999px'
+      },
+      letterSpacing: {
+        tighter: '0',
+        tight: '0',
+        normal: '0',
+        wide: '0',
+        wider: '0',
+        widest: '0'
       }
     }
   },

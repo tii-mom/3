@@ -29,14 +29,14 @@
         <!-- Hero Section -->
         <section class="home-hero grid grid-cols-1 lg:grid-cols-12 gap-12 items-center mb-24">
           <!-- Hero Left Content -->
-          <div class="lg:col-span-7 max-w-3xl space-y-8 text-left reveal">
+          <div class="lg:col-span-7 max-w-3xl space-y-8 text-left reveal active">
             <!-- Brand Logo & Name directly in Hero -->
-            <div class="flex items-center gap-3 mb-6">
-              <img v-if="siteLogo" :src="siteLogo" alt="Logo" class="h-8 w-auto rounded-lg" />
-              <div v-else class="h-8 w-8 rounded-lg bg-primary-505 bg-gradient-primary flex items-center justify-center text-white font-black text-sm shadow-sm select-none">
+            <div class="flex max-w-full flex-wrap items-center gap-4 mb-6">
+              <img v-if="siteLogo" :src="siteLogo" alt="Logo" class="h-14 w-auto max-w-[min(16rem,70vw)] rounded-lg object-contain sm:h-16" />
+              <div v-else class="h-14 w-14 shrink-0 rounded-lg bg-primary-505 bg-gradient-primary flex items-center justify-center text-white font-black text-xl shadow-sm select-none sm:h-16 sm:w-16">
                 3
               </div>
-              <span class="text-xl font-black text-slate-900 dark:text-white">{{ siteName }}</span>
+              <span class="text-xl font-black text-slate-900 dark:text-white sm:text-2xl">{{ siteName }}</span>
             </div>
 
             <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-7.5xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.15]">
@@ -46,7 +46,10 @@
               </span>
             </h1>
 
-            <p class="text-lg text-slate-600 dark:text-gray-400 max-w-lg leading-relaxed font-sans">
+            <p
+              v-if="showSiteSubtitle"
+              class="home-hero-description text-lg text-slate-600 dark:text-gray-400 max-w-lg leading-relaxed font-sans"
+            >
               {{ siteSubtitle.startsWith('home.') ? t(siteSubtitle) : siteSubtitle }}
             </p>
 
@@ -85,7 +88,7 @@
           </div>
 
           <!-- Concentric Double Bezel Terminal Wrapper -->
-          <div class="rounded-4xl p-1.5 bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200/50 dark:border-white/[0.05] shadow-glass shadow-primary-500/2 reveal lg:col-span-5 flex h-fit">
+          <div class="rounded-4xl p-1.5 bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200/50 dark:border-white/[0.05] shadow-glass shadow-primary-500/2 reveal active lg:col-span-5 flex h-fit">
             <div class="home-routing-console rounded-[calc(2rem-0.375rem)] bg-white dark:bg-dark-900 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] overflow-hidden w-full flex flex-col" aria-label="3API routing control preview">
               <div class="home-console-head">
                 <div class="flex items-center gap-2"><span class="home-console-dot"></span><span>3API ROUTING CORE</span></div>
@@ -394,22 +397,22 @@
                   <!-- Nav list -->
                   <ul class="space-y-1 text-left">
                     <li>
-                      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg bg-white/[0.04] text-xs font-semibold text-white">
+                      <button type="button" class="flex w-full items-center gap-3 px-3 py-2 rounded-lg bg-white/[0.04] text-left text-xs font-semibold text-white" aria-current="page">
                         <Icon name="edit" class="h-4 w-4 text-primary-400" />
                         <span>{{ t('home.codex.newtask') }}</span>
-                      </a>
+                      </button>
                     </li>
                     <li>
-                      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/[0.02] transition-all">
+                      <button type="button" class="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-left text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/[0.02] transition-all">
                         <Icon name="clock" class="h-4 w-4" />
                         <span>{{ t('home.codex.scheduled') }}</span>
-                      </a>
+                      </button>
                     </li>
                     <li>
-                      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/[0.02] transition-all">
+                      <button type="button" class="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-left text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/[0.02] transition-all">
                         <Icon name="swap" class="h-4 w-4" />
                         <span>{{ t('home.codex.plugins') }}</span>
-                      </a>
+                      </button>
                     </li>
                   </ul>
                 </div>
@@ -647,10 +650,11 @@ import { useAuthStore, useAppStore } from '@/stores'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { sanitizeUrl } from '@/utils/url'
+import { PRODUCT_NAME } from '@/constants/brand'
 import { useTheme } from '@/composables/useTheme'
 import DOMPurify from 'dompurify'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -671,8 +675,12 @@ const topModels = [
 
 const isCcsImported = ref(false)
 
-const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || '3API')
+const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || PRODUCT_NAME)
 const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || t('home.heroDesc'))
+const showSiteSubtitle = computed(() => {
+  if (!String(locale.value).toLowerCase().startsWith('zh')) return true
+  return !/^AI API gateway for unified model access$/i.test(siteSubtitle.value.trim())
+})
 const siteLogo = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
 const docUrl = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.doc_url || appStore.docUrl || ''))
 const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
@@ -735,7 +743,14 @@ onMounted(() => {
     })
   }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' })
 
-  revealElements.forEach((el) => observer.observe(el))
+  revealElements.forEach((el) => {
+    const rect = el.getBoundingClientRect()
+    if (rect.top < window.innerHeight * 0.95 && rect.bottom > 0) {
+      el.classList.add('active')
+      return
+    }
+    observer.observe(el)
+  })
 
   codexTaskTimer = setInterval(() => {
     const currentIndex = codexTasks.value.findIndex((task) => task.id === activeCodexTask.value)
@@ -1339,21 +1354,86 @@ onUnmounted(() => {
   }
 
   .home-redesign .home-main {
-    padding-top: 4rem;
+    padding-top: 2.75rem;
+    padding-bottom: 6rem;
+  }
+
+  .home-redesign .home-hero {
+    gap: 1.75rem;
+    margin-bottom: 5.5rem;
+  }
+
+  .home-redesign .home-hero > div:first-child {
+    gap: 1.25rem;
+  }
+
+  .home-redesign .home-hero > div:first-child > div:first-child {
+    margin-bottom: 0;
   }
 
   .home-redesign .home-hero h1 {
-    font-size: clamp(2.8rem, 15vw, 4.4rem);
+    font-size: clamp(2.55rem, 13.5vw, 3.65rem);
+    letter-spacing: 0;
   }
 
-  .home-console-body,
-  .home-preview-grid {
-    grid-template-columns: 1fr;
+  .home-redesign .home-hero h1 span:last-child {
+    margin-top: 0.65rem;
+    font-size: clamp(1.35rem, 6.5vw, 1.8rem);
+    line-height: 1.25;
+  }
+
+  .home-redesign .home-hero .btn {
+    min-height: 3rem;
+    padding-inline: 1.5rem;
+  }
+
+  .home-routing-console {
+    min-height: 17.25rem;
+  }
+
+  .home-console-head {
+    padding: 0.75rem 0.85rem;
+  }
+
+  .home-console-body {
+    grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+    min-height: 14.25rem;
+  }
+
+  .home-console-request,
+  .home-console-routes {
+    padding: 0.75rem;
   }
 
   .home-console-request {
-    border-right: 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    gap: 0.45rem;
+    border-right: 1px solid var(--home-line);
+    border-bottom: 0;
+  }
+
+  .home-console-request strong {
+    font-size: 0.78rem;
+    overflow-wrap: anywhere;
+  }
+
+  .home-request-row,
+  .home-console-trace,
+  .home-route {
+    font-size: 0.6rem;
+  }
+
+  .home-route {
+    gap: 0.4rem;
+    min-height: 2.6rem;
+    padding: 0.55rem 0.6rem;
+  }
+
+  .home-route strong {
+    font-size: 0.56rem;
+  }
+
+  .home-preview-grid {
+    grid-template-columns: 1fr;
   }
 
   .home-preview-controls {
@@ -1376,9 +1456,19 @@ onUnmounted(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .animate-marquee,
+  .particle-anim-bar,
+  .home-redesign .home-atmosphere,
   .home-business-card,
   .home-route,
   .home-business-link svg {
+    animation: none;
+    transition: none;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
     transition: none;
   }
 }
