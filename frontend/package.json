@@ -6,8 +6,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "pnpm run brand:check && vue-tsc -b && vite build",
+    "build": "pnpm run brand:check && vue-tsc -b && vite build && pnpm run seo:check",
     "brand:check": "node scripts/check-public-brand.mjs",
+    "seo:check": "node scripts/check-built-seo.mjs",
     "preview": "vite preview",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
     "lint:check": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts",
