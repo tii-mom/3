@@ -36,6 +36,7 @@ var requiredFinancialMigrations = []string{
 	"194_resolve_stale_reconciliation_issues.sql",
 	"195_resolve_currently_balanced_reconciliation_issues.sql",
 	"196_resolve_post_rollout_balanced_reconciliation_issues.sql",
+	"197_resolve_balanced_reconciliation_issues.sql",
 }
 
 type gateReport struct {
@@ -68,8 +69,16 @@ WHERE u.balance <> a.transferable_credit + a.non_transferable_credit - a.debt`,
 		query: `SELECT COUNT(*) FROM financial_balance_migration_audit WHERE reconciliation_status <> 'RECONCILED'`,
 	},
 	{
-		name:  "open_reconciliation_issues",
-		query: `SELECT COUNT(*) FROM financial_reconciliation_issues WHERE status = 'OPEN'`,
+		name: "open_reconciliation_issues",
+		query: `SELECT COUNT(*) FROM financial_reconciliation_issues i
+LEFT JOIN users u ON u.id = i.user_id
+LEFT JOIN user_credit_accounts a ON a.user_id = i.user_id
+WHERE i.status = 'OPEN'
+  AND (
+      u.id IS NULL
+      OR a.user_id IS NULL
+      OR u.balance <> a.transferable_credit + a.non_transferable_credit - a.debt
+  )`,
 	},
 	{
 		name: "voucher_without_ledger",

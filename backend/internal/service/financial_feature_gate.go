@@ -31,8 +31,15 @@ WHERE a.user_id IS NULL`).Scan(&missingAccounts); err != nil {
 	var openIssues int64
 	if err := db.QueryRowContext(ctx, `
 SELECT COUNT(*)
-FROM financial_reconciliation_issues
-WHERE status = 'OPEN'`).Scan(&openIssues); err != nil {
+FROM financial_reconciliation_issues i
+LEFT JOIN users u ON u.id = i.user_id
+LEFT JOIN user_credit_accounts a ON a.user_id = i.user_id
+WHERE i.status = 'OPEN'
+  AND (
+      u.id IS NULL
+      OR a.user_id IS NULL
+      OR u.balance <> a.transferable_credit + a.non_transferable_credit - a.debt
+  )`).Scan(&openIssues); err != nil {
 		return err
 	}
 

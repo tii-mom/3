@@ -173,3 +173,15 @@ func TestLatestPostRolloutReconciliationIssueResolutionIsAuditOnlyAndBalanceGuar
 	require.NotContains(t, strings.ToLower(sql), "delete from")
 	require.NotContains(t, strings.ToLower(sql), "drop table")
 }
+
+func TestRecurringBalancedReconciliationIssueResolutionIsAuditOnlyAndBalanceGuarded(t *testing.T) {
+	sql := normalizedMigration(t, "197_resolve_balanced_reconciliation_issues.sql")
+	require.Contains(t, sql, "UPDATE financial_reconciliation_issues AS i")
+	require.Contains(t, sql, "SET status = 'RESOLVED'")
+	require.Contains(t, sql, "resolved_at = COALESCE(i.resolved_at, NOW())")
+	require.Contains(t, sql, "'auto_resolved_by', '197_resolve_balanced_reconciliation_issues'")
+	require.Contains(t, sql, "i.status = 'OPEN'")
+	require.Contains(t, sql, "u.balance = a.transferable_credit + a.non_transferable_credit - a.debt")
+	require.NotContains(t, strings.ToLower(sql), "delete from")
+	require.NotContains(t, strings.ToLower(sql), "drop table")
+}
