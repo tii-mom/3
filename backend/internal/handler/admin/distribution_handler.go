@@ -12,11 +12,10 @@ import (
 
 type DistributionHandler struct {
 	service *service.DistributionService
-	totp    *service.TotpService
 }
 
-func NewDistributionHandler(distributionService *service.DistributionService, totpService *service.TotpService) *DistributionHandler {
-	return &DistributionHandler{service: distributionService, totp: totpService}
+func NewDistributionHandler(distributionService *service.DistributionService, _ *service.TotpService) *DistributionHandler {
+	return &DistributionHandler{service: distributionService}
 }
 
 func (h *DistributionHandler) ListWithdrawals(c *gin.Context) {
@@ -82,7 +81,6 @@ func (h *DistributionHandler) ListTierAssignments(c *gin.Context) {
 type tierOverrideRequest struct {
 	TierOverride *int   `json:"tier_override"`
 	Reason       string `json:"reason"`
-	TOTPCode     string `json:"totp_code" binding:"required"`
 }
 
 func (h *DistributionHandler) SetTierOverride(c *gin.Context) {
@@ -101,10 +99,6 @@ func (h *DistributionHandler) SetTierOverride(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
-	if err := h.totp.VerifyCode(c.Request.Context(), subject.UserID, request.TOTPCode); err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
 	item, err := h.service.AdminSetTierOverride(c.Request.Context(), subject.UserID, userID, request.TierOverride, request.Reason)
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -116,7 +110,6 @@ func (h *DistributionHandler) SetTierOverride(c *gin.Context) {
 type distributionReversalRequest struct {
 	ReversalType string `json:"reversal_type" binding:"required"`
 	Reason       string `json:"reason" binding:"required"`
-	TOTPCode     string `json:"totp_code" binding:"required"`
 }
 
 func (h *DistributionHandler) ReverseRecharge(c *gin.Context) {
@@ -133,10 +126,6 @@ func (h *DistributionHandler) ReverseRecharge(c *gin.Context) {
 	var request distributionReversalRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
-		return
-	}
-	if err := h.totp.VerifyCode(c.Request.Context(), subject.UserID, request.TOTPCode); err != nil {
-		response.ErrorFrom(c, err)
 		return
 	}
 	item, err := h.service.ReverseRecharge(c.Request.Context(), eventID, subject.UserID, request.ReversalType, request.Reason)
@@ -176,22 +165,12 @@ func (h *DistributionHandler) GetExchangeRate(c *gin.Context) {
 
 type exchangeRateRequest struct {
 	USDToCNYRate string `json:"usd_to_cny_rate" binding:"required"`
-	TOTPCode     string `json:"totp_code" binding:"required"`
 }
 
 func (h *DistributionHandler) UpdateExchangeRate(c *gin.Context) {
-	subject, ok := middleware.GetAuthSubjectFromContext(c)
-	if !ok {
-		response.Unauthorized(c, "Admin not authenticated")
-		return
-	}
 	var request exchangeRateRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
-		return
-	}
-	if err := h.totp.VerifyCode(c.Request.Context(), subject.UserID, request.TOTPCode); err != nil {
-		response.ErrorFrom(c, err)
 		return
 	}
 	rate, err := decimal.NewFromString(request.USDToCNYRate)
@@ -207,29 +186,18 @@ func (h *DistributionHandler) UpdateExchangeRate(c *gin.Context) {
 }
 
 type distributionConfigRequest struct {
-	Enabled         bool   `json:"enabled"`
-	StackWithLegacy bool   `json:"stack_with_legacy"`
-	TOTPCode        string `json:"totp_code" binding:"required"`
+	Enabled         bool `json:"enabled"`
+	StackWithLegacy bool `json:"stack_with_legacy"`
 }
 
 type financialRuntimeConfigRequest struct {
-	CreditBucketEnforceEnabled bool   `json:"credit_bucket_enforce_enabled"`
-	TOTPCode                   string `json:"totp_code" binding:"required"`
+	CreditBucketEnforceEnabled bool `json:"credit_bucket_enforce_enabled"`
 }
 
 func (h *DistributionHandler) UpdateFinancialRuntimeConfig(c *gin.Context) {
-	subject, ok := middleware.GetAuthSubjectFromContext(c)
-	if !ok {
-		response.Unauthorized(c, "Admin not authenticated")
-		return
-	}
 	var request financialRuntimeConfigRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
-		return
-	}
-	if err := h.totp.VerifyCode(c.Request.Context(), subject.UserID, request.TOTPCode); err != nil {
-		response.ErrorFrom(c, err)
 		return
 	}
 	if err := h.service.UpdateFinancialRuntimeConfig(c.Request.Context(), request.CreditBucketEnforceEnabled); err != nil {
@@ -241,7 +209,6 @@ func (h *DistributionHandler) UpdateFinancialRuntimeConfig(c *gin.Context) {
 
 type distributionPolicyRequest struct {
 	service.DistributionPolicyInput
-	TOTPCode string `json:"totp_code" binding:"required"`
 }
 
 func (h *DistributionHandler) CreatePolicyVersion(c *gin.Context) {
@@ -255,10 +222,6 @@ func (h *DistributionHandler) CreatePolicyVersion(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
-	if err := h.totp.VerifyCode(c.Request.Context(), subject.UserID, request.TOTPCode); err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
 	version, err := h.service.CreatePolicyVersion(c.Request.Context(), subject.UserID, request.DistributionPolicyInput)
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -268,18 +231,9 @@ func (h *DistributionHandler) CreatePolicyVersion(c *gin.Context) {
 }
 
 func (h *DistributionHandler) UpdateConfig(c *gin.Context) {
-	subject, ok := middleware.GetAuthSubjectFromContext(c)
-	if !ok {
-		response.Unauthorized(c, "Admin not authenticated")
-		return
-	}
 	var request distributionConfigRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
-		return
-	}
-	if err := h.totp.VerifyCode(c.Request.Context(), subject.UserID, request.TOTPCode); err != nil {
-		response.ErrorFrom(c, err)
 		return
 	}
 	if err := h.service.UpdateProgramConfig(c.Request.Context(), request.Enabled, request.StackWithLegacy); err != nil {
@@ -294,7 +248,6 @@ type withdrawalTransitionRequest struct {
 	Reason           string `json:"reason"`
 	PaymentReference string `json:"payment_reference"`
 	ProofURL         string `json:"proof_url"`
-	TOTPCode         string `json:"totp_code" binding:"required"`
 }
 
 func (h *DistributionHandler) TransitionWithdrawal(c *gin.Context) {
@@ -313,10 +266,6 @@ func (h *DistributionHandler) TransitionWithdrawal(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
-	if err := h.totp.VerifyCode(c.Request.Context(), subject.UserID, request.TOTPCode); err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
 	item, err := h.service.AdminTransitionWithdrawal(c.Request.Context(), withdrawalID, subject.UserID, request.Status, request.Reason, request.PaymentReference, request.ProofURL)
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -325,28 +274,10 @@ func (h *DistributionHandler) TransitionWithdrawal(c *gin.Context) {
 	response.Success(c, item)
 }
 
-type payoutDetailsRequest struct {
-	TOTPCode string `json:"totp_code" binding:"required"`
-}
-
 func (h *DistributionHandler) PayoutDetails(c *gin.Context) {
-	subject, ok := middleware.GetAuthSubjectFromContext(c)
-	if !ok {
-		response.Unauthorized(c, "Admin not authenticated")
-		return
-	}
 	withdrawalID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil || withdrawalID <= 0 {
 		response.BadRequest(c, "Invalid withdrawal id")
-		return
-	}
-	var request payoutDetailsRequest
-	if err := c.ShouldBindJSON(&request); err != nil {
-		response.BadRequest(c, "Invalid request: "+err.Error())
-		return
-	}
-	if err := h.totp.VerifyCode(c.Request.Context(), subject.UserID, request.TOTPCode); err != nil {
-		response.ErrorFrom(c, err)
 		return
 	}
 	details, err := h.service.AdminPayoutDetails(c.Request.Context(), withdrawalID)

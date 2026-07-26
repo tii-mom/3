@@ -8,14 +8,14 @@
 
     <!-- Main Content Area -->
     <div
-      class="app-main-redesign relative min-h-screen min-w-0 transition-all duration-300"
+      class="app-main-redesign relative min-h-screen min-w-0 transition-[margin] duration-200"
       :class="[sidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-64']"
     >
       <!-- Header -->
       <AppHeader />
 
       <!-- Main Content -->
-      <main class="p-4 md:p-6 lg:p-8">
+      <main id="main-content" tabindex="-1" class="outline-none">
         <slot />
       </main>
     </div>

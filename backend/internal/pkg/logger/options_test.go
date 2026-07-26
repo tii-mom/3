@@ -80,6 +80,16 @@ func TestNormalizedOptions_InvalidFallback(t *testing.T) {
 	if out.Sampling.Initial != 100 || out.Sampling.Thereafter != 100 {
 		t.Fatalf("normalized sampling defaults invalid: %+v", out.Sampling)
 	}
+	if out.ServiceName != "3api" {
+		t.Fatalf("normalized service name = %q, want 3api", out.ServiceName)
+	}
+}
+
+func TestNormalizedOptions_NormalizesLegacyServiceName(t *testing.T) {
+	out := (InitOptions{ServiceName: " Sub2API "}).normalized()
+	if out.ServiceName != "3api" {
+		t.Fatalf("normalized legacy service name = %q, want 3api", out.ServiceName)
+	}
 }
 
 func TestBuildFileCore_InvalidPathFallback(t *testing.T) {

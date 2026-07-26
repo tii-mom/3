@@ -525,7 +525,7 @@ func (s *NotificationEmailService) siteName(ctx context.Context) string {
 	if err != nil || strings.TrimSpace(name) == "" {
 		return defaultSiteName
 	}
-	return strings.TrimSpace(name)
+	return NormalizeSiteName(name)
 }
 
 func (s *NotificationEmailService) baseURL(ctx context.Context) string {

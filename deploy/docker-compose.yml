@@ -1,5 +1,5 @@
 # =============================================================================
-# Sub2API Docker Compose Configuration
+# 3API Docker Compose Configuration
 # =============================================================================
 # Quick Start:
 #   1. Copy .env.example to .env and configure
@@ -13,7 +13,7 @@
 
 services:
   # ===========================================================================
-  # Sub2API Application
+  # 3API Application
   # ===========================================================================
   sub2api:
     image: ${SUB2API_IMAGE:-weishaw/sub2api:latest}
@@ -78,7 +78,7 @@ services:
       # =======================================================================
       # Admin Account (auto-created on first run)
       # =======================================================================
-      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@sub2api.local}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@3api.local}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
 
       # =======================================================================

@@ -21,7 +21,7 @@
               v-if="showCloseButton"
               type="button"
               @click="emit('close')"
-              class="-mr-2 rounded-xl p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 focus-visible:ring-offset-2 dark:text-dark-500 dark:hover:bg-dark-700 dark:hover:text-dark-300 dark:focus-visible:ring-offset-dark-900"
+              class="-mr-1 flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 focus-visible:ring-offset-2 dark:text-dark-400 dark:hover:bg-dark-700 dark:hover:text-white dark:focus-visible:ring-offset-dark-900"
               aria-label="Close modal"
             >
               <Icon name="x" size="md" />

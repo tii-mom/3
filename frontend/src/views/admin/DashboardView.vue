@@ -2,18 +2,22 @@
   <AppLayout>
     <div class="admin-page-redesign space-y-6">
       <!-- Loading State -->
-      <div v-if="loading" class="flex items-center justify-center py-12">
-        <LoadingSpinner />
+      <div v-if="loading" class="grid grid-cols-2 gap-px overflow-hidden border border-gray-200 bg-gray-200 lg:grid-cols-4 dark:border-dark-700 dark:bg-dark-700" role="status" :aria-label="t('common.loading')">
+        <div v-for="item in 8" :key="item" class="min-h-24 bg-white p-4 motion-safe:animate-pulse dark:bg-dark-900">
+          <div class="h-3 w-20 bg-gray-200 dark:bg-dark-700"></div>
+          <div class="mt-4 h-7 w-24 bg-gray-200 dark:bg-dark-700"></div>
+          <div class="mt-3 h-3 w-16 bg-gray-100 dark:bg-dark-800"></div>
+        </div>
       </div>
 
       <template v-else-if="stats">
         <!-- Row 1: Core Stats -->
-        <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <section class="grid grid-cols-2 gap-px overflow-hidden border border-gray-200 bg-gray-200 lg:grid-cols-4 dark:border-dark-700 dark:bg-dark-700">
           <!-- Total API Keys -->
-          <div class="card p-4">
+          <article class="bg-white p-4 dark:bg-dark-900">
             <div class="flex items-center gap-3">
-              <div class="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
-                <Icon name="key" size="md" class="text-blue-600 dark:text-blue-400" :stroke-width="2" />
+              <div class="border border-gray-200 bg-gray-50 p-2 text-primary-600 dark:border-dark-700 dark:bg-dark-800 dark:text-primary-400">
+                <Icon name="key" size="md" :stroke-width="2" />
               </div>
               <div>
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -27,13 +31,13 @@
                 </p>
               </div>
             </div>
-          </div>
+          </article>
 
           <!-- Service Accounts -->
-          <div class="card p-4">
+          <article class="bg-white p-4 dark:bg-dark-900">
             <div class="flex items-center gap-3">
-              <div class="rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30">
-                <Icon name="server" size="md" class="text-purple-600 dark:text-purple-400" :stroke-width="2" />
+              <div class="border border-gray-200 bg-gray-50 p-2 text-primary-600 dark:border-dark-700 dark:bg-dark-800 dark:text-primary-400">
+                <Icon name="server" size="md" :stroke-width="2" />
               </div>
               <div>
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -52,13 +56,13 @@
                 </p>
               </div>
             </div>
-          </div>
+          </article>
 
           <!-- Today Requests -->
-          <div class="card p-4">
+          <article class="bg-white p-4 dark:bg-dark-900">
             <div class="flex items-center gap-3">
-              <div class="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
-                <Icon name="chart" size="md" class="text-green-600 dark:text-green-400" :stroke-width="2" />
+              <div class="border border-gray-200 bg-gray-50 p-2 text-primary-600 dark:border-dark-700 dark:bg-dark-800 dark:text-primary-400">
+                <Icon name="chart" size="md" :stroke-width="2" />
               </div>
               <div>
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -72,19 +76,19 @@
                 </p>
               </div>
             </div>
-          </div>
+          </article>
 
           <!-- New Users Today -->
-          <div class="card p-4">
+          <article class="bg-white p-4 dark:bg-dark-900">
             <div class="flex items-center gap-3">
-              <div class="rounded-lg bg-emerald-100 p-2 dark:bg-emerald-900/30">
-                <Icon name="userPlus" size="md" class="text-emerald-600 dark:text-emerald-400" :stroke-width="2" />
+              <div class="border border-gray-200 bg-gray-50 p-2 text-primary-600 dark:border-dark-700 dark:bg-dark-800 dark:text-primary-400">
+                <Icon name="userPlus" size="md" :stroke-width="2" />
               </div>
               <div>
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
                   {{ t('admin.dashboard.users') }}
                 </p>
-                <p class="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                <p class="text-xl font-bold text-gray-900 dark:text-white">
                   +{{ stats.today_new_users }}
                 </p>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -92,16 +96,16 @@
                 </p>
               </div>
             </div>
-          </div>
-        </div>
+          </article>
+        </section>
 
         <!-- Row 2: Token Stats -->
-        <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <section class="grid grid-cols-2 gap-px overflow-hidden border border-gray-200 bg-gray-200 lg:grid-cols-4 dark:border-dark-700 dark:bg-dark-700">
           <!-- Today Tokens -->
-          <div class="card p-4">
+          <article class="bg-white p-4 dark:bg-dark-900">
             <div class="flex items-center gap-3">
-              <div class="rounded-lg bg-amber-100 p-2 dark:bg-amber-900/30">
-                <Icon name="cube" size="md" class="text-amber-600 dark:text-amber-400" :stroke-width="2" />
+              <div class="border border-gray-200 bg-gray-50 p-2 text-primary-600 dark:border-dark-700 dark:bg-dark-800 dark:text-primary-400">
+                <Icon name="cube" size="md" :stroke-width="2" />
               </div>
               <div>
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -131,13 +135,13 @@
                 </p>
               </div>
             </div>
-          </div>
+          </article>
 
           <!-- Total Tokens -->
-          <div class="card p-4">
+          <article class="bg-white p-4 dark:bg-dark-900">
             <div class="flex items-center gap-3">
-              <div class="rounded-lg bg-indigo-100 p-2 dark:bg-indigo-900/30">
-                <Icon name="database" size="md" class="text-indigo-600 dark:text-indigo-400" :stroke-width="2" />
+              <div class="border border-gray-200 bg-gray-50 p-2 text-primary-600 dark:border-dark-700 dark:bg-dark-800 dark:text-primary-400">
+                <Icon name="database" size="md" :stroke-width="2" />
               </div>
               <div>
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -167,13 +171,13 @@
                 </p>
               </div>
             </div>
-          </div>
+          </article>
 
           <!-- Performance (RPM/TPM) -->
-          <div class="card p-4">
+          <article class="bg-white p-4 dark:bg-dark-900">
             <div class="flex items-center gap-3">
-              <div class="rounded-lg bg-violet-100 p-2 dark:bg-violet-900/30">
-                <Icon name="bolt" size="md" class="text-violet-600 dark:text-violet-400" :stroke-width="2" />
+              <div class="border border-gray-200 bg-gray-50 p-2 text-primary-600 dark:border-dark-700 dark:bg-dark-800 dark:text-primary-400">
+                <Icon name="bolt" size="md" :stroke-width="2" />
               </div>
               <div class="flex-1">
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -186,20 +190,20 @@
                   <span class="text-xs text-gray-500 dark:text-gray-400">RPM</span>
                 </div>
                 <div class="flex items-baseline gap-2">
-                  <p class="text-sm font-semibold text-violet-600 dark:text-violet-400">
+                  <p class="text-sm font-semibold text-primary-600 dark:text-primary-400">
                     {{ formatTokens(stats.tpm) }}
                   </p>
                   <span class="text-xs text-gray-500 dark:text-gray-400">TPM</span>
                 </div>
               </div>
             </div>
-          </div>
+          </article>
 
           <!-- Avg Response Time -->
-          <div class="card p-4">
+          <article class="bg-white p-4 dark:bg-dark-900">
             <div class="flex items-center gap-3">
-              <div class="rounded-lg bg-rose-100 p-2 dark:bg-rose-900/30">
-                <Icon name="clock" size="md" class="text-rose-600 dark:text-rose-400" :stroke-width="2" />
+              <div class="border border-gray-200 bg-gray-50 p-2 text-primary-600 dark:border-dark-700 dark:bg-dark-800 dark:text-primary-400">
+                <Icon name="clock" size="md" :stroke-width="2" />
               </div>
               <div>
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -213,8 +217,8 @@
                 </p>
               </div>
             </div>
-          </div>
-        </div>
+          </article>
+        </section>
 
         <!-- Quick Actions -->
         <div class="card p-4">
@@ -227,10 +231,10 @@
             <button
               v-if="canUseBatchImage"
               type="button"
-              class="group flex items-center gap-3 rounded-lg bg-gray-50 p-3 text-left transition-colors hover:bg-sky-50 dark:bg-dark-800/50 dark:hover:bg-sky-900/20"
+              class="group flex items-center gap-3 border border-gray-200 bg-gray-50 p-3 text-left transition-colors hover:border-primary-300 hover:bg-primary-50 dark:border-dark-700 dark:bg-dark-800/50 dark:hover:border-primary-800 dark:hover:bg-primary-950/20"
               @click="router.push('/batch-image')"
             >
-              <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">
+              <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center border border-gray-200 bg-white text-primary-600 dark:border-dark-700 dark:bg-dark-900 dark:text-primary-400">
                 <Icon name="sparkles" size="md" :stroke-width="2" />
               </span>
               <span class="min-w-0 flex-1">
@@ -241,14 +245,14 @@
                   {{ t('admin.dashboard.batchImageDesc') }}
                 </span>
               </span>
-              <Icon name="chevronRight" size="sm" class="text-gray-400 group-hover:text-sky-500" />
+              <Icon name="chevronRight" size="sm" class="text-gray-400 group-hover:text-primary-600" />
             </button>
             <button
               type="button"
-              class="group flex items-center gap-3 rounded-lg bg-gray-50 p-3 text-left transition-colors hover:bg-emerald-50 dark:bg-dark-800/50 dark:hover:bg-emerald-900/20"
+              class="group flex items-center gap-3 border border-gray-200 bg-gray-50 p-3 text-left transition-colors hover:border-primary-300 hover:bg-primary-50 dark:border-dark-700 dark:bg-dark-800/50 dark:hover:border-primary-800 dark:hover:bg-primary-950/20"
               @click="router.push('/admin/groups')"
             >
-              <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+              <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center border border-gray-200 bg-white text-primary-600 dark:border-dark-700 dark:bg-dark-900 dark:text-primary-400">
                 <Icon name="grid" size="md" :stroke-width="2" />
               </span>
               <span class="min-w-0 flex-1">
@@ -259,7 +263,7 @@
                   {{ t('admin.dashboard.groupPricingDesc') }}
                 </span>
               </span>
-              <Icon name="chevronRight" size="sm" class="text-gray-400 group-hover:text-emerald-500" />
+              <Icon name="chevronRight" size="sm" class="text-gray-400 group-hover:text-primary-600" />
             </button>
           </div>
         </div>

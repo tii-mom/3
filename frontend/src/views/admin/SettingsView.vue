@@ -5995,8 +5995,62 @@
         </div>
         <!-- /Tab: Login Agreement -->
 
-	        <!-- Tab: Features (功能开关) -->
+        <!-- Tab: Features (功能开关) -->
         <div v-show="activeTab === 'features'" class="space-y-6">
+
+        <div class="card">
+          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+              {{ localText('业务功能', 'Business features') }}
+            </h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {{ localText('这里只管理功能是否对用户开放，收益规则和提现审核请在财务运营中处理。', 'These switches control user availability only. Manage earnings rules and payout review in Finance Operations.') }}
+            </p>
+          </div>
+          <div class="space-y-5 p-6">
+            <div v-if="financialFeaturesLoading" class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+              <div class="h-4 w-4 animate-spin rounded-full border-b-2 border-primary-600"></div>
+              {{ t('common.loading') }}
+            </div>
+            <div v-else class="space-y-5">
+              <div class="flex items-center justify-between gap-4">
+                <div>
+                  <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('nav.distribution') }}
+                  </label>
+                  <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    {{ localText('开放用户端算力公司、收益和提现功能。', 'Allows users to access the Compute Company, earnings, and payout features.') }}
+                  </p>
+                </div>
+                <Toggle
+                  :model-value="financialFeatures.distributionEnabled"
+                  :disabled="financialFeaturesSaving !== null"
+                  @update:model-value="toggleFinancialFeature('distribution')"
+                />
+              </div>
+
+              <div class="flex items-center justify-between gap-4 border-t border-gray-100 pt-5 dark:border-dark-700">
+                <div>
+                  <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('nav.balanceVouchers') }}
+                  </label>
+                  <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    {{ localText('开放用户生成和兑换额度兑换码。', 'Allows users to create and redeem balance vouchers.') }}
+                  </p>
+                </div>
+                <Toggle
+                  :model-value="financialFeatures.vouchersEnabled"
+                  :disabled="financialFeaturesSaving !== null"
+                  @update:model-value="toggleFinancialFeature('vouchers')"
+                />
+              </div>
+
+              <p v-if="financialFeaturesError" class="border-l-4 border-amber-500 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                {{ financialFeaturesError }}
+              </p>
+            </div>
+          </div>
+        </div>
 
         <div class="card">
           <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
@@ -7588,6 +7642,12 @@ import {
   normalizeDefaultSubscriptionSettings,
   resolveWeChatConnectModeCapabilities,
 } from "@/api/admin/settings";
+import {
+  getDistributionConfig,
+  getVoucherConfig,
+  updateDistributionConfig,
+  updateVoucherConfig,
+} from "@/api/admin/finance";
 import type {
   AuthSourceDefaultsState,
   AuthSourceType,
@@ -7631,7 +7691,7 @@ import {
 } from "@/composables/useStepUp";
 import TotpStepUpDialog from "@/components/auth/TotpStepUpDialog.vue";
 import { affiliatesAPI, type AffiliateAdminEntry, type SimpleUser as AffiliateSimpleUser } from "@/api/admin/affiliates";
-import { extractApiErrorMessage, extractI18nErrorMessage } from "@/utils/apiError";
+import { extractApiErrorCode, extractApiErrorMessage, extractI18nErrorMessage } from "@/utils/apiError";
 import { useAppStore } from "@/stores";
 import { useAdminSettingsStore } from "@/stores/adminSettings";
 import { normalizeVisibleMethod } from "@/components/payment/paymentFlow";
@@ -7749,6 +7809,14 @@ const { copyToClipboard } = useClipboard();
 const loading = ref(true);
 const loadFailed = ref(false);
 const saving = ref(false);
+const financialFeaturesLoading = ref(true);
+const financialFeaturesLoaded = ref(false);
+const financialFeaturesSaving = ref<"distribution" | "vouchers" | null>(null);
+const financialFeaturesError = ref("");
+const financialFeatures = reactive({
+  distributionEnabled: false,
+  vouchersEnabled: false,
+});
 const testingSmtp = ref(false);
 const sendingTestEmail = ref(false);
 const smtpPasswordManuallyEdited = ref(false);
@@ -7756,6 +7824,58 @@ const testEmailAddress = ref("");
 const registrationEmailSuffixWhitelistTags = ref<string[]>([]);
 const registrationEmailSuffixWhitelistDraft = ref("");
 const tablePageSizeOptionsInput = ref("10, 20, 50, 100");
+
+function financialFeatureErrorMessage(error: unknown): string {
+  if (extractApiErrorCode(error) === "CREDIT_BUCKETS_NOT_ENFORCED") {
+    return localText(
+      "请先完成额度账本准备，再开启此功能。现有用户数据不会被自动修改。",
+      "Complete the credit ledger preparation before enabling this feature. Existing user data will not be changed automatically.",
+    );
+  }
+  return extractApiErrorMessage(error, localText("加载业务开关失败", "Failed to load business switches"));
+}
+
+async function loadFinancialFeatures(): Promise<void> {
+  financialFeaturesLoading.value = true;
+  financialFeaturesError.value = "";
+  try {
+    const [distribution, vouchers] = await Promise.all([
+      getDistributionConfig(),
+      getVoucherConfig(),
+    ]);
+    financialFeatures.distributionEnabled = distribution.enabled;
+    financialFeatures.vouchersEnabled = vouchers.enabled;
+    financialFeaturesLoaded.value = true;
+  } catch (error) {
+    financialFeaturesError.value = financialFeatureErrorMessage(error);
+  } finally {
+    financialFeaturesLoading.value = false;
+  }
+}
+
+async function toggleFinancialFeature(feature: "distribution" | "vouchers"): Promise<void> {
+  const enabled = feature === "distribution"
+    ? financialFeatures.distributionEnabled
+    : financialFeatures.vouchersEnabled;
+  financialFeaturesSaving.value = feature;
+  financialFeaturesError.value = "";
+  try {
+    if (feature === "distribution") {
+      await updateDistributionConfig(!enabled);
+      financialFeatures.distributionEnabled = !enabled;
+    } else {
+      await updateVoucherConfig(!enabled);
+      financialFeatures.vouchersEnabled = !enabled;
+    }
+    appStore.showSuccess(t("common.saved"));
+  } catch (error) {
+    const message = financialFeatureErrorMessage(error);
+    financialFeaturesError.value = message;
+    appStore.showError(message);
+  } finally {
+    financialFeaturesSaving.value = null;
+  }
+}
 
 // Admin API Key 状态
 const adminApiKeyLoading = ref(true);
@@ -8333,7 +8453,7 @@ const form = reactive<SettingsForm>({
   default_user_rpm_limit: 0,
   site_name: "3API",
   site_logo: "",
-  site_subtitle: "Subscription to API Conversion Platform",
+  site_subtitle: "AI API gateway for unified model access",
   api_base_url: "",
   contact_info: "",
   doc_url: "",
@@ -10950,6 +11070,12 @@ onMounted(() => {
   loadRectifierSettings();
   loadBetaPolicySettings();
   loadProviders();
+});
+
+watch(activeTab, (tab) => {
+  if (tab === "features" && !financialFeaturesLoaded.value) {
+    loadFinancialFeatures();
+  }
 });
 
 // =========================

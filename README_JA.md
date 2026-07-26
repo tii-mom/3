@@ -1,4 +1,4 @@
-# Sub2API
+# 3API
 
 <div align="center">
 
@@ -98,13 +98,13 @@
 
 <tr>
 <td width="180"><a href="https://roxybrowser.com/invite/bgGKG7"><img src="assets/partners/logos/RoxyBrowser.png" alt="RoxyBrowser" width="150"></a></td>
-<td>RoxyBrowser のご支援に感謝します！<a href="https://roxybrowser.com/invite/bgGKG7">RoxyBrowser</a> は Sub2API の理想的なパートナーです：ネイティブ統合された Roxy AI Agent と高品質なネイティブ住宅 IP を搭載し、シンプルなコマンドで一括自動化をサポート、マルチアカウント管理のセキュリティと効率を大幅に向上させます！<a href="https://roxybrowser.com/invite/bgGKG7">このリンク</a>から登録すると、無料の住宅 IP パッケージと生涯 10% 割引を獲得できます。
+<td>RoxyBrowser のご支援に感謝します！<a href="https://roxybrowser.com/invite/bgGKG7">RoxyBrowser</a> は 3API の理想的なパートナーです：ネイティブ統合された Roxy AI Agent と高品質なネイティブ住宅 IP を搭載し、シンプルなコマンドで一括自動化をサポート、マルチアカウント管理のセキュリティと効率を大幅に向上させます！<a href="https://roxybrowser.com/invite/bgGKG7">このリンク</a>から登録すると、無料の住宅 IP パッケージと生涯 10% 割引を獲得できます。
 </td>
 </tr>
 
 <tr>
 <td width="180"><a href="https://apikl.ai"><img src="assets/partners/logos/apikl.png" alt="apikl" width="150"></a></td>
-<td>Apikl のご支援に感謝します！Sub2API をベースに構築された本プラットフォームは、開発者向けに Codex / Claude シリーズモデルの中継サービスを提供しています。長期安定性、高速直結、高いコストパフォーマンスを重視し、従量課金の残高ベース課金、エンタープライズグレードの正規請求書、1対1の専属サポートを提供します。<a href="https://apikl.ai">今すぐ登録</a>でチャージ 1:1 ボーナス — 残高が倍に！
+<td>Apikl のご支援に感謝します！3API をベースに構築された本プラットフォームは、開発者向けに Codex / Claude シリーズモデルの中継サービスを提供しています。長期安定性、高速直結、高いコストパフォーマンスを重視し、従量課金の残高ベース課金、エンタープライズグレードの正規請求書、1対1の専属サポートを提供します。<a href="https://apikl.ai">今すぐ登録</a>でチャージ 1:1 ボーナス — 残高が倍に！
 </td>
 </tr>
 
@@ -183,7 +183,7 @@
 
 ## 概要
 
-Sub2API は、AI 製品のサブスクリプションから API クォータを配分・管理するために設計された AI API ゲートウェイプラットフォームです。ユーザーはプラットフォームが生成した API キーを通じて上流の AI サービスにアクセスでき、プラットフォームは認証、課金、負荷分散、リクエスト転送を処理します。
+3API は、AI 製品のサブスクリプションから API クォータを配分・管理するために設計された AI API ゲートウェイプラットフォームです。ユーザーはプラットフォームが生成した API キーを通じて上流の AI サービスにアクセスでき、プラットフォームは認証、課金、負荷分散、リクエスト転送を処理します。
 
 ## 機能
 
@@ -199,11 +199,11 @@ Sub2API は、AI 製品のサブスクリプションから API クォータを�
 
 ## エコシステム
 
-Sub2API を拡張・統合するコミュニティプロジェクト:
+3API を拡張・統合するコミュニティプロジェクト:
 
 | プロジェクト | 説明 | 機能 |
 |---------|-------------|----------|
-| ~~[Sub2ApiPay](https://github.com/touwaeriol/sub2apipay)~~ | ~~セルフサービス決済システム~~ | **内蔵済み** — 決済機能は Sub2API に統合されました。別途デプロイは不要です。[決済設定ガイド](docs/PAYMENT.md)をご参照ください |
+| ~~[Sub2ApiPay](https://github.com/touwaeriol/sub2apipay)~~ | ~~セルフサービス決済システム~~ | **内蔵済み** — 決済機能は 3API に統合されました。別途デプロイは不要です。[決済設定ガイド](docs/PAYMENT.md)をご参照ください |
 | [sub2api-mobile](https://github.com/ckken/sub2api-mobile) | モバイル管理コンソール | ユーザー管理、アカウント管理、監視ダッシュボード、マルチバックエンド切り替えが可能なクロスプラットフォームアプリ（iOS/Android/Web）。Expo + React Native で構築 |
 
 ## 技術スタック
@@ -219,7 +219,7 @@ Sub2API を拡張・統合するコミュニティプロジェクト:
 
 ## Nginx リバースプロキシに関する注意
 
-Sub2API（または CRS）を Nginx でリバースプロキシし、Codex CLI と組み合わせて使用する場合、Nginx に以下を追加してください:
+3API（または CRS）を Nginx でリバースプロキシし、Codex CLI と組み合わせて使用する場合、Nginx に以下を追加してください:
 
 ```nginx
 # http または server: アンダースコア付きヘッダーを保持（スティッキーセッション）
@@ -472,7 +472,7 @@ rm -rf data/ postgres_data/ redis_data/
 
 ### 方法3: Apple container（macOS）
 
-Apple シリコン搭載 Mac と macOS 26 では、Apple `container` 1.1.0 以降を使用して Sub2API、PostgreSQL、Redis の完全なスタックを実行できます:
+Apple シリコン搭載 Mac と macOS 26 では、Apple `container` 1.1.0 以降を使用して 3API、PostgreSQL、Redis の完全なスタックを実行できます:
 
 ```bash
 git clone https://github.com/Wei-Shaw/sub2api.git
@@ -677,7 +677,7 @@ go generate ./cmd/server
 
 ## Antigravity サポート
 
-Sub2API は [Antigravity](https://antigravity.so/) アカウントをサポートしています。認証後、Claude および Gemini モデル用の専用エンドポイントが利用可能になります。
+3API は [Antigravity](https://antigravity.so/) アカウントをサポートしています。認証後、Claude および Gemini モデル用の専用エンドポイントが利用可能になります。
 
 ### 専用エンドポイント
 

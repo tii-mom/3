@@ -57,7 +57,12 @@ func (o InitOptions) normalized() InitOptions {
 	}
 	out.ServiceName = strings.TrimSpace(out.ServiceName)
 	if out.ServiceName == "" {
-		out.ServiceName = "sub2api"
+		out.ServiceName = "3api"
+	} else if strings.EqualFold(out.ServiceName, "sub2api") {
+		// Existing config files may still carry the source project's default.
+		// Keep the config compatible while preventing the legacy brand from
+		// appearing in operator-visible log records.
+		out.ServiceName = "3api"
 	}
 	out.Environment = strings.TrimSpace(out.Environment)
 	if out.Environment == "" {
@@ -107,7 +112,7 @@ func bootstrapOptions() InitOptions {
 	return InitOptions{
 		Level:       "info",
 		Format:      "console",
-		ServiceName: "sub2api",
+		ServiceName: "3api",
 		Environment: "bootstrap",
 		Output: OutputOptions{
 			ToStdout: true,

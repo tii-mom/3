@@ -1,7 +1,7 @@
 # =============================================================================
-# Sub2API Docker Compose - Standalone Configuration
+# 3API Docker Compose - Standalone Configuration
 # =============================================================================
-# This configuration runs only the Sub2API application.
+# This configuration runs only the 3API application.
 # PostgreSQL and Redis must be provided externally.
 #
 # Usage:
@@ -68,7 +68,7 @@ services:
       # =======================================================================
       # Admin Account (auto-created on first run)
       # =======================================================================
-      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@sub2api.local}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@3api.local}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
 
       # =======================================================================

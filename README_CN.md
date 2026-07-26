@@ -1,4 +1,4 @@
-# Sub2API
+# 3API
 
 <div align="center">
 
@@ -99,13 +99,13 @@
 
 <tr>
 <td width="180"><a href="https://roxybrowser.com/invite/bgGKG7"><img src="assets/partners/logos/RoxyBrowser.png" alt="RoxyBrowser" width="150"></a></td>
-<td>感谢 RoxyBrowser 赞助本项目！<a href="https://roxybrowser.com/invite/bgGKG7">RoxyBrowser</a> 是 Sub2API 的理想搭档：内置原生 Roxy AI Agent 与高质量原生住宅 IP，支持通过简单命令实现批量自动化，显著提升多账号管理的安全性与效率！点击<a href="https://roxybrowser.com/invite/bgGKG7">此链接</a>注册，可领取免费住宅 IP 套餐与终身 9 折优惠。
+<td>感谢 RoxyBrowser 赞助本项目！<a href="https://roxybrowser.com/invite/bgGKG7">RoxyBrowser</a> 是 3API 的理想搭档：内置原生 Roxy AI Agent 与高质量原生住宅 IP，支持通过简单命令实现批量自动化，显著提升多账号管理的安全性与效率！点击<a href="https://roxybrowser.com/invite/bgGKG7">此链接</a>注册，可领取免费住宅 IP 套餐与终身 9 折优惠。
 </td>
 </tr>
 
 <tr>
 <td width="180"><a href="https://apikl.ai"><img src="assets/partners/logos/apikl.png" alt="apikl" width="150"></a></td>
-<td>感谢 Apikl 赞助本项目！平台基于 Sub2API 搭建，为开发者提供 Codex / Claude 系列模型的中转服务，专注于长期稳定、高速直连与高性价比。支持按量计费的余额结算、企业级正规发票及一对一专属对接。<a href="https://apikl.ai">立即注册</a>即享充值 1:1 赠送 — 余额翻倍！
+<td>感谢 Apikl 赞助本项目！平台基于 3API 搭建，为开发者提供 Codex / Claude 系列模型的中转服务，专注于长期稳定、高速直连与高性价比。支持按量计费的余额结算、企业级正规发票及一对一专属对接。<a href="https://apikl.ai">立即注册</a>即享充值 1:1 赠送 — 余额翻倍！
 </td>
 </tr>
 
@@ -188,7 +188,7 @@
 
 ## 项目概述
 
-Sub2API 是一个 AI API 网关平台，用于分发和管理 AI 产品订阅的 API 配额。用户通过平台生成的 API Key 调用上游 AI 服务，平台负责鉴权、计费、负载均衡和请求转发。
+3API 是一个 AI API 网关平台，用于分发和管理 AI 产品订阅的 API 配额。用户通过平台生成的 API Key 调用上游 AI 服务，平台负责鉴权、计费、负载均衡和请求转发。
 
 ## 核心功能
 
@@ -204,11 +204,11 @@ Sub2API 是一个 AI API 网关平台，用于分发和管理 AI 产品订阅的
 
 ## 生态项目
 
-围绕 Sub2API 的社区扩展与集成项目：
+围绕 3API 的社区扩展与集成项目：
 
 | 项目 | 说明 | 功能 |
 |------|------|------|
-| ~~[Sub2ApiPay](https://github.com/touwaeriol/sub2apipay)~~ | ~~自助支付系统~~ | **已内置** — 支付功能已集成到 Sub2API 中，无需独立部署。详见 [支付配置指南](docs/PAYMENT_CN.md) |
+| ~~[Sub2ApiPay](https://github.com/touwaeriol/sub2apipay)~~ | ~~自助支付系统~~ | **已内置** — 支付功能已集成到 3API 中，无需独立部署。详见 [支付配置指南](docs/PAYMENT_CN.md) |
 | [sub2api-mobile](https://github.com/ckken/sub2api-mobile) | 移动端管理控制台 | 跨平台应用（iOS/Android/Web），支持用户管理、账号管理、监控看板、多后端切换；基于 Expo + React Native 构建 |
 
 ## 技术栈
@@ -224,7 +224,7 @@ Sub2API 是一个 AI API 网关平台，用于分发和管理 AI 产品订阅的
 
 ## Nginx 反向代理注意事项
 
-通过 Nginx 反向代理 Sub2API（或 CRS 服务）并搭配 Codex CLI 使用时，需要在 Nginx 配置中添加：
+通过 Nginx 反向代理 3API（或 CRS 服务）并搭配 Codex CLI 使用时，需要在 Nginx 配置中添加：
 
 ```nginx
 # http 或 server 块：保留 session_id 等下划线头（粘性会话）
@@ -489,7 +489,7 @@ rm -rf data/ postgres_data/ redis_data/
 
 ### 方式三：Apple container（macOS）
 
-Apple 芯片 Mac 在 macOS 26 上可使用 Apple `container` 1.1.0 或更高版本运行完整的 Sub2API、PostgreSQL 和 Redis：
+Apple 芯片 Mac 在 macOS 26 上可使用 Apple `container` 1.1.0 或更高版本运行完整的 3API、PostgreSQL 和 Redis：
 
 ```bash
 git clone https://github.com/Wei-Shaw/sub2api.git
@@ -746,7 +746,7 @@ go generate ./cmd/server
 
 ## Antigravity 使用说明
 
-Sub2API 支持 [Antigravity](https://antigravity.so/) 账户，授权后可通过专用端点访问 Claude 和 Gemini 模型。
+3API 支持 [Antigravity](https://antigravity.so/) 账户，授权后可通过专用端点访问 Claude 和 Gemini 模型。
 
 ### 专用端点
 

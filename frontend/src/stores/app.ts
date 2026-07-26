@@ -15,6 +15,7 @@ import {
 import { getPublicSettings as fetchPublicSettingsAPI } from '@/api/auth'
 import { apiClient } from '@/api/client'
 import { getAPIBaseURL, resolveApiClientBaseURL } from '@/api/url'
+import { normalizeSiteName, normalizeSiteSubtitle, PRODUCT_NAME } from '@/constants/brand'
 
 export const useAppStore = defineStore('app', () => {
   // ==================== State ====================
@@ -28,7 +29,7 @@ export const useAppStore = defineStore('app', () => {
   // Public settings cache state
   const publicSettingsLoaded = ref<boolean>(false)
   const publicSettingsLoading = ref<boolean>(false)
-  const siteName = ref<string>('3API')
+  const siteName = ref<string>(PRODUCT_NAME)
   const siteLogo = ref<string>('')
   const siteVersion = ref<string>('')
   const contactInfo = ref<string>('')
@@ -292,22 +293,27 @@ export const useAppStore = defineStore('app', () => {
    * Apply settings to store state (internal helper to avoid code duplication)
    */
   function applySettings(config: PublicSettings): void {
-    if (typeof window !== 'undefined') {
-      window.__APP_CONFIG__ = { ...config }
+    const normalizedConfig: PublicSettings = {
+      ...config,
+      site_name: normalizeSiteName(config.site_name),
+      site_subtitle: normalizeSiteSubtitle(config.site_subtitle),
     }
-    cachedPublicSettings.value = config
-    siteName.value = config.site_name || '3API'
-    siteLogo.value = config.site_logo || ''
-    siteVersion.value = config.version || ''
-    contactInfo.value = config.contact_info || ''
-    apiBaseUrl.value = config.api_base_url || ''
-    docUrl.value = config.doc_url || ''
+    if (typeof window !== 'undefined') {
+      window.__APP_CONFIG__ = { ...normalizedConfig }
+    }
+    cachedPublicSettings.value = normalizedConfig
+    siteName.value = normalizedConfig.site_name
+    siteLogo.value = normalizedConfig.site_logo || ''
+    siteVersion.value = normalizedConfig.version || ''
+    contactInfo.value = normalizedConfig.contact_info || ''
+    apiBaseUrl.value = normalizedConfig.api_base_url || ''
+    docUrl.value = normalizedConfig.doc_url || ''
     publicSettingsLoaded.value = true
 
     // Bind axios to the versioned JSON API base. Site `api_base_url` is often the
     // public gateway origin for CLI clients (without /api/v1); never use that raw
     // value as the SPA client baseURL or admin/settings will receive HTML.
-    apiClient.defaults.baseURL = resolveApiClientBaseURL(config.api_base_url || getAPIBaseURL())
+    apiClient.defaults.baseURL = resolveApiClientBaseURL(normalizedConfig.api_base_url || getAPIBaseURL())
   }
 
   /**

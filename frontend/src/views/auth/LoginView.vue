@@ -1,6 +1,6 @@
 <template>
   <AuthLayout>
-    <div class="space-y-6">
+    <div class="auth-flow space-y-6">
       <!-- Title -->
       <div class="text-center">
         <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
@@ -10,8 +10,18 @@
           {{ t('auth.signInToAccount') }}
         </p>
       </div>
+
+      <div
+        v-if="errorMessage"
+        class="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
+        role="alert"
+        aria-live="polite"
+      >
+        <Icon name="exclamationCircle" size="md" class="mt-0.5 shrink-0" />
+        <span>{{ errorMessage }}</span>
+      </div>
       <!-- Login Form -->
-      <form @submit.prevent="handleLogin" class="space-y-5">
+      <form @submit.prevent="handleLogin" class="space-y-5" :aria-busy="isLoading">
         <!-- Email Input -->
         <div>
           <label for="email" class="input-label">
@@ -31,9 +41,14 @@
               :disabled="authActionDisabled"
               class="input pl-11"
               :class="{ 'input-error': errors.email }"
+              :aria-invalid="Boolean(errors.email)"
+              :aria-describedby="errors.email ? 'login-email-error' : undefined"
               :placeholder="t('auth.emailPlaceholder')"
             />
           </div>
+          <p v-if="errors.email" id="login-email-error" class="mt-1.5 text-xs text-red-600 dark:text-red-400" role="alert">
+            {{ errors.email }}
+          </p>
         </div>
 
         <!-- Password Input -->
@@ -54,6 +69,8 @@
               :disabled="authActionDisabled"
               class="input pl-11 pr-11"
               :class="{ 'input-error': errors.password }"
+              :aria-invalid="Boolean(errors.password)"
+              :aria-describedby="errors.password ? 'login-password-error' : undefined"
               :placeholder="t('auth.passwordPlaceholder')"
             />
             <button
@@ -62,12 +79,15 @@
               :disabled="authActionDisabled"
               :aria-label="t(showPassword ? 'auth.hidePassword' : 'auth.showPassword')"
               :aria-pressed="showPassword"
-              class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-dark-300"
+              class="absolute inset-y-0 right-0 flex min-w-11 items-center justify-center text-gray-400 transition-colors hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:hover:text-dark-300"
             >
               <Icon v-if="showPassword" name="eyeOff" size="md" />
               <Icon v-else name="eye" size="md" />
             </button>
           </div>
+          <p v-if="errors.password" id="login-password-error" class="mt-1.5 text-xs text-red-600 dark:text-red-400" role="alert">
+            {{ errors.password }}
+          </p>
           <div class="mt-1 flex items-center justify-between">
             <span></span>
             <router-link
@@ -95,7 +115,7 @@
         <button
           type="submit"
           :disabled="authActionDisabled || (turnstileEnabled && !turnstileToken)"
-          class="btn btn-primary w-full"
+          class="btn btn-primary min-h-11 w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-dark-900"
         >
           <svg
             v-if="isLoading"
@@ -555,6 +575,15 @@ function handle2FACancel(): void {
 </script>
 
 <style scoped>
+.auth-flow :deep(.input) {
+  min-height: 2.875rem;
+}
+
+.auth-flow a,
+.auth-flow button {
+  text-underline-offset: 3px;
+}
+
 .fade-enter-active,
 .fade-leave-active {
   transition: all 0.3s ease;
@@ -565,4 +594,5 @@ function handle2FACancel(): void {
   opacity: 0;
   transform: translateY(-8px);
 }
+
 </style>

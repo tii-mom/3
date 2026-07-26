@@ -40,7 +40,7 @@ Centered: Both horizontally and vertically
 ┌─────────────────────────────────────────────┐
 │                                             │
 │         🔷 3API                          │
-│    Subscription to API Conversion Platform  │
+│    AI API gateway for unified model access   │
 │                                             │
 │  ┌─────────────────────────────────────┐   │
 │  │                                     │   │
@@ -134,7 +134,7 @@ Centered: Both horizontally and vertically
 ┌─────────────────────────────────────────────┐
 │                                             │
 │         🔷 3API                          │
-│    Subscription to API Conversion Platform  │
+│    AI API gateway for unified model access   │
 │                                             │
 │  ┌─────────────────────────────────────┐   │
 │  │                                     │   │

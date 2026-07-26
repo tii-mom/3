@@ -391,20 +391,22 @@ WHERE m.program_id = $1`, programID, version); err != nil {
 }
 
 func (s *DistributionService) UpdateProgramConfig(ctx context.Context, enabled, stack bool) error {
-	if enabled {
-		config, err := s.FinancialRuntimeConfig(ctx)
-		if err != nil {
-			return err
-		}
-		if enforced, _ := config["credit_bucket_enforce_enabled"].(bool); !enforced {
-			return ErrCreditBucketsNotEnforced
-		}
-	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
+	if enabled {
+		if err := ensureCreditBucketsReady(ctx, tx); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `
+INSERT INTO settings (key, value, updated_at)
+VALUES ('credit_bucket_enforce_enabled', 'true', NOW())
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`); err != nil {
+			return err
+		}
+	}
 	// Legacy rewards are no longer part of the active compute-company policy.
 	// Keep the column for rollback compatibility, but never enable stacking.
 	if _, err := tx.ExecContext(ctx, `UPDATE distribution_programs SET enabled = $1, stack_with_legacy = FALSE, updated_at = NOW() WHERE tenant_id = 1 AND code = 'compute_company'`, enabled); err != nil {

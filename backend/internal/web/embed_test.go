@@ -204,6 +204,17 @@ func TestNonceHTMLPlaceholder(t *testing.T) {
 	})
 }
 
+func TestStripStaticSEOSnapshot(t *testing.T) {
+	html := []byte(`<!doctype html><html><head><style id="seo-snapshot-style">#seo-snapshot{color:red}</style></head><body><div id="app"><div id="seo-snapshot"><main><div>snapshot</div></main></div></div><script type="module" src="/assets/app.js"></script></body></html>`)
+
+	result := string(stripStaticSEOSnapshot(html))
+
+	assert.NotContains(t, result, `id="seo-snapshot"`)
+	assert.NotContains(t, result, `id="seo-snapshot-style"`)
+	assert.Contains(t, result, `<div id="app"></div>`)
+	assert.Contains(t, result, `<script type="module" src="/assets/app.js"></script>`)
+}
+
 // mockSettingsProvider implements PublicSettingsProvider for testing
 type mockSettingsProvider struct {
 	settings any
@@ -638,12 +649,26 @@ func TestFrontendServer_Middleware(t *testing.T) {
 			t.Run(path, func(t *testing.T) {
 				w := httptest.NewRecorder()
 				req := httptest.NewRequest(http.MethodGet, path, nil)
+				if path == "/" {
+					req.Header.Set("User-Agent", "Mozilla/5.0")
+				}
 				router.ServeHTTP(w, req)
 
 				assert.Equal(t, http.StatusOK, w.Code)
 				assert.Contains(t, w.Header().Get("Content-Type"), "text/html")
+				assert.NotContains(t, w.Body.String(), `id="seo-snapshot"`)
+				assert.Contains(t, w.Body.String(), `<div id="app"></div>`)
 			})
 		}
+
+		t.Run("crawler_root_keeps_snapshot", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req.Header.Set("User-Agent", "Googlebot/2.1")
+			router.ServeHTTP(w, req)
+
+			assert.Contains(t, w.Body.String(), `id="seo-snapshot"`)
+		})
 	})
 
 	t.Run("serves_static_files", func(t *testing.T) {

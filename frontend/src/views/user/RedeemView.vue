@@ -1,28 +1,28 @@
 <template>
   <AppLayout>
-    <div class="mx-auto max-w-4xl space-y-6">
+    <div class="mx-auto max-w-5xl space-y-5">
       <!-- Current Balance Card -->
-      <div class="card p-6 border-l-4 border-l-primary-500 dark:border-l-primary-500 bg-white dark:bg-dark-800">
-        <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+      <div class="border border-gray-200 border-l-4 border-l-primary-500 bg-white p-4 sm:p-5 dark:border-dark-700 dark:border-l-primary-500 dark:bg-dark-900">
+        <div class="flex items-center justify-between gap-4">
           <div class="flex items-center gap-4">
-            <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400">
+            <div class="flex h-10 w-10 flex-none items-center justify-center border border-primary-200 bg-primary-50 text-primary-600 dark:border-primary-900/60 dark:bg-primary-950/30 dark:text-primary-400">
               <Icon name="creditCard" size="lg" />
             </div>
             <div>
-              <p class="text-xs font-semibold uppercase tracking-wider text-gray-500">{{ t('redeem.currentBalance') }}</p>
-              <p class="text-3xl font-extrabold text-gray-900 dark:text-white font-mono mt-1">
+              <p class="text-xs font-medium text-gray-500">{{ t('redeem.currentBalance') }}</p>
+              <p class="mt-1 font-mono text-2xl font-semibold tabular-nums text-gray-900 sm:text-3xl dark:text-white">
                 ${{ user?.balance?.toFixed(2) || '0.00' }}
               </p>
             </div>
           </div>
-          <div class="text-right text-xs text-gray-500 dark:text-dark-400 font-mono">
+          <div class="flex-none text-right font-mono text-xs text-gray-500 dark:text-dark-400">
             {{ t('redeem.concurrency') }}: <span class="font-bold text-gray-900 dark:text-white">{{ user?.concurrency || 0 }}</span> {{ t('redeem.requests') }}
           </div>
         </div>
       </div>
 
       <!-- Primary mode switch -->
-      <div class="rounded-xl border border-gray-200 bg-gray-50 p-1.5 dark:border-dark-700 dark:bg-dark-800/80" role="tablist" :aria-label="t('redeem.modeSwitcherLabel')">
+      <div class="sticky top-20 z-20 border border-gray-200 bg-gray-50/95 p-1 shadow-sm backdrop-blur dark:border-dark-700 dark:bg-dark-800/95" role="tablist" :aria-label="t('redeem.modeSwitcherLabel')">
         <div class="grid grid-cols-2 gap-1.5">
           <button
             id="redeem-mode-tab"
@@ -31,7 +31,7 @@
             :aria-selected="activeMode === 'redeem'"
             aria-controls="redeem-mode-panel"
             :class="[
-              'flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-dark-900',
+              'flex min-h-11 items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset',
               activeMode === 'redeem'
                 ? 'bg-white text-primary-700 shadow-sm dark:bg-dark-700 dark:text-primary-300'
                 : 'text-gray-500 hover:bg-white/70 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-700/70 dark:hover:text-white'
@@ -48,7 +48,7 @@
             :aria-selected="activeMode === 'create'"
             aria-controls="create-mode-panel"
             :class="[
-              'flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-dark-900',
+              'flex min-h-11 items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset',
               activeMode === 'create'
                 ? 'bg-white text-primary-700 shadow-sm dark:bg-dark-700 dark:text-primary-300'
                 : 'text-gray-500 hover:bg-white/70 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-700/70 dark:hover:text-white'
@@ -64,7 +64,7 @@
       <!-- Redeem Form -->
       <section v-if="activeMode === 'redeem'" id="redeem-mode-panel" role="tabpanel" aria-labelledby="redeem-mode-tab" class="space-y-6">
         <div class="card">
-          <div class="p-6">
+          <div class="p-4 sm:p-6">
             <form @submit.prevent="handleRedeem" class="space-y-5">
               <div>
                 <label for="code" class="input-label">
@@ -126,7 +126,7 @@
       <section v-else id="create-mode-panel" role="tabpanel" aria-labelledby="create-mode-tab" class="space-y-6">
         <div class="card">
           <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-start justify-between gap-3">
               <div>
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                   {{ t('finance.vouchers.createTitle') }}
@@ -141,7 +141,7 @@
             </div>
           </div>
 
-          <div class="space-y-5 p-6">
+          <div class="space-y-5 p-4 sm:p-6">
           <div v-if="voucherAvailabilityLoading" class="flex items-center justify-center py-6">
             <svg class="h-6 w-6 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -261,6 +261,8 @@
       <transition name="fade">
         <div
           v-if="redeemResult && activeMode === 'redeem'"
+          role="status"
+          aria-live="polite"
           class="card border-emerald-200 bg-emerald-50 dark:border-emerald-800/50 dark:bg-emerald-900/20"
         >
           <div class="p-6">
@@ -315,6 +317,7 @@
       <transition name="fade">
         <div
           v-if="errorMessage && errorMode === activeMode"
+          role="alert"
           class="card border-red-200 bg-red-50 dark:border-red-800/50 dark:bg-red-900/20"
         >
           <div class="p-6">

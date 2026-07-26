@@ -318,7 +318,7 @@ export default {
       },
       upstreamBillingProbe: {
         title: 'Upstream Rate Auto Detection',
-        description: 'Periodically retrieve billing rates declared by upstream Sub2API sites connected to OpenAI API keys.',
+        description: 'Periodically retrieve billing rates declared by upstream sites connected to OpenAI API keys.',
         enabled: 'Enable global auto detection',
         enabledHint: 'When enabled, scheduled detection runs only for accounts that also enable automatic detection. Disabling stops all scheduled detection; manual detection remains available.',
         intervalMinutes: 'Detection interval (minutes)',
@@ -450,7 +450,7 @@ export default {
         siteNamePlaceholder: '3API',
         siteNameHint: 'Displayed in emails and page titles',
         siteSubtitle: 'Site Subtitle',
-        siteSubtitlePlaceholder: 'Subscription to API Conversion Platform',
+        siteSubtitlePlaceholder: 'AI API gateway for unified model access',
         siteSubtitleHint: 'Displayed on login and register pages',
         apiBaseUrl: 'API Base URL',
         apiBaseUrlPlaceholder: 'https://api.example.com',
