@@ -14,6 +14,7 @@ const publicDocs = [
   'docs',
   'deploy/README.md',
   'deploy/DOCKER.md',
+  'deploy/config.example.yaml',
   'deploy/APPLE_CONTAINER.md',
   'deploy/CODEX_POOL_PLAYBOOK.md',
   'deploy/DATAMANAGEMENTD_CN.md',
@@ -22,7 +23,7 @@ const publicDocs = [
 const excludedSegments = new Set(['__tests__', 'api', 'types'])
 const excludedFiles = new Set(['src/constants/brand.ts'])
 const legacyBrandPattern = /sub2api|subscription to api conversion platform/i
-const legacyPublicDocsPattern = /\bSub2API\b|Subscription to API Conversion Platform/
+const legacyPublicDocsPattern = /sub2api|subscription to api conversion platform/i
 const findings = []
 
 async function scanFile(path, pattern = legacyBrandPattern) {

@@ -7,7 +7,7 @@
 ## 中文
 
 ### 目标
-本文档用于对接外部支付系统（如 `sub2apipay`）与 3API 的 Admin API，覆盖：
+本文档用于对接外部支付系统与 3API 的 Admin API，覆盖：
 - 支付成功后充值
 - 用户查询
 - 人工余额修正
@@ -37,11 +37,11 @@
 请求体示例：
 ```json
 {
-  "code": "s2p_cm1234567890",
+  "code": "pay_cm1234567890",
   "type": "balance",
   "value": 100.0,
   "user_id": 123,
-  "notes": "sub2apipay order: cm1234567890"
+  "notes": "external payment order: cm1234567890"
 }
 ```
 
@@ -57,11 +57,11 @@ curl -X POST "${BASE}/api/v1/admin/redeem-codes/create-and-redeem" \
   -H "Idempotency-Key: pay-cm1234567890-success" \
   -H "Content-Type: application/json" \
   -d '{
-    "code":"s2p_cm1234567890",
+    "code":"pay_cm1234567890",
     "type":"balance",
     "value":100.00,
     "user_id":123,
-    "notes":"sub2apipay order: cm1234567890"
+    "notes":"external payment order: cm1234567890"
   }'
 ```
 
@@ -119,15 +119,15 @@ https://pay.example.com/pay?user_id=123&token=<jwt>&theme=light&lang=zh&ui_mode=
 - 重试保持相同 `code`，并使用新的 `Idempotency-Key`
 
 ### 6) `doc_url` 配置建议
-- 查看链接：`https://github.com/Wei-Shaw/sub2api/blob/main/ADMIN_PAYMENT_INTEGRATION_API.md`
-- 下载链接：`https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/ADMIN_PAYMENT_INTEGRATION_API.md`
+- 查看链接：请以当前 3API 仓库地址为准。
+- 下载链接：请以当前 3API 仓库地址为准。
 
 ---
 
 ## English
 
 ### Purpose
-This document describes the minimal 3API Admin API surface for external payment integrations (for example, `sub2apipay`), including:
+This document describes the minimal 3API Admin API surface for external payment integrations, including:
 - Recharge after payment success
 - User lookup
 - Manual balance correction
@@ -157,11 +157,11 @@ Headers:
 Request body:
 ```json
 {
-  "code": "s2p_cm1234567890",
+  "code": "pay_cm1234567890",
   "type": "balance",
   "value": 100.0,
   "user_id": 123,
-  "notes": "sub2apipay order: cm1234567890"
+  "notes": "external payment order: cm1234567890"
 }
 ```
 
@@ -177,11 +177,11 @@ curl -X POST "${BASE}/api/v1/admin/redeem-codes/create-and-redeem" \
   -H "Idempotency-Key: pay-cm1234567890-success" \
   -H "Content-Type: application/json" \
   -d '{
-    "code":"s2p_cm1234567890",
+    "code":"pay_cm1234567890",
     "type":"balance",
     "value":100.00,
     "user_id":123,
-    "notes":"sub2apipay order: cm1234567890"
+    "notes":"external payment order: cm1234567890"
   }'
 ```
 
@@ -239,5 +239,5 @@ https://pay.example.com/pay?user_id=123&token=<jwt>&theme=light&lang=zh&ui_mode=
 - Keep the same `code` for retry, and use a new `Idempotency-Key`
 
 ### 6) Recommended `doc_url`
-- View URL: `https://github.com/Wei-Shaw/sub2api/blob/main/ADMIN_PAYMENT_INTEGRATION_API.md`
-- Download URL: `https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/ADMIN_PAYMENT_INTEGRATION_API.md`
+- View URL: use the current 3API repository URL.
+- Download URL: use the current 3API repository URL.

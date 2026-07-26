@@ -53,9 +53,9 @@ traffic; the values below are conservative starting points, not universal
 capacity targets.
 
 ```nginx
-limit_conn_zone $binary_remote_addr zone=sub2api_conn:20m;
-limit_req_zone  $binary_remote_addr zone=sub2api_auth:20m rate=5r/s;
-limit_req_zone  $binary_remote_addr zone=sub2api_api:40m rate=30r/s;
+limit_conn_zone $binary_remote_addr zone=api3_conn:20m;
+limit_req_zone  $binary_remote_addr zone=api3_auth:20m rate=5r/s;
+limit_req_zone  $binary_remote_addr zone=api3_api:40m rate=30r/s;
 map $http_upgrade $connection_upgrade {
     default upgrade;
     ''      close;
@@ -68,21 +68,21 @@ server {
     client_header_timeout 10s;
     client_max_body_size 256m;
     large_client_header_buffers 4 16k;
-    limit_conn sub2api_conn 40;
+    limit_conn api3_conn 40;
 
     location ~ ^/(auth|api/auth)/ {
-        limit_req zone=sub2api_auth burst=10 nodelay;
+        limit_req zone=api3_auth burst=10 nodelay;
         proxy_pass http://127.0.0.1:8080;
     }
 
     location ~ ^/(v1/)?(embeddings|alpha/search)$ {
         client_max_body_size 32m;
-        limit_req zone=sub2api_api burst=60 nodelay;
+        limit_req zone=api3_api burst=60 nodelay;
         proxy_pass http://127.0.0.1:8080;
     }
 
     location / {
-        limit_req zone=sub2api_api burst=60 nodelay;
+        limit_req zone=api3_api burst=60 nodelay;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

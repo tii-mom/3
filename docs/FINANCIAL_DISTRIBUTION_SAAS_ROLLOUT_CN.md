@@ -22,18 +22,18 @@
 
 ```bash
 cd backend
-DATABASE_URL='postgres://user:password@127.0.0.1:5432/threeapi_gate?sslmode=disable' \
+DATABASE_URL='${DATABASE_URL}' \
   go run ./cmd/financialgate
 ```
 
 全新空白本地库可以追加 `-run-scenarios`，该模式会写入隔离夹具并验证重复充值、首充赠额、兑换码并发兑换和 SaaS 批发重复计费。已有用户时命令会拒绝运行。
 
 ```bash
-DATABASE_URL='postgres://user:password@127.0.0.1:5432/threeapi_gate?sslmode=disable' \
+DATABASE_URL='${DATABASE_URL}' \
   go run ./cmd/financialgate -run-scenarios
 
 # 在已经完成夹具验收的隔离库执行分销压力门禁
-DATABASE_URL='postgres://user:password@127.0.0.1:5432/threeapi_gate?sslmode=disable' \
+DATABASE_URL='${DATABASE_URL}' \
   go run ./cmd/financialgate -stress-orders 1000 -stress-concurrency 32 -timeout 10m
 ```
 
@@ -162,7 +162,7 @@ SELECT status, COUNT(*), MAX(attempts) FROM financial_outbox_events GROUP BY sta
 - Docker PostgreSQL 18 空库再次完成 12 路充值/兑换/批发幂等场景；500 个分销订单、32 worker 产生 500 个事件和 2,500 笔佣金，对账为零。批发余额不足请求被原子拒绝，钱包和幂等占位均未改变。
 - 第二白牌实例在 `512 MiB / 1 CPU / 256 PID` 限制下健康运行，使用独立数据库和 Redis DB；停止该实例不影响主实例，恢复后自身健康检查通过。
 - 最终回归通过：`go test ./...`、`go test -tags=unit ./internal/service`、`pnpm typecheck`、`pnpm lint:check`、`pnpm test:run`、`pnpm build`。
-- 官方 `Wei-Shaw/sub2api` 主分支当前为 `0.1.161`（`d4b9797ff72024960a035cf22fdd8f213e149169`），本项目基线为 `0.1.152`，且内部仓库不是 GitHub fork、无可直接比较的共同提交；文件级差异约 `892` 项。必须在本功能分支固定提交后创建独立上游集成分支逐项合并和复测，禁止直接覆盖当前已验收代码。
+- 上游基线主分支当前为 `0.1.161`（`d4b9797ff72024960a035cf22fdd8f213e149169`），本项目基线为 `0.1.152`，且内部仓库不是 GitHub fork、无可直接比较的共同提交；文件级差异约 `892` 项。必须在本功能分支固定提交后创建独立上游集成分支逐项合并和复测，禁止直接覆盖当前已验收代码。
 
 ## 10. 2026-07-19 官方 0.1.161 集成验收记录
 
@@ -170,7 +170,7 @@ SELECT status, COUNT(*), MAX(attempts) FROM financial_outbox_events GROUP BY sta
 - 升级后 PostgreSQL `18.4` 空库迁移总数为 `234`，第二次执行仍为 `234`；十项财务对账均为零。500 个订单、32 worker 产生 500 个充值事件和 2,500 笔佣金，耗时 `4.170s`，约 `119.9 orders/s`。
 - 逻辑备份通过 `pg_restore --single-transaction` 恢复到独立数据库，恢复库保持 `234` 个迁移，十项财务对账均为零。
 - 最终回归通过：`go test ./...`、`go test -tags=unit ./internal/service -count=1`、Testcontainers 仓储集成测试、`pnpm typecheck`、`pnpm lint:check`、182 个前端测试文件共 1,237 项测试以及 `pnpm build`。
-- 生产镜像 `3api-financial-gate:upstream-0161` 摘要为 `sha256:452809d6f839b2ab8cf25b9e5d02d2acdfab9f0aed21d7dbee50831addf2154a`，大小 `38,136,988` 字节，内嵌版本 `0.1.161`。应用主进程以 `sub2api` 用户运行，`/health` 同时报 PostgreSQL 和 Redis 为 `ok`。
+- 生产镜像 `3api-financial-gate:upstream-0161` 摘要为 `sha256:452809d6f839b2ab8cf25b9e5d02d2acdfab9f0aed21d7dbee50831addf2154a`，大小 `38,136,988` 字节，内嵌版本 `0.1.161`。应用主进程以兼容运行用户启动，`/health` 同时报 PostgreSQL 和 Redis 为 `ok`。
 - 根 Dockerfile 已移除不必要的远程 Dockerfile frontend 语法声明，避免受限网络环境在业务构建开始前阻塞；Docker Desktop 自带 BuildKit 可直接解析现有 cache mount 指令。
 
 ## 11. 生产备份与隔离恢复预检
@@ -180,7 +180,7 @@ SELECT status, COUNT(*), MAX(attempts) FROM financial_outbox_events GROUP BY sta
 - 手动运行 GitHub Actions 工作流 `Production Backup and Isolated Restore Preflight`，输入候选 digest 和确认短语 `BACKUP_AND_RESTORE_ONLY`。
 - 预检对生产 PostgreSQL 只执行版本、用户数、迁移数、数据库大小查询和 `pg_dump`。它不会执行迁移、场景夹具、回填、删除或更新。
 - 备份恢复到随机命名的临时 PostgreSQL 18 容器；候选镜像的迁移双跑、功能默认值和十项财务门禁只在该恢复副本执行。
-- 备份文件、SHA-256 和财务门禁 JSON 保存在服务器 `/opt/sub2api-deploy/backups/preflight/`。临时容器和网络自动删除，备份及报告不自动删除。
+- 备份文件、SHA-256 和财务门禁 JSON 保存在服务器预检备份目录。临时容器和网络自动删除，备份及报告不自动删除。
 - 只有预检成功且人工核对报告后，才允许手动运行生产部署工作流。部署后所有新功能仍保持关闭。
 - 手动部署必须输入同一个已预检 digest 和确认短语 `DEPLOY_PREFLIGHTED_DIGEST`；工作流不会重新构建镜像，避免实际部署物与预检物不一致。
 - 2026-07-19 本地端到端脚本演练通过：对已有 1 个用户、220 个迁移的 PostgreSQL 18.1 验收库只读备份，恢复副本升级到 234 个迁移并通过十项财务门禁；演练同时验证了环境文件权限拒绝和 archive 恢复的 `--no-owner --no-acl` 兼容处理。
