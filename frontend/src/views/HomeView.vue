@@ -652,6 +652,7 @@ import Icon from '@/components/icons/Icon.vue'
 import { sanitizeUrl } from '@/utils/url'
 import { PRODUCT_NAME } from '@/constants/brand'
 import { useTheme } from '@/composables/useTheme'
+import { hasBrowserAuthBootstrapHint } from '@/router/authBootstrap'
 import DOMPurify from 'dompurify'
 
 const { t, locale } = useI18n()
@@ -726,7 +727,9 @@ const reviewsList = computed(() => [
 onMounted(() => {
   syncThemeFromDOM()
 
-  authStore.checkAuth()
+  if (hasBrowserAuthBootstrapHint()) {
+    authStore.checkAuth()
+  }
 
   if (!appStore.publicSettingsLoaded) {
     appStore.fetchPublicSettings()
