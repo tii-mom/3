@@ -33,6 +33,7 @@ var requiredFinancialMigrations = []string{
 	"189_distribution_conversion_idempotency_scope.sql",
 	"190_distribution_purchase_multiplier.sql",
 	"191_reconcile_legacy_credit_balances.sql",
+	"194_resolve_stale_reconciliation_issues.sql",
 }
 
 type gateReport struct {
