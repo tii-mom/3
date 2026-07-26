@@ -13,7 +13,9 @@ func TestEnsureCreditBucketsReady(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
 SELECT COUNT(*)
@@ -38,7 +40,9 @@ func TestEnsureCreditBucketsReadyRejectsMissingAccounts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
 SELECT COUNT(*)
