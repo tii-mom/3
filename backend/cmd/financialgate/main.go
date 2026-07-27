@@ -226,7 +226,7 @@ func runGate(ctx context.Context, db *sql.DB) (*gateReport, error) {
 	if report.MigrationsAfterFirst != report.MigrationsAfterSecond {
 		return nil, fmt.Errorf("migration pass was not idempotent: first=%d second=%d", report.MigrationsAfterFirst, report.MigrationsAfterSecond)
 	}
-	if err := verifyFeatureDefaults(ctx, db); err != nil {
+	if err := verifyFeatureState(ctx, db); err != nil {
 		return nil, err
 	}
 	if err := runReconciliationChecks(ctx, db, report.Reconciliation); err != nil {
@@ -305,28 +305,37 @@ func verifyRequiredMigrations(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
-func verifyFeatureDefaults(ctx context.Context, db *sql.DB) error {
+func verifyFeatureState(ctx context.Context, db *sql.DB) error {
 	keys := []string{
 		"credit_bucket_enforce_enabled",
 		"balance_voucher_enabled",
 		"distribution_enabled",
 		"saas_control_plane_enabled",
 	}
+	values := make(map[string]bool, len(keys))
 	for _, key := range keys {
 		var value string
 		if err := db.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = $1`, key).Scan(&value); err != nil {
-			return fmt.Errorf("read feature default %s: %w", key, err)
+			return fmt.Errorf("read feature state %s: %w", key, err)
 		}
-		if !strings.EqualFold(strings.TrimSpace(value), "false") {
-			return fmt.Errorf("feature %s must remain disabled before rollout, got %q", key, value)
+		normalized := strings.ToLower(strings.TrimSpace(value))
+		if normalized != "true" && normalized != "false" {
+			return fmt.Errorf("feature %s has invalid boolean value %q", key, value)
 		}
+		values[key] = normalized == "true"
+	}
+	if (values["balance_voucher_enabled"] || values["distribution_enabled"] || values["saas_control_plane_enabled"]) && !values["credit_bucket_enforce_enabled"] {
+		return errors.New("credit buckets must be enforced before user-facing financial features are enabled")
 	}
 	var enabled, stack bool
 	if err := db.QueryRowContext(ctx, `SELECT enabled, stack_with_legacy FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company'`).Scan(&enabled, &stack); err != nil {
-		return fmt.Errorf("read distribution defaults: %w", err)
+		return fmt.Errorf("read distribution state: %w", err)
 	}
-	if enabled || stack {
-		return fmt.Errorf("distribution defaults are unsafe: enabled=%t stack_with_legacy=%t", enabled, stack)
+	if stack {
+		return errors.New("compute company must not stack with legacy affiliate rewards")
+	}
+	if values["distribution_enabled"] != enabled {
+		return fmt.Errorf("distribution setting and compute company program disagree: distribution_enabled=%t compute_company.enabled=%t", values["distribution_enabled"], enabled)
 	}
 	return nil
 }
