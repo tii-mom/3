@@ -814,6 +814,7 @@ import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useClipboard } from '@/composables/useClipboard'
 import Icon from '@/components/icons/Icon.vue'
+import { extractOAuthCallbackParams } from '@/utils/oauthCallback'
 import type { AddMethod, AuthInputMethod } from '@/composables/useAccountOAuth'
 import type { AccountPlatform } from '@/types'
 
@@ -882,7 +883,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const showLocalCallbackNotice = computed(() => props.platform === 'openai' || props.platform === 'grok')
+const showLocalCallbackNotice = computed(() => props.platform === 'openai' || props.platform === 'antigravity' || props.platform === 'grok')
 
 // Get translation key based on platform
 const getOAuthKey = (key: string) => {
@@ -992,31 +993,12 @@ watch(authCodeInput, (newVal) => {
   if (props.platform !== 'openai' && props.platform !== 'gemini' && props.platform !== 'antigravity' && props.platform !== 'grok') return
 
   const trimmed = newVal.trim()
-  // Check if it looks like a URL with code parameter
-  if (trimmed.includes('code=')) {
-    try {
-      // Try to parse as URL
-      const url = trimmed.includes('?') ? new URL(trimmed) : new URL(`http://localhost/callback?${trimmed.replace(/^\?/, '')}`)
-      const code = url.searchParams.get('code')
-      const stateParam = url.searchParams.get('state')
-      if ((props.platform === 'openai' || props.platform === 'gemini' || props.platform === 'antigravity' || props.platform === 'grok') && stateParam) {
-        oauthState.value = stateParam
-      }
-      if (code && code !== trimmed) {
-        // Replace the input with just the code
-        authCodeInput.value = code
-      }
-    } catch {
-      // If URL parsing fails, try regex extraction
-      const match = trimmed.match(/[?&]code=([^&]+)/)
-      const stateMatch = trimmed.match(/[?&]state=([^&]+)/)
-      if ((props.platform === 'openai' || props.platform === 'gemini' || props.platform === 'antigravity' || props.platform === 'grok') && stateMatch && stateMatch[1]) {
-        oauthState.value = stateMatch[1]
-      }
-      if (match && match[1] && match[1] !== trimmed) {
-        authCodeInput.value = match[1]
-      }
-    }
+  const params = extractOAuthCallbackParams(trimmed)
+  if (params.state) {
+    oauthState.value = params.state
+  }
+  if (params.code && params.code !== trimmed) {
+    authCodeInput.value = params.code
   }
 })
 

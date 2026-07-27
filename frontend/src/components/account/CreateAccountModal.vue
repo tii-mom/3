@@ -3140,6 +3140,7 @@
           :groups="groups"
           :platform="form.platform"
           :mixed-scheduling="mixedScheduling"
+          :empty-message="accountGroupEmptyMessage"
           data-tour="account-form-groups"
         />
       </div>
@@ -4071,6 +4072,13 @@ const form = reactive({
   expires_at: null as number | null
 })
 
+const accountGroupEmptyMessage = computed(() => {
+  if (form.platform !== 'antigravity') return undefined
+  return mixedScheduling.value
+    ? t('admin.accounts.antigravityNoCompatibleGroups')
+    : t('admin.accounts.antigravityNoNativeGroups')
+})
+
 // Helper to check if current type needs OAuth flow
 const isOAuthFlow = computed(() => {
   // Antigravity upstream 类型不需要 OAuth 流程
@@ -4186,6 +4194,7 @@ watch(
     modelMappings.value = []
     // Antigravity: 默认使用映射模式并填充默认映射
     if (newPlatform === 'antigravity') {
+      mixedScheduling.value = true
       antigravityModelRestrictionMode.value = 'mapping'
       fetchAntigravityDefaultMappings().then(mappings => {
         antigravityModelMappings.value = [...mappings]
@@ -4687,6 +4696,7 @@ const resetForm = () => {
   cacheTTLOverrideTarget.value = '5m'
   customBaseUrlEnabled.value = false
   customBaseUrl.value = ''
+  mixedScheduling.value = false
   allowOverages.value = false
   antigravityAccountType.value = 'oauth'
   antigravityProjectId.value = ''
@@ -5974,7 +5984,11 @@ const handleAntigravityExchange = async (authCode: string) => {
 		const extra = buildAntigravityExtra()
 		await createAccountAndFinish('antigravity', 'oauth', credentials, extra)
   } catch (error: any) {
-    antigravityOAuth.error.value = error.response?.data?.detail || t('admin.accounts.oauth.authFailed')
+    antigravityOAuth.error.value =
+      error.response?.data?.detail ||
+      error.response?.data?.message ||
+      error.message ||
+      t('admin.accounts.oauth.authFailed')
     appStore.showError(antigravityOAuth.error.value)
   } finally {
     antigravityOAuth.loading.value = false

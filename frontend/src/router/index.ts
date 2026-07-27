@@ -249,6 +249,26 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/api-workbench',
+    name: 'ApiWorkbench',
+    component: () => import('@/views/user/ModelTestView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'API Workbench',
+      titleKey: 'apiTools.workbench.title',
+      descriptionKey: 'apiTools.workbench.subtitle'
+    }
+  },
+  {
+    path: '/model-test',
+    redirect: '/api-workbench',
+  },
+  {
+    path: '/image-generation',
+    redirect: { path: '/api-workbench', query: { mode: 'image' } },
+  },
+  {
     path: '/batch-image',
     name: 'BatchImageGuide',
     alias: '/docs/batch-image',
@@ -326,6 +346,10 @@ const routes: RouteRecordRaw[] = [
       titleKey: 'profile.title',
       descriptionKey: 'profile.description'
     }
+  },
+  {
+    path: '/contact',
+    redirect: '/profile'
   },
   {
     path: '/subscriptions',

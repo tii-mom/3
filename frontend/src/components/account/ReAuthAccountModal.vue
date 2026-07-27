@@ -450,7 +450,11 @@ const handleExchangeCode = async () => {
       emit('reauthorized')
       handleClose()
     } catch (error: any) {
-      antigravityOAuth.error.value = error.response?.data?.detail || t('admin.accounts.oauth.authFailed')
+      antigravityOAuth.error.value =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        t('admin.accounts.oauth.authFailed')
       appStore.showError(antigravityOAuth.error.value)
     }
   } else {

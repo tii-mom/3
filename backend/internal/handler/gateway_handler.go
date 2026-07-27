@@ -1020,12 +1020,11 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 	if apiKey != nil && apiKey.Group != nil && apiKey.Group.CustomModelsListEnabled() {
 		fallbackModels := defaultModelIDsForPlatform(platform)
 		availableModels = filterModelsByCustomList(customModelsListSource(platform, availableModels, fallbackModels), fallbackModels, apiKey.Group.ModelsListConfig.Models)
+		availableModels = appendOpenAIImageModelIfAllowed(availableModels, platform, apiKey)
 		writeCustomModelsList(c, platform, availableModels)
 		return
 	}
-	if platform == service.PlatformOpenAI && len(availableModels) > 0 && apiKey != nil && apiKey.Group != nil && service.GroupAllowsImageGeneration(apiKey.Group) {
-		availableModels = appendModelIDIfMissing(availableModels, "gpt-image-2")
-	}
+	availableModels = appendOpenAIImageModelIfAllowed(availableModels, platform, apiKey)
 
 	if len(availableModels) > 0 {
 		writeModelsList(c, platform, availableModels)
@@ -1066,6 +1065,13 @@ func appendModelIDIfMissing(models []string, modelID string) []string {
 		}
 	}
 	return append(models, modelID)
+}
+
+func appendOpenAIImageModelIfAllowed(models []string, platform string, apiKey *service.APIKey) []string {
+	if platform != service.PlatformOpenAI || apiKey == nil || apiKey.Group == nil || !service.GroupAllowsImageGeneration(apiKey.Group) {
+		return models
+	}
+	return appendModelIDIfMissing(models, "gpt-image-2")
 }
 
 func writeModelsList(c *gin.Context, platform string, modelIDs []string) {
