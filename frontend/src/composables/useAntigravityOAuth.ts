@@ -4,6 +4,15 @@ import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
 import type { AntigravityTokenInfo } from '@/api/admin/antigravity'
 
+const getOAuthErrorMessage = (err: any, fallback: string) => {
+  return (
+    err?.response?.data?.detail ||
+    err?.response?.data?.message ||
+    err?.message ||
+    fallback
+  )
+}
+
 export function useAntigravityOAuth() {
   const appStore = useAppStore()
   const { t } = useI18n()
@@ -39,8 +48,10 @@ export function useAntigravityOAuth() {
       state.value = response.state
       return true
     } catch (err: any) {
-      error.value =
-        err.response?.data?.detail || t('admin.accounts.oauth.antigravity.failedToGenerateUrl')
+      error.value = getOAuthErrorMessage(
+        err,
+        t('admin.accounts.oauth.antigravity.failedToGenerateUrl')
+      )
       appStore.showError(error.value)
       return false
     } finally {
@@ -74,8 +85,10 @@ export function useAntigravityOAuth() {
       const tokenInfo = await adminAPI.antigravity.exchangeCode(payload as any)
       return tokenInfo as AntigravityTokenInfo
     } catch (err: any) {
-      error.value =
-        err.response?.data?.detail || t('admin.accounts.oauth.antigravity.failedToExchangeCode')
+      error.value = getOAuthErrorMessage(
+        err,
+        t('admin.accounts.oauth.antigravity.failedToExchangeCode')
+      )
       appStore.showError(error.value)
       return null
     } finally {
@@ -102,8 +115,10 @@ export function useAntigravityOAuth() {
       )
       return tokenInfo as AntigravityTokenInfo
     } catch (err: any) {
-      error.value =
-        err.response?.data?.detail || t('admin.accounts.oauth.antigravity.failedToValidateRT')
+      error.value = getOAuthErrorMessage(
+        err,
+        t('admin.accounts.oauth.antigravity.failedToValidateRT')
+      )
       // Don't show global error toast for batch validation to avoid spamming
       // appStore.showError(error.value)
       return null

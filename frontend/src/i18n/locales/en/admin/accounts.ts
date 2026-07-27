@@ -751,6 +751,8 @@ export default {
       mixedSchedulingHint: 'Enable to participate in Anthropic/Gemini group scheduling',
       mixedSchedulingTooltip:
         '!! WARNING !! Antigravity Claude and Anthropic Claude cannot be used in the same context. If you have both Anthropic and Antigravity accounts, enabling this option will cause frequent 400 errors. When enabled, please use the group feature to isolate Antigravity accounts from Anthropic accounts. Make sure you understand this before enabling!!',
+      antigravityNoCompatibleGroups: 'No Antigravity, Anthropic, or Gemini groups available. Create an active group first.',
+      antigravityNoNativeGroups: 'No Antigravity groups available. Enable /v1/messages scheduling to use Anthropic/Gemini groups, or create an Antigravity group.',
       aiCreditsBalance: 'AI Credits',
       allowOverages: 'Allow Overages (AI Credits)',
       allowOveragesTooltip:
@@ -1027,14 +1029,14 @@ export default {
           step2OpenUrl: 'Open the URL in your browser and complete authorization',
           openUrlDesc: 'Open the authorization URL in a new tab, log in to your Google account and authorize.',
           importantNotice:
-            'Important: The page may take a while to load after authorization. Please wait patiently. When the browser address bar shows http://localhost..., authorization is complete.',
+            'Important: The page may take a while to load after authorization. Please wait patiently. When the browser address bar shows http://localhost..., authorization is complete. If you see /login?redirect=/callback?..., copy the full address bar URL.',
           step3EnterCode: 'Enter Authorization URL or Code',
           authCodeDesc:
-            'After authorization, when the page URL becomes http://localhost:xxx/auth/callback?code=...:',
+            'After authorization, paste the full callback URL. In local testing it may look like http://localhost:8085/login?redirect=/callback?...:',
           authCode: 'Authorization URL or Code',
           authCodePlaceholder:
-            'Option 1: Copy the complete URL\n(http://localhost:xxx/auth/callback?code=...)\nOption 2: Copy only the code parameter value',
-                    authCodeHint: 'You can copy the entire URL or just the code parameter value, the system will auto-detect',
+            'Recommended: copy the full address bar URL\nExample: http://localhost:8085/login?redirect=/callback?state=...%26code=...\nPasting only the code parameter is also supported',
+                    authCodeHint: 'After you paste the full URL, the field may collapse to the code value. This is expected; the state was detected and saved.',
                     failedToGenerateUrl: 'Failed to generate Antigravity auth URL',
                     missingExchangeParams: 'Missing code, session ID, or state',
                     failedToExchangeCode: 'Failed to exchange Antigravity auth code',

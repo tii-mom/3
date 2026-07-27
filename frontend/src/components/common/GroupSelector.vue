@@ -50,7 +50,7 @@
         v-if="filteredGroups.length === 0"
         class="col-span-2 py-2 text-center text-sm text-gray-500 dark:text-gray-400"
       >
-        {{ t('common.noGroupsAvailable') }}
+        {{ emptyStateMessage }}
       </div>
     </div>
   </div>
@@ -71,6 +71,7 @@ interface Props {
   platform?: GroupPlatform // Optional platform filter
   mixedScheduling?: boolean // For antigravity accounts: allow anthropic/gemini groups
   searchable?: boolean | 'auto'
+  emptyMessage?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -86,6 +87,8 @@ const isSearchable = computed(() => {
   if (props.searchable === 'auto') return props.groups.length > 5
   return props.searchable
 })
+
+const emptyStateMessage = computed(() => props.emptyMessage || t('common.noGroupsAvailable'))
 
 // Filter groups by platform if specified
 const filteredGroups = computed(() => {

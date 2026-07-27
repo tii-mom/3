@@ -936,6 +936,46 @@
   border-radius: 0 5px 5px 0;
 }
 
+.app-sidebar-redesign .sidebar-link-featured {
+  --sidebar-feature-accent: var(--ui-brand);
+  --sidebar-feature-bg: color-mix(in srgb, var(--ui-brand) 11%, var(--ui-surface));
+  --sidebar-feature-bg-hover: color-mix(in srgb, var(--ui-brand) 16%, var(--ui-surface));
+  --sidebar-feature-fg: var(--ui-brand-strong);
+  background: var(--sidebar-feature-bg) !important;
+  color: var(--sidebar-feature-fg) !important;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--sidebar-feature-accent) 22%, transparent),
+    0 6px 16px color-mix(in srgb, var(--sidebar-feature-accent) 8%, transparent) !important;
+}
+
+.app-sidebar-redesign .sidebar-link-featured:hover {
+  background: var(--sidebar-feature-bg-hover) !important;
+  color: var(--sidebar-feature-fg) !important;
+}
+
+.app-sidebar-redesign .sidebar-link-featured.sidebar-link-active {
+  background: var(--sidebar-feature-bg-hover) !important;
+  color: var(--sidebar-feature-fg) !important;
+  box-shadow:
+    inset 3px 0 0 var(--sidebar-feature-accent),
+    inset 0 0 0 1px color-mix(in srgb, var(--sidebar-feature-accent) 34%, transparent),
+    0 8px 18px color-mix(in srgb, var(--sidebar-feature-accent) 10%, transparent) !important;
+}
+
+.app-sidebar-redesign .sidebar-link-featured-api {
+  --sidebar-feature-accent: #2563eb;
+  --sidebar-feature-bg: color-mix(in srgb, #2563eb 8%, var(--ui-surface));
+  --sidebar-feature-bg-hover: color-mix(in srgb, #2563eb 13%, var(--ui-surface));
+  --sidebar-feature-fg: color-mix(in srgb, #2563eb 74%, var(--ui-ink));
+}
+
+.dark .app-sidebar-redesign .sidebar-link-featured-api {
+  --sidebar-feature-accent: #60a5fa;
+  --sidebar-feature-bg: color-mix(in srgb, #60a5fa 12%, var(--ui-surface));
+  --sidebar-feature-bg-hover: color-mix(in srgb, #60a5fa 18%, var(--ui-surface));
+  --sidebar-feature-fg: #bfdbfe;
+}
+
 .app-sidebar-redesign .sidebar-link:focus-visible,
 .app-header-redesign button:focus-visible,
 .app-header-redesign a:focus-visible {
@@ -1182,6 +1222,20 @@
 .business-page-redesign .text-emerald-600,
 .admin-page-redesign .text-emerald-600 {
   color: #2b9568 !important;
+}
+
+.business-page-redesign > .compute-overview-hero {
+  border-color: color-mix(in srgb, var(--ui-line) 82%, #e26b36 18%) !important;
+  background:
+    radial-gradient(circle at 88% 0%, rgb(226 107 54 / 12%), transparent 34%),
+    linear-gradient(135deg, #fffaf5 0%, #ffffff 46%, #f7f4ee 100%) !important;
+}
+
+.dark .business-page-redesign > .compute-overview-hero {
+  border-color: color-mix(in srgb, var(--ui-line) 74%, #e26b36 26%) !important;
+  background:
+    radial-gradient(circle at 88% -8%, rgb(226 107 54 / 18%), transparent 34%),
+    linear-gradient(135deg, #10161d 0%, #151a1f 52%, #0f1419 100%) !important;
 }
 
 @media (max-width: 1023px) {

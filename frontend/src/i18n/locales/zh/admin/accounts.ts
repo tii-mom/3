@@ -844,6 +844,8 @@ export default {
       mixedSchedulingHint: '启用后可参与 Anthropic/Gemini 分组的调度',
       mixedSchedulingTooltip:
         '！！注意！！ Antigravity Claude 和 Anthropic Claude 无法在同个上下文中使用，如果你同时有 Anthropic 账号和 Antigravity 账号，开启此选项会导致经常 400 报错。开启后，请用分组功能做好 Antigravity 账号和 Anthropic 账号的隔离。一定要弄明白再开启！！',
+      antigravityNoCompatibleGroups: '暂无可用的 Antigravity、Anthropic 或 Gemini 分组，请先创建并启用分组。',
+      antigravityNoNativeGroups: '暂无 Antigravity 分组。可开启“在 /v1/messages 中使用”来选择 Anthropic/Gemini 分组，或先创建 Antigravity 分组。',
       aiCreditsBalance: 'AI Credits',
       allowOverages: '允许超量请求 (AI Credits)',
       allowOveragesTooltip:
@@ -1110,14 +1112,14 @@ export default {
           step2OpenUrl: '在浏览器中打开链接并完成授权',
           openUrlDesc: '请在新标签页中打开授权链接，登录您的 Google 账户并授权。',
           importantNotice:
-            '重要提示：授权后页面可能会加载较长时间，请耐心等待。当浏览器地址栏变为 http://localhost... 开头时，表示授权已完成。',
+            '重要提示：授权后页面可能会加载较长时间，请耐心等待。当浏览器地址栏变为 http://localhost... 开头时，表示授权已完成。若看到 /login?redirect=/callback?...，请复制整个地址栏链接。',
           step3EnterCode: '输入授权链接或 Code',
           authCodeDesc:
-            '授权完成后，当页面地址变为 http://localhost:xxx/auth/callback?code=... 时：',
+            '授权完成后，请粘贴完整 callback 链接；本地测试时可能是 http://localhost:8085/login?redirect=/callback?...：',
           authCode: '授权链接或 Code',
           authCodePlaceholder:
-            '方式1：复制完整的链接\n(http://localhost:xxx/auth/callback?code=...)\n方式2：仅复制 code 参数的值',
-          authCodeHint: '您可以直接复制整个链接或仅复制 code 参数值，系统会自动识别',
+            '推荐：复制完整地址栏链接\n例如：http://localhost:8085/login?redirect=/callback?state=...%26code=...\n也支持仅粘贴 code 参数值',
+          authCodeHint: '粘贴完整链接后输入框会自动变成 code，这是正常现象；state 已自动识别并保存。',
           failedToGenerateUrl: '生成 Antigravity 授权链接失败',
           missingExchangeParams: '缺少 code / session_id / state',
           failedToExchangeCode: 'Antigravity 授权码兑换失败',
