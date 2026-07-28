@@ -205,7 +205,7 @@ interface NavItem {
   label: string
   icon: unknown
   iconSvg?: string
-  highlight?: 'api' | 'company'
+  highlight?: 'api' | 'company' | 'shop'
   hideInSimpleMode?: boolean
   children?: NavItem[]
   /**
@@ -703,7 +703,6 @@ const flagPayment = makeSidebarFlag(FeatureFlags.payment)
 const flagAvailableChannels = makeSidebarFlag(FeatureFlags.availableChannels)
 const flagRiskControl = makeSidebarFlag(FeatureFlags.riskControl)
 const flagOpsMonitoring = () => adminSettingsStore.opsMonitoringEnabled
-const flagAdminPayment = () => adminSettingsStore.paymentEnabled
 const flagBatchImageAccess = () => canUseBatchImage.value
 
 // buildSelfNavItems 构造用户自己的导航项（用户端主菜单和管理员的"我的账户"子菜单共享这组声明）。
@@ -719,7 +718,9 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   items.push(
     { path: '/distribution', label: t('nav.distribution'), icon: UsersIcon, highlight: 'company' },
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon, highlight: 'api' },
+    { path: '/shop', label: t('nav.shop'), icon: GiftIcon, highlight: 'shop', hideInSimpleMode: true },
     { path: '/api-workbench', label: t('nav.apiWorkbench'), icon: ModelTestIcon },
+    { path: '/tools', label: t('nav.aiTools'), icon: GlobeIcon, hideInSimpleMode: true },
     { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
     { path: '/available-channels', label: t('nav.availableChannels'), icon: ChannelIcon, hideInSimpleMode: true, featureFlag: flagAvailableChannels },
@@ -785,6 +786,7 @@ const adminNavItems = computed((): NavItem[] => {
         { path: '/admin/channels/monitor', label: t('nav.channelMonitor'), icon: SignalIcon, featureFlag: flagChannelMonitor },
       ],
     },
+    { path: '/admin/orders/plans', label: t('nav.paymentPlans'), icon: CreditCardIcon, hideInSimpleMode: true },
     { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
     { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon },
     { path: '/admin/announcements', label: t('nav.announcements'), icon: BellIcon },
@@ -804,17 +806,17 @@ const adminNavItems = computed((): NavItem[] => {
     { path: '/admin/redeem', label: t('nav.redeemCodes'), icon: TicketIcon, hideInSimpleMode: true },
     { path: '/admin/promo-codes', label: t('nav.promoCodes'), icon: GiftIcon, hideInSimpleMode: true },
     { path: '/admin/finance', label: t('nav.financeOperations'), icon: CreditCardIcon, hideInSimpleMode: true },
+    { path: '/admin/shop', label: t('nav.shopManagement'), icon: GiftIcon, hideInSimpleMode: true },
+    { path: '/admin/tools', label: t('nav.aiToolsManagement'), icon: GlobeIcon, hideInSimpleMode: true },
     {
       path: '/admin/orders',
       label: t('nav.orderManagement'),
       icon: OrderIcon,
       hideInSimpleMode: true,
       expandOnly: true,
-      featureFlag: flagAdminPayment,
       children: [
         { path: '/admin/orders/dashboard', label: t('nav.paymentDashboard'), icon: ChartIcon },
         { path: '/admin/orders', label: t('nav.orderManagement'), icon: OrderIcon },
-        { path: '/admin/orders/plans', label: t('nav.paymentPlans'), icon: CreditCardIcon },
       ],
     },
     { path: '/admin/usage', label: t('nav.usage'), icon: ChartIcon },
@@ -882,6 +884,7 @@ function navLinkClasses(item: NavItem) {
     'sidebar-link-featured': Boolean(item.highlight),
     'sidebar-link-featured-api': item.highlight === 'api',
     'sidebar-link-featured-company': item.highlight === 'company',
+    'sidebar-link-featured-shop': item.highlight === 'shop',
   }
 }
 

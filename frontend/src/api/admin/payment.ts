@@ -107,6 +107,11 @@ export const adminPaymentAPI = {
     return apiClient.post(`/admin/payment/orders/${id}/retry`)
   },
 
+  /** Manually confirm a pending subscription payment and fulfill it */
+  confirmSubscriptionPayment(id: number, reference?: string) {
+    return apiClient.post(`/admin/payment/orders/${id}/confirm-subscription`, { reference })
+  },
+
   // ==================== Channels ====================
 
   /** Get all payment channels */

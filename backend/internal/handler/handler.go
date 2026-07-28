@@ -44,6 +44,8 @@ type AdminHandlers struct {
 	Distribution           *admin.DistributionHandler
 	SaaS                   *admin.SaaSHandler
 	Voucher                *admin.VoucherHandler
+	Shop                   *admin.ShopHandler
+	AITool                 *admin.AIToolHandler
 }
 
 // Handlers contains all HTTP handlers
@@ -69,6 +71,8 @@ type Handlers struct {
 	AvailableChannel *AvailableChannelHandler
 	AsyncImage       *AsyncImageHandler
 	BatchImage       *BatchImageHandler
+	Shop             *ShopHandler
+	AITool           *AIToolHandler
 }
 
 // BuildInfo contains build-time information

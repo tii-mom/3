@@ -601,9 +601,9 @@ export default {
 
     // Subscriptions Management
     subscriptions: {
-      title: '订阅管理',
-      description: '管理用户订阅和配额限制',
-      assignSubscription: '分配订阅',
+      title: '用户订阅',
+      description: '查看用户已购订阅，特殊情况可手动补发或调整',
+      assignSubscription: '手动补发订阅',
       adjustSubscription: '调整订阅',
       revokeSubscription: '撤销订阅',
       restoreSubscription: '恢复订阅',
@@ -666,7 +666,7 @@ export default {
       quotaResetSuccess: '配额重置成功',
       failedToResetQuota: '重置配额失败',
       noSubscriptionsYet: '暂无订阅',
-      assignFirstSubscription: '分配一个订阅以开始使用。',
+      assignFirstSubscription: '用户购买套餐后会自动出现在这里；特殊情况可手动补发。',
       subscriptionAssigned: '订阅分配成功',
       subscriptionAdjusted: '订阅调整成功',
       subscriptionRevoked: '订阅撤销成功',
@@ -684,8 +684,8 @@ export default {
       revokeConfirm: "确定要撤销 '{user}' 的订阅吗？可稍后在已撤销列表中恢复。",
       restoreConfirm: "确定要恢复 '{user}' 的订阅吗？如果原订阅已过期，恢复后将显示为已过期。",
       guide: {
-        title: '订阅管理教程',
-        subtitle: '订阅模式允许你按时间周期为用户分配使用额度，支持日/周/月配额限制。按照以下步骤即可完成配置。',
+        title: '用户订阅说明',
+        subtitle: '这里主要用于查看用户已拥有的订阅。售卖套餐请到「订阅套餐」页面创建并上架。',
         showGuide: '使用指南',
         step1: {
           title: '创建订阅分组',
@@ -695,8 +695,8 @@ export default {
           link: '前往分组管理'
         },
         step2: {
-          title: '分配订阅给用户',
-          line1: '点击本页右上角「分配订阅」按钮',
+          title: '手动补发订阅',
+          line1: '点击本页右上角「手动补发订阅」按钮',
           line2: '在弹窗中搜索用户邮箱并选择目标用户',
           line3: '选择订阅分组、设置有效期天数，点击「分配」'
         },

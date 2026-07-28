@@ -601,9 +601,9 @@ export default {
 
     // Subscriptions
     subscriptions: {
-      title: 'Subscription Management',
-      description: 'Manage user subscriptions and quota limits',
-      assignSubscription: 'Assign Subscription',
+      title: 'User Subscriptions',
+      description: 'View purchased subscriptions; manually grant or adjust only for special cases',
+      assignSubscription: 'Manual Grant',
       adjustSubscription: 'Adjust Subscription',
       revokeSubscription: 'Revoke Subscription',
       restoreSubscription: 'Restore Subscription',
@@ -666,7 +666,7 @@ export default {
       quotaResetSuccess: 'Quota reset successfully',
       failedToResetQuota: 'Failed to reset quota',
       noSubscriptionsYet: 'No subscriptions yet',
-      assignFirstSubscription: 'Assign a subscription to get started.',
+      assignFirstSubscription: 'Purchased subscriptions appear here automatically; use manual grant only for special cases.',
       subscriptionAssigned: 'Subscription assigned successfully',
       subscriptionAdjusted: 'Subscription adjusted successfully',
       subscriptionRevoked: 'Subscription revoked successfully',
@@ -686,8 +686,8 @@ export default {
       restoreConfirm:
         "Restore the subscription for '{user}'? If the original subscription has expired, it will be restored as expired.",
       guide: {
-        title: 'Subscription Management Guide',
-        subtitle: 'Subscription mode lets you assign time-based usage quotas to users, with daily/weekly/monthly limits. Follow these steps to get started.',
+        title: 'User Subscription Guide',
+        subtitle: 'This page is mainly for viewing user subscriptions. Create and publish sellable plans on the Subscription Plans page.',
         showGuide: 'Usage Guide',
         step1: {
           title: 'Create a Subscription Group',
@@ -697,8 +697,8 @@ export default {
           link: 'Go to Group Management'
         },
         step2: {
-          title: 'Assign Subscription to User',
-          line1: 'Click the "Assign Subscription" button in the top right',
+          title: 'Manual Grant',
+          line1: 'Click the "Manual Grant" button in the top right',
           line2: 'Search for a user by email and select them',
           line3: 'Choose a subscription group, set validity days, then click "Assign"'
         },

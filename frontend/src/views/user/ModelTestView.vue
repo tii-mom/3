@@ -150,9 +150,17 @@
                       :key="`${image.safeUrl}-${index}`"
                       class="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 dark:border-dark-700 dark:bg-dark-900/50"
                     >
-                      <div class="flex aspect-square items-center justify-center bg-white dark:bg-dark-950">
+                      <button
+                        type="button"
+                        class="group relative flex aspect-square w-full items-center justify-center bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:bg-dark-950"
+                        :aria-label="t('apiTools.workbench.previewImage')"
+                        @click="openImagePreview(image, index)"
+                      >
                         <img :src="image.safeUrl" :alt="t('apiTools.workbench.generatedAlt')" class="h-full w-full object-contain" />
-                      </div>
+                        <span class="pointer-events-none absolute inset-x-3 bottom-3 rounded-full bg-black/60 px-3 py-1.5 text-center text-xs font-medium text-white opacity-0 backdrop-blur transition group-hover:opacity-100 group-focus-visible:opacity-100">
+                          {{ t('apiTools.workbench.previewImage') }}
+                        </span>
+                      </button>
                       <div class="space-y-3 p-3">
                         <p v-if="image.revisedPrompt" class="text-xs leading-5 text-gray-500 dark:text-gray-400">
                           {{ image.revisedPrompt }}
@@ -173,40 +181,6 @@
             </div>
 
             <form class="border-t border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-800 sm:p-5" @submit.prevent="sendCurrent">
-              <details v-if="mode === 'image'" class="mb-4 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm dark:border-dark-700 dark:bg-dark-900/60">
-                <summary class="cursor-pointer select-none font-medium text-gray-800 dark:text-gray-100">
-                  {{ t('apiTools.workbench.advancedOptions') }}
-                </summary>
-                <div class="mt-4 grid gap-4 sm:grid-cols-3">
-                  <div>
-                    <label class="input-label">{{ t('apiTools.workbench.size') }}</label>
-                    <select v-model="form.size" class="input">
-                      <option value="1024x1024">1024×1024</option>
-                      <option value="1536x1024">1536×1024</option>
-                      <option value="1024x1536">1024×1536</option>
-                      <option value="2048x2048">2048×2048</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label class="input-label">{{ t('apiTools.workbench.quality') }}</label>
-                    <select v-model="form.quality" class="input">
-                      <option value="auto">Auto</option>
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label class="input-label">{{ t('apiTools.workbench.outputFormat') }}</label>
-                    <select v-model="form.outputFormat" class="input">
-                      <option value="png">PNG</option>
-                      <option value="jpeg">JPEG</option>
-                      <option value="webp">WebP</option>
-                    </select>
-                  </div>
-                </div>
-              </details>
-
               <div class="mx-auto flex max-w-3xl flex-col gap-3 rounded-3xl border border-gray-200 bg-gray-50 p-3 shadow-sm dark:border-dark-700 dark:bg-dark-900/70">
                 <textarea
                   ref="composerRef"
@@ -233,6 +207,52 @@
         </div>
       </section>
     </main>
+
+    <Teleport to="body">
+      <div
+        v-if="previewImage"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="t('apiTools.workbench.previewImage')"
+        @click.self="closeImagePreview"
+      >
+        <div class="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-white/10 bg-white shadow-2xl dark:bg-dark-900">
+          <header class="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 dark:border-dark-700 sm:px-5">
+            <div class="min-w-0">
+              <p class="text-xs font-semibold tracking-[0.12em] text-primary-600 dark:text-primary-400">3API / GPT-IMAGE-2</p>
+              <h2 class="truncate text-base font-semibold text-gray-950 dark:text-white">{{ t('apiTools.workbench.previewImage') }}</h2>
+            </div>
+            <div class="flex items-center gap-2">
+              <button type="button" class="btn btn-secondary btn-sm inline-flex items-center gap-1.5" @click="downloadImage(previewImage, previewImageIndex)">
+                <Icon name="download" size="sm" />
+                {{ t('apiTools.workbench.download') }}
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm !px-2" :aria-label="t('common.close')" @click="closeImagePreview">
+                <Icon name="x" size="sm" />
+              </button>
+            </div>
+          </header>
+          <div class="grid min-h-0 flex-1 gap-4 overflow-y-auto bg-gray-50 p-4 dark:bg-dark-950 sm:p-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <div class="flex min-h-[320px] items-center justify-center rounded-3xl bg-white p-3 dark:bg-dark-900">
+              <img :src="previewImage.safeUrl" :alt="t('apiTools.workbench.generatedAlt')" class="max-h-[72vh] w-auto max-w-full rounded-2xl object-contain" />
+            </div>
+            <aside class="rounded-3xl border border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-900">
+              <p class="text-sm font-semibold text-gray-950 dark:text-white">{{ t('apiTools.workbench.imageDetails') }}</p>
+              <p v-if="previewImage.revisedPrompt" class="mt-3 text-sm leading-6 text-gray-600 dark:text-gray-300">
+                {{ previewImage.revisedPrompt }}
+              </p>
+              <p v-else class="mt-3 text-sm leading-6 text-gray-500 dark:text-gray-400">
+                {{ t('apiTools.workbench.noRevisedPrompt') }}
+              </p>
+              <p class="mt-4 border-t border-gray-100 pt-4 text-xs leading-5 text-gray-500 dark:border-dark-700 dark:text-gray-400">
+                {{ t('apiTools.workbench.localHistoryHint') }}
+              </p>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </AppLayout>
 </template>
 
@@ -266,6 +286,16 @@ interface WorkbenchMessage {
 }
 
 const CHAT_CAPABLE_PLATFORMS = new Set(['openai', 'anthropic', 'gemini', 'grok'])
+const HISTORY_KEY = '3api-api-workbench-history-v1'
+const HISTORY_TTL_MS = 6 * 60 * 60 * 1000
+const HISTORY_LIMIT = 12
+const HISTORY_MAX_CHARS = 3_500_000
+
+interface PersistedWorkbenchHistory {
+  expiresAt: number
+  chat: WorkbenchMessage[]
+  image: WorkbenchMessage[]
+}
 
 const { t } = useI18n()
 const route = useRoute()
@@ -281,7 +311,10 @@ const modelOptions = ref<string[]>([])
 const modelLoadError = ref('')
 const timelineRef = ref<HTMLElement | null>(null)
 const composerRef = ref<HTMLTextAreaElement | null>(null)
+const previewImage = ref<SafeGeneratedImage | null>(null)
+const previewImageIndex = ref(0)
 let modelRequestSeq = 0
+let restoringHistory = false
 
 const form = reactive({
   apiKeyId: 0,
@@ -410,6 +443,61 @@ function safeImage(item: GeneratedImage): SafeGeneratedImage | null {
   const safeUrl = sanitizeUrl(item.url, { allowDataUrl: true })
   if (!safeUrl) return null
   return { ...item, safeUrl }
+}
+
+function pruneHistoryMessages(messages: WorkbenchMessage[]): WorkbenchMessage[] {
+  const cutoff = Date.now() - HISTORY_TTL_MS
+  return messages
+    .filter(message => Number(message.createdAt) >= cutoff)
+    .slice(-HISTORY_LIMIT)
+}
+
+function persistWorkbenchHistory() {
+  if (restoringHistory || typeof window === 'undefined') return
+  const payload: PersistedWorkbenchHistory = {
+    expiresAt: Date.now() + HISTORY_TTL_MS,
+    chat: pruneHistoryMessages(chatMessages.value),
+    image: pruneHistoryMessages(imageMessages.value),
+  }
+  let serialized = JSON.stringify(payload)
+  while (serialized.length > HISTORY_MAX_CHARS && (payload.image.length > 0 || payload.chat.length > 0)) {
+    if (payload.image.length >= payload.chat.length && payload.image.length > 0) payload.image.shift()
+    else payload.chat.shift()
+    serialized = JSON.stringify(payload)
+  }
+  try {
+    window.localStorage.setItem(HISTORY_KEY, serialized)
+  } catch {
+    try {
+      window.localStorage.removeItem(HISTORY_KEY)
+    } catch {
+      // Ignore storage failures; workbench history is a local convenience only.
+    }
+  }
+}
+
+function restoreWorkbenchHistory() {
+  if (typeof window === 'undefined') return
+  restoringHistory = true
+  try {
+    const raw = window.localStorage.getItem(HISTORY_KEY)
+    if (!raw) return
+    const parsed = JSON.parse(raw) as PersistedWorkbenchHistory
+    if (!parsed?.expiresAt || parsed.expiresAt < Date.now()) {
+      window.localStorage.removeItem(HISTORY_KEY)
+      return
+    }
+    chatMessages.value = pruneHistoryMessages(Array.isArray(parsed.chat) ? parsed.chat : [])
+    imageMessages.value = pruneHistoryMessages(Array.isArray(parsed.image) ? parsed.image : [])
+  } catch {
+    try {
+      window.localStorage.removeItem(HISTORY_KEY)
+    } catch {
+      // Ignore cleanup failures.
+    }
+  } finally {
+    restoringHistory = false
+  }
 }
 
 async function scrollToBottom() {
@@ -574,6 +662,15 @@ function downloadImage(image: SafeGeneratedImage, index: number) {
   link.remove()
 }
 
+function openImagePreview(image: SafeGeneratedImage, index: number) {
+  previewImage.value = image
+  previewImageIndex.value = index
+}
+
+function closeImagePreview() {
+  previewImage.value = null
+}
+
 watch(() => route.query.mode, (value) => {
   const nextMode = resolveMode(value)
   if (mode.value !== nextMode) {
@@ -595,7 +692,11 @@ watch(() => currentMessages.value.length, () => {
   void scrollToBottom()
 })
 
+watch([chatMessages, imageMessages], persistWorkbenchHistory, { deep: true })
+
 onMounted(async () => {
+  restoreWorkbenchHistory()
   await refreshAll()
+  await scrollToBottom()
 })
 </script>

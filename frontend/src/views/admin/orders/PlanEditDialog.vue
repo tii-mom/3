@@ -1,13 +1,13 @@
 <template>
   <BaseDialog :show="show" :title="plan ? t('payment.admin.editPlan') : t('payment.admin.createPlan')" width="wide" @close="emit('close')">
     <form id="plan-form" @submit.prevent="handleSavePlan" class="space-y-4">
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid gap-4 sm:grid-cols-2">
         <div>
           <label class="input-label">{{ t('payment.admin.planName') }} <span class="text-red-500">*</span></label>
-          <input v-model="planForm.name" type="text" class="input" required />
+          <input v-model="planForm.name" type="text" class="input" :placeholder="t('payment.admin.planNamePlaceholder')" required />
         </div>
         <div>
-          <label class="input-label">{{ t('payment.admin.group') }} <span class="text-red-500">*</span></label>
+          <label class="input-label">{{ t('payment.admin.planBenefitGroup') }} <span class="text-red-500">*</span></label>
           <Select v-model="planForm.group_id" :options="groupOptions" :placeholder="t('payment.admin.selectGroup')" class="w-full">
             <template #selected="{ option }">
               <span v-if="option?.platform" :class="platformTextClass(String(option.platform))">{{ option.label }}</span>
@@ -33,30 +33,28 @@
         </div>
       </div>
 
-      <div><label class="input-label">{{ t('payment.admin.planDescription') }} <span class="text-red-500">*</span></label><textarea v-model="planForm.description" rows="2" class="input" required></textarea></div>
-      <div class="grid grid-cols-2 gap-4">
+      <div><label class="input-label">{{ t('payment.admin.planDescription') }} <span class="text-red-500">*</span></label><textarea v-model="planForm.description" rows="2" class="input" :placeholder="t('payment.admin.planDescriptionPlaceholder')" required></textarea></div>
+      <div class="grid gap-4 sm:grid-cols-2">
         <div>
-          <label class="input-label">{{ t('payment.admin.price') }} <span class="text-red-500">*</span></label>
-          <input v-model.number="planForm.price" type="number" step="0.01" min="0.01" class="input" required />
-          <p v-if="subscriptionCnyPreview" class="mt-1 text-xs font-medium text-primary-600 dark:text-primary-400">
+          <label class="input-label">{{ t('payment.admin.salePriceCny') }} <span class="text-red-500">*</span></label>
+          <input v-model.number="planForm.sale_price_cny" type="number" step="0.01" min="0.01" class="input" placeholder="10" required />
+          <p class="mt-1 text-xs font-medium text-primary-600 dark:text-primary-400">
             {{ t('payment.admin.subscriptionCnyPayPreview', { amount: subscriptionCnyPreview.amount }) }}
             <span v-if="subscriptionCnyPreview.feeRate > 0">
               {{ t('payment.admin.subscriptionCnyPayPreviewWithFee', { feeRate: subscriptionCnyPreview.feeRate, total: subscriptionCnyPreview.total }) }}
             </span>
           </p>
         </div>
-        <div><label class="input-label">{{ t('payment.admin.originalPrice') }}</label><input v-model.number="planForm.original_price" type="number" step="0.01" min="0" class="input" /></div>
+        <div><label class="input-label">{{ t('payment.admin.originalPriceCny') }}</label><input v-model.number="planForm.original_price_cny" type="number" step="0.01" min="0" class="input" /></div>
       </div>
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid gap-4 sm:grid-cols-2">
         <div><label class="input-label">{{ t('payment.admin.validity') }} <span class="text-red-500">*</span></label><input v-model.number="planForm.validity_days" type="number" min="1" class="input" required /></div>
         <div><label class="input-label">{{ t('payment.admin.validityUnit') }} <span class="text-red-500">*</span></label><Select v-model="planForm.validity_unit" :options="validityUnitOptions" /></div>
       </div>
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid gap-4 sm:grid-cols-2">
         <div><label class="input-label">{{ t('payment.admin.sortOrder') }}</label><input v-model.number="planForm.sort_order" type="number" min="0" class="input" /></div>
-        <div>
-          <label class="input-label">{{ t('payment.admin.currency') }}</label>
-          <input v-model="planForm.currency" type="text" maxlength="3" class="input uppercase" :placeholder="t('payment.admin.currencyPlaceholder')" />
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('payment.admin.currencyHint') }}</p>
+        <div class="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-500 dark:border-dark-700 dark:bg-dark-800 dark:text-gray-400">
+          {{ t('payment.admin.planAutoFulfillHint') }}
         </div>
       </div>
       <div>
@@ -122,7 +120,7 @@ const { t } = useI18n()
 const appStore = useAppStore()
 
 const saving = ref(false)
-const planForm = reactive({ name: '', group_id: null as number | null, description: '', price: 0, original_price: 0, currency: '', validity_days: 30, validity_unit: 'days', sort_order: 0, for_sale: true })
+const planForm = reactive({ name: '', group_id: null as number | null, description: '', sale_price_cny: 0, original_price_cny: 0, validity_days: 30, validity_unit: 'days', sort_order: 0, for_sale: true })
 const planFeaturesText = ref('')
 
 const validityUnitOptions = computed(() => [
@@ -154,12 +152,23 @@ function ceilCnyAmount(value: number): number {
   return Math.ceil(value * 100) / 100
 }
 
-const subscriptionCnyPreview = computed(() => {
-  const price = Number(planForm.price) || 0
-  const rate = Number(props.paymentConfig?.subscription_usd_to_cny_rate) || 0
-  if (price <= 0 || rate <= 0) return null
+function subscriptionRate(): number {
+  return Number(props.paymentConfig?.subscription_usd_to_cny_rate) || 0
+}
 
-  const amount = roundCnyAmount(price * rate)
+function internalPriceFromCny(value: number): number {
+  const rate = subscriptionRate()
+  const raw = rate > 0 ? value / rate : value
+  return Math.round(raw * 10000) / 10000
+}
+
+function cnyPriceFromInternal(value: number): number {
+  const rate = subscriptionRate()
+  return roundCnyAmount(rate > 0 ? value * rate : value)
+}
+
+const subscriptionCnyPreview = computed(() => {
+  const amount = roundCnyAmount(Number(planForm.sale_price_cny) || 0)
   const feeRate = Number(props.paymentConfig?.recharge_fee_rate) || 0
   const fee = feeRate > 0 ? ceilCnyAmount((amount * feeRate) / 100) : 0
   const total = feeRate > 0 ? roundCnyAmount(amount + fee) : amount
@@ -175,10 +184,10 @@ const subscriptionCnyPreview = computed(() => {
 watch(() => props.show, (visible) => {
   if (!visible) return
   if (props.plan) {
-    Object.assign(planForm, { name: props.plan.name, group_id: props.plan.group_id, description: props.plan.description, price: props.plan.price, original_price: props.plan.original_price || 0, currency: props.plan.currency || '', validity_days: props.plan.validity_days, validity_unit: props.plan.validity_unit || 'days', sort_order: props.plan.sort_order || 0, for_sale: props.plan.for_sale })
+    Object.assign(planForm, { name: props.plan.name, group_id: props.plan.group_id, description: props.plan.description, sale_price_cny: cnyPriceFromInternal(props.plan.price), original_price_cny: props.plan.original_price ? cnyPriceFromInternal(props.plan.original_price) : 0, validity_days: props.plan.validity_days, validity_unit: props.plan.validity_unit || 'days', sort_order: props.plan.sort_order || 0, for_sale: props.plan.for_sale })
     planFeaturesText.value = (props.plan.features || []).join('\n')
   } else {
-    Object.assign(planForm, { name: '', group_id: null, description: '', price: 0, original_price: 0, currency: '', validity_days: 30, validity_unit: 'days', sort_order: 0, for_sale: true })
+    Object.assign(planForm, { name: '', group_id: null, description: '', sale_price_cny: 0, original_price_cny: 0, validity_days: 30, validity_unit: 'days', sort_order: 0, for_sale: true })
     planFeaturesText.value = ''
   }
 })
@@ -190,9 +199,9 @@ function buildPlanPayload() {
     name: planForm.name,
     group_id: planForm.group_id,
     description: planForm.description,
-    price: planForm.price,
-    original_price: planForm.original_price || 0,
-    currency: planForm.currency.trim().toUpperCase(),
+    price: internalPriceFromCny(Number(planForm.sale_price_cny) || 0),
+    original_price: planForm.original_price_cny ? internalPriceFromCny(Number(planForm.original_price_cny) || 0) : 0,
+    currency: 'CNY',
     validity_days: planForm.validity_days,
     validity_unit: planForm.validity_unit,
     sort_order: planForm.sort_order,
@@ -206,7 +215,7 @@ async function handleSavePlan() {
     appStore.showError(t('payment.admin.groupRequired'))
     return
   }
-  if (!planForm.price || planForm.price <= 0) {
+  if (!planForm.sale_price_cny || planForm.sale_price_cny <= 0) {
     appStore.showError(t('payment.admin.priceRequired'))
     return
   }

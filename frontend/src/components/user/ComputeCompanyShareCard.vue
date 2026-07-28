@@ -229,4 +229,6 @@ watch(open, async (value) => {
 watch(() => [props.inviteLink, props.inviteCode, locale.value], () => {
   if (open.value) void renderPoster()
 })
+
+defineExpose({ openPreview })
 </script>

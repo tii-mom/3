@@ -49,6 +49,8 @@ func ProvideAdminHandlers(
 	distributionHandler *admin.DistributionHandler,
 	saasHandler *admin.SaaSHandler,
 	voucherHandler *admin.VoucherHandler,
+	shopHandler *admin.ShopHandler,
+	adminAIToolHandler *admin.AIToolHandler,
 ) *AdminHandlers {
 	accountHandler.SetUpstreamBillingProbeService(upstreamBillingProbe)
 	return &AdminHandlers{
@@ -89,6 +91,8 @@ func ProvideAdminHandlers(
 		Distribution:           distributionHandler,
 		SaaS:                   saasHandler,
 		Voucher:                voucherHandler,
+		Shop:                   shopHandler,
+		AITool:                 adminAIToolHandler,
 	}
 }
 
@@ -191,6 +195,8 @@ func ProvideHandlers(
 	availableChannelHandler *AvailableChannelHandler,
 	asyncImageHandler *AsyncImageHandler,
 	batchImageHandler *BatchImageHandler,
+	shopHandler *ShopHandler,
+	aiToolHandler *AIToolHandler,
 	_ *service.IdempotencyCoordinator,
 	_ *service.IdempotencyCleanupService,
 ) *Handlers {
@@ -216,6 +222,8 @@ func ProvideHandlers(
 		AvailableChannel: availableChannelHandler,
 		AsyncImage:       asyncImageHandler,
 		BatchImage:       batchImageHandler,
+		Shop:             shopHandler,
+		AITool:           aiToolHandler,
 	}
 }
 
@@ -238,6 +246,8 @@ var ProviderSet = wire.NewSet(
 	NewTotpHandler,
 	ProvideSettingHandler,
 	NewPaymentHandler,
+	NewShopHandler,
+	NewAIToolHandler,
 	NewPaymentWebhookHandler,
 	NewAvailableChannelHandler,
 	NewAsyncImageHandler,
@@ -280,6 +290,8 @@ var ProviderSet = wire.NewSet(
 	admin.NewDistributionHandler,
 	admin.NewSaaSHandler,
 	admin.NewVoucherHandler,
+	admin.NewShopHandler,
+	admin.NewAIToolHandler,
 
 	// AdminHandlers and Handlers constructors
 	ProvideAdminHandlers,

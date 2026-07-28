@@ -84,6 +84,7 @@ type CreateOrderRequest struct {
 	PaymentSource   string
 	OrderType       string
 	PlanID          int64
+	ShopOrderID     int64
 	Locale          string
 }
 
@@ -189,6 +190,7 @@ type PaymentService struct {
 	resumeService            *PaymentResumeService
 	affiliateService         *AffiliateService
 	distributionService      *DistributionService
+	shopService              *ShopService
 	notificationEmailService *NotificationEmailService
 }
 
@@ -204,6 +206,10 @@ func (s *PaymentService) SetNotificationEmailService(notificationEmailService *N
 
 func (s *PaymentService) SetDistributionService(distributionService *DistributionService) {
 	s.distributionService = distributionService
+}
+
+func (s *PaymentService) SetShopService(shopService *ShopService) {
+	s.shopService = shopService
 }
 
 // --- Provider Registry ---

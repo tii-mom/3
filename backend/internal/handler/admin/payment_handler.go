@@ -117,6 +117,27 @@ func (h *PaymentHandler) RetryFulfillment(c *gin.Context) {
 	response.Success(c, gin.H{"message": "fulfillment retried"})
 }
 
+type AdminConfirmSubscriptionPaymentRequest struct {
+	Reference string `json:"reference"`
+}
+
+// ConfirmSubscriptionPayment confirms an offline/manual payment for a pending
+// subscription order and opens the subscription using the normal fulfillment flow.
+// POST /api/v1/admin/payment/orders/:id/confirm-subscription
+func (h *PaymentHandler) ConfirmSubscriptionPayment(c *gin.Context) {
+	orderID, ok := parseIDParam(c, "id")
+	if !ok {
+		return
+	}
+	var req AdminConfirmSubscriptionPaymentRequest
+	_ = c.ShouldBindJSON(&req)
+	if err := h.paymentService.AdminConfirmSubscriptionPayment(c.Request.Context(), orderID, req.Reference); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"message": "subscription payment confirmed"})
+}
+
 type AdminPaymentOrderResult struct {
 	ID                  int64      `json:"id"`
 	UserID              int64      `json:"user_id"`

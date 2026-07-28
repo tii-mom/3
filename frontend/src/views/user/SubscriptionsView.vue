@@ -100,123 +100,41 @@
               }}</span>
             </div>
 
-            <!-- Daily Usage -->
-            <div v-if="subscription.group?.daily_limit_usd" class="space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('userSubscriptions.daily') }}
-                </span>
-                <span class="text-sm text-gray-500 dark:text-dark-400 font-mono">
-                  ${{ (subscription.daily_usage_usd || 0).toFixed(2) }} / ${{
-                    subscription.group.daily_limit_usd.toFixed(2)
-                  }}
-                </span>
+            <!-- Usage Windows -->
+            <div
+              v-for="window in usageWindows(subscription)"
+              :key="window.key"
+              class="rounded-xl border border-gray-100 bg-gray-50/80 p-3 dark:border-dark-700 dark:bg-dark-900/40"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-xs font-medium text-gray-500 dark:text-dark-400">
+                    {{ window.title }}
+                  </p>
+                  <p class="mt-1 text-lg font-semibold text-gray-950 dark:text-white">
+                    {{ formatUsd(window.remaining) }}
+                    <span class="text-xs font-medium text-gray-400 dark:text-gray-500">
+                      / {{ formatUsd(window.limit) }}
+                    </span>
+                  </p>
+                </div>
+                <div class="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-gray-500 shadow-sm dark:bg-dark-800 dark:text-dark-300">
+                  {{ t('userSubscriptions.remaining') }}
+                </div>
               </div>
-              <div class="relative h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
-                <div
-                  class="absolute inset-y-0 left-0 rounded-full transition-all duration-300"
-                  :class="
-                    getProgressBarClass(
-                      subscription.daily_usage_usd,
-                      subscription.group.daily_limit_usd
-                    )
-                  "
-                  :style="{
-                    width: getProgressWidth(
-                      subscription.daily_usage_usd,
-                      subscription.group.daily_limit_usd
-                    )
-                  }"
-                ></div>
-              </div>
-              <p
-                v-if="subscription.daily_window_start"
-                class="text-xs text-gray-500 dark:text-dark-400 font-mono"
-              >
-                {{ formatDailyUsageWindow(subscription) }}
-              </p>
-            </div>
 
-            <!-- Weekly Usage -->
-            <div v-if="subscription.group?.weekly_limit_usd" class="space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('userSubscriptions.weekly') }}
-                </span>
-                <span class="text-sm text-gray-500 dark:text-dark-400 font-mono">
-                  ${{ (subscription.weekly_usage_usd || 0).toFixed(2) }} / ${{
-                    subscription.group.weekly_limit_usd.toFixed(2)
-                  }}
-                </span>
-              </div>
-              <div class="relative h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
+              <div class="mt-3 relative h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
                 <div
                   class="absolute inset-y-0 left-0 rounded-full transition-all duration-300"
-                  :class="
-                    getProgressBarClass(
-                      subscription.weekly_usage_usd,
-                      subscription.group.weekly_limit_usd
-                    )
-                  "
-                  :style="{
-                    width: getProgressWidth(
-                      subscription.weekly_usage_usd,
-                      subscription.group.weekly_limit_usd
-                    )
-                  }"
+                  :class="getProgressBarClass(window.used, window.limit)"
+                  :style="{ width: getProgressWidth(window.used, window.limit) }"
                 ></div>
               </div>
-              <p
-                v-if="subscription.weekly_window_start"
-                class="text-xs text-gray-500 dark:text-dark-400 font-mono"
-              >
-                {{
-                  t('userSubscriptions.resetIn', {
-                    time: formatResetTime(subscription.weekly_window_start, 168)
-                  })
-                }}
-              </p>
-            </div>
 
-            <!-- Monthly Usage -->
-            <div v-if="subscription.group?.monthly_limit_usd" class="space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('userSubscriptions.monthly') }}
-                </span>
-                <span class="text-sm text-gray-500 dark:text-dark-400 font-mono">
-                  ${{ (subscription.monthly_usage_usd || 0).toFixed(2) }} / ${{
-                    subscription.group.monthly_limit_usd.toFixed(2)
-                  }}
-                </span>
+              <div class="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-dark-400">
+                <span>{{ t('userSubscriptions.usedAmount', { amount: formatUsd(window.used) }) }}</span>
+                <span v-if="window.footer" class="font-mono">{{ window.footer }}</span>
               </div>
-              <div class="relative h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
-                <div
-                  class="absolute inset-y-0 left-0 rounded-full transition-all duration-300"
-                  :class="
-                    getProgressBarClass(
-                      subscription.monthly_usage_usd,
-                      subscription.group.monthly_limit_usd
-                    )
-                  "
-                  :style="{
-                    width: getProgressWidth(
-                      subscription.monthly_usage_usd,
-                      subscription.group.monthly_limit_usd
-                    )
-                  }"
-                ></div>
-              </div>
-              <p
-                v-if="subscription.monthly_window_start"
-                class="text-xs text-gray-500 dark:text-dark-400"
-              >
-                {{
-                  t('userSubscriptions.resetIn', {
-                    time: formatResetTime(subscription.monthly_window_start, 720)
-                  })
-                }}
-              </p>
             </div>
 
             <!-- No limits configured - Unlimited badge -->
@@ -278,6 +196,15 @@ const appStore = useAppStore()
 const subscriptions = ref<UserSubscription[]>([])
 const loading = ref(true)
 
+type UsageWindowView = {
+  key: 'daily' | 'weekly' | 'monthly'
+  title: string
+  used: number
+  limit: number
+  remaining: number
+  footer: string
+}
+
 function subscriptionHasPeakRate(subscription: UserSubscription): boolean {
   return hasPeakRate(subscription.group)
 }
@@ -310,6 +237,77 @@ function getProgressBarClass(used: number | undefined, limit: number | null | un
   if (percentage >= 90) return 'bg-red-500'
   if (percentage >= 70) return 'bg-orange-500'
   return 'bg-green-500'
+}
+
+function normalizeUsageAmount(value: number | null | undefined): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(value ?? 0, 0)
+}
+
+function remainingUsage(used: number | null | undefined, limit: number | null | undefined): number {
+  const safeLimit = normalizeUsageAmount(limit)
+  const safeUsed = normalizeUsageAmount(used)
+  return Math.max(safeLimit - safeUsed, 0)
+}
+
+function formatUsd(value: number | null | undefined): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(normalizeUsageAmount(value))
+}
+
+function usageWindows(subscription: UserSubscription): UsageWindowView[] {
+  const group = subscription.group
+  if (!group) return []
+
+  const windows: UsageWindowView[] = []
+  if (group.daily_limit_usd) {
+    const used = normalizeUsageAmount(subscription.daily_usage_usd)
+    const limit = normalizeUsageAmount(group.daily_limit_usd)
+    windows.push({
+      key: 'daily',
+      title: t('userSubscriptions.dailyRemaining'),
+      used,
+      limit,
+      remaining: remainingUsage(used, limit),
+      footer: subscription.daily_window_start ? formatDailyUsageWindow(subscription) : t('userSubscriptions.windowNotActive'),
+    })
+  }
+
+  if (group.weekly_limit_usd) {
+    const used = normalizeUsageAmount(subscription.weekly_usage_usd)
+    const limit = normalizeUsageAmount(group.weekly_limit_usd)
+    windows.push({
+      key: 'weekly',
+      title: t('userSubscriptions.weeklyRemaining'),
+      used,
+      limit,
+      remaining: remainingUsage(used, limit),
+      footer: subscription.weekly_window_start
+        ? t('userSubscriptions.resetIn', { time: formatResetTime(subscription.weekly_window_start, 168) })
+        : t('userSubscriptions.windowNotActive'),
+    })
+  }
+
+  if (group.monthly_limit_usd) {
+    const used = normalizeUsageAmount(subscription.monthly_usage_usd)
+    const limit = normalizeUsageAmount(group.monthly_limit_usd)
+    windows.push({
+      key: 'monthly',
+      title: t('userSubscriptions.monthlyRemaining'),
+      used,
+      limit,
+      remaining: remainingUsage(used, limit),
+      footer: subscription.monthly_window_start
+        ? t('userSubscriptions.resetIn', { time: formatResetTime(subscription.monthly_window_start, 720) })
+        : t('userSubscriptions.windowNotActive'),
+    })
+  }
+
+  return windows
 }
 
 function formatExpirationDate(expiresAt: string): string {

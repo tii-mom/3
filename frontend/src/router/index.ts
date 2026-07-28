@@ -377,6 +377,28 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/shop',
+    name: 'Shop',
+    component: () => import('@/views/user/ShopView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Shop',
+      titleKey: 'nav.shop'
+    }
+  },
+  {
+    path: '/tools',
+    name: 'AITools',
+    component: () => import('@/views/user/AIToolsView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'AI Tools',
+      titleKey: 'nav.aiTools'
+    }
+  },
+  {
     path: '/orders',
     name: 'OrderList',
     component: () => import('@/views/user/UserOrdersView.vue'),
@@ -742,8 +764,7 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Payment Dashboard',
-      titleKey: 'nav.paymentDashboard',
-      requiresPayment: true
+      titleKey: 'nav.paymentDashboard'
     }
   },
   {
@@ -754,8 +775,7 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Order Management',
-      titleKey: 'nav.orderManagement',
-      requiresPayment: true
+      titleKey: 'nav.orderManagement'
     }
   },
   {
@@ -766,8 +786,29 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Subscription Plans',
-      titleKey: 'nav.paymentPlans',
-      requiresPayment: true
+      titleKey: 'nav.paymentPlans'
+    }
+  },
+  {
+    path: '/admin/shop',
+    name: 'AdminShop',
+    component: () => import('@/views/admin/shop/AdminShopView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Shop Management',
+      titleKey: 'nav.shopManagement'
+    }
+  },
+  {
+    path: '/admin/tools',
+    name: 'AdminAITools',
+    component: () => import('@/views/admin/tools/AdminAIToolsView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'AI Tools Management',
+      titleKey: 'nav.aiToolsManagement'
     }
   },
 

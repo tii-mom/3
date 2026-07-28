@@ -40,6 +40,15 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	if err != nil {
 		return nil, err
 	}
+	if req.OrderType == payment.OrderTypeShop {
+		if s.shopService == nil {
+			return nil, infraerrors.Forbidden("SHOP_UNAVAILABLE", "shop is not available")
+		}
+		req.Amount, err = s.shopService.ValidatePendingOrderForPayment(ctx, req.ShopOrderID, req.UserID)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if err := s.checkCancelRateLimit(ctx, req.UserID, cfg); err != nil {
 		return nil, err
 	}
@@ -104,6 +113,16 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	if err != nil {
 		return nil, err
 	}
+	if req.OrderType == payment.OrderTypeShop && s.shopService != nil {
+		if err := s.shopService.AttachPaymentOrder(ctx, req.ShopOrderID, req.UserID, order.ID); err != nil {
+			_, _ = s.entClient.PaymentOrder.UpdateOneID(order.ID).
+				SetStatus(OrderStatusFailed).
+				SetFailedAt(time.Now()).
+				SetFailedReason("attach shop order failed").
+				Save(ctx)
+			return nil, fmt.Errorf("attach shop payment order: %w", err)
+		}
+	}
 	resp, err := s.invokeProvider(ctx, order, req, cfg, limitAmount, payAmountStr, payAmount, plan, sel)
 	if err != nil {
 		_, _ = s.entClient.PaymentOrder.UpdateOneID(order.ID).
@@ -120,6 +139,16 @@ func (s *PaymentService) validateOrderInput(ctx context.Context, req CreateOrder
 	}
 	if req.OrderType == payment.OrderTypeSubscription {
 		return s.validateSubOrder(ctx, req)
+	}
+	if req.OrderType == payment.OrderTypeShop {
+		if s.shopService == nil {
+			return nil, infraerrors.Forbidden("SHOP_UNAVAILABLE", "shop is not available")
+		}
+		if req.ShopOrderID <= 0 {
+			return nil, infraerrors.BadRequest("INVALID_INPUT", "shop order is required")
+		}
+		_, err := s.shopService.ValidatePendingOrderForPayment(ctx, req.ShopOrderID, req.UserID)
+		return nil, err
 	}
 	if math.IsNaN(req.Amount) || math.IsInf(req.Amount, 0) || req.Amount <= 0 {
 		return nil, infraerrors.BadRequest("INVALID_AMOUNT", "amount must be a positive number")

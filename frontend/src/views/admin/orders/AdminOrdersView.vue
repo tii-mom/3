@@ -30,6 +30,10 @@
               <Icon name="x" size="sm" />
               {{ t('payment.orders.cancel') }}
             </button>
+            <button v-if="row.status === 'PENDING' && row.order_type === 'subscription'" @click="handleConfirmSubscriptionPayment(row)" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
+              <Icon name="check" size="sm" />
+              {{ t('payment.admin.confirmSubscriptionPayment') }}
+            </button>
             <button v-if="row.status === 'FAILED'" @click="handleRetryOrder(row)" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20">
               <Icon name="refresh" size="sm" />
               {{ t('payment.admin.retry') }}
@@ -187,6 +191,7 @@ const orderTypeFilterOptions = computed(() => [
   { value: '', label: t('payment.admin.allOrderTypes') },
   { value: 'balance', label: t('payment.admin.balanceOrder') },
   { value: 'subscription', label: t('payment.admin.subscriptionOrder') },
+  { value: 'shop', label: t('payment.admin.shopOrder') },
 ])
 
 async function showOrderDetail(order: PaymentOrder) {
@@ -209,6 +214,21 @@ async function handleCancelOrder(order: PaymentOrder) {
 async function handleRetryOrder(order: PaymentOrder) {
   try { await adminPaymentAPI.retryRecharge(order.id); appStore.showSuccess(t('payment.admin.retrySuccess')); loadOrders() }
   catch (err: unknown) { appStore.showError(extractI18nErrorMessage(err, t, 'payment.errors', t('common.error'))) }
+}
+
+async function handleConfirmSubscriptionPayment(order: PaymentOrder) {
+  const ok = window.confirm(t('payment.admin.confirmSubscriptionPaymentPrompt', {
+    amount: `${paymentAmountSymbol(order)}${order.pay_amount.toFixed(2)}`,
+    order: order.out_trade_no,
+  }))
+  if (!ok) return
+  try {
+    await adminPaymentAPI.confirmSubscriptionPayment(order.id)
+    appStore.showSuccess(t('payment.admin.confirmSubscriptionPaymentSuccess'))
+    await loadOrders()
+  } catch (err: unknown) {
+    appStore.showError(extractI18nErrorMessage(err, t, 'payment.errors', t('common.error')))
+  }
 }
 
 function formatDateTime(dateStr: string): string { return formatOrderDateTime(dateStr) }

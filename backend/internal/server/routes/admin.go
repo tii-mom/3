@@ -119,6 +119,9 @@ func RegisterAdminRoutes(
 
 		// 操作审计日志
 		registerAuditLogRoutes(admin, h, stepUpAuth)
+
+		// AI 工具箱
+		registerAdminAIToolRoutes(admin, h.Admin.AITool)
 	}
 }
 

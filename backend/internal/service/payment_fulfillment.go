@@ -221,6 +221,12 @@ func (s *PaymentService) executeFulfillment(ctx context.Context, oid int64) erro
 	if o.OrderType == payment.OrderTypeSubscription {
 		return s.ExecuteSubscriptionFulfillment(ctx, oid)
 	}
+	if o.OrderType == payment.OrderTypeShop {
+		if s.shopService == nil {
+			return infraerrors.Forbidden("SHOP_UNAVAILABLE", "shop is not available")
+		}
+		return s.shopService.FulfillPaidPaymentOrder(ctx, oid)
+	}
 	return s.ExecuteBalanceFulfillment(ctx, oid)
 }
 
@@ -678,4 +684,29 @@ func (s *PaymentService) RetryFulfillment(ctx context.Context, oid int64) error 
 	}
 	s.writeAuditLog(ctx, oid, "RECHARGE_RETRY", "admin", map[string]any{"detail": "admin manual retry"})
 	return s.executeFulfillment(ctx, oid)
+}
+
+// AdminConfirmSubscriptionPayment marks a pending subscription order as paid by
+// an offline/manual collection and then executes the existing subscription
+// fulfillment path. It intentionally reuses toPaid/executeFulfillment so the
+// idempotency and duplicate-assignment protections stay centralized.
+func (s *PaymentService) AdminConfirmSubscriptionPayment(ctx context.Context, oid int64, reference string) error {
+	o, err := s.entClient.PaymentOrder.Get(ctx, oid)
+	if err != nil {
+		return infraerrors.NotFound("NOT_FOUND", "order not found")
+	}
+	if o.OrderType != payment.OrderTypeSubscription {
+		return infraerrors.BadRequest("INVALID_ORDER_TYPE", "only subscription orders can be manually confirmed here")
+	}
+	if o.Status != OrderStatusPending {
+		return infraerrors.BadRequest("INVALID_STATUS", "only pending subscription orders can be manually confirmed")
+	}
+	if !isValidProviderAmount(o.PayAmount) {
+		return infraerrors.BadRequest("INVALID_AMOUNT", "order payable amount is invalid")
+	}
+	reference = strings.TrimSpace(reference)
+	if reference == "" {
+		reference = fmt.Sprintf("manual-subscription-%d", oid)
+	}
+	return s.toPaid(ctx, o, reference, o.PayAmount, "admin_manual")
 }

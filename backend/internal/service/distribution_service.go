@@ -1854,7 +1854,20 @@ func (s *DistributionService) Thaw(ctx context.Context, userID int64) error {
 		return err
 	}
 	var amount int64
-	if err := tx.QueryRowContext(ctx, `WITH thawed AS (UPDATE distribution_commissions SET status = 'AVAILABLE', thawed_at = NOW() WHERE program_id = $1 AND beneficiary_user_id = $2 AND status = 'FROZEN' AND frozen_until <= NOW() RETURNING amount_cny_minor) SELECT COALESCE(SUM(amount_cny_minor), 0) FROM thawed`, programID, userID).Scan(&amount); err != nil {
+	if err := tx.QueryRowContext(ctx, `
+WITH distribution_thawed AS (
+    UPDATE distribution_commissions
+    SET status = 'AVAILABLE', thawed_at = NOW()
+    WHERE program_id = $1 AND beneficiary_user_id = $2 AND status = 'FROZEN' AND frozen_until <= NOW()
+    RETURNING amount_cny_minor
+), shop_thawed AS (
+    UPDATE shop_commission_records
+    SET status = 'AVAILABLE', updated_at = NOW()
+    WHERE tenant_id = 1 AND beneficiary_user_id = $2 AND status = 'FROZEN' AND frozen_until <= NOW()
+    RETURNING amount_cny_minor
+)
+SELECT COALESCE((SELECT SUM(amount_cny_minor) FROM distribution_thawed), 0)
+     + COALESCE((SELECT SUM(amount_cny_minor) FROM shop_thawed), 0)`).Scan(&amount); err != nil {
 		return err
 	}
 	if amount > 0 {
@@ -1878,10 +1891,17 @@ func (s *DistributionService) ThawDue(ctx context.Context, limit int) error {
 		limit = 200
 	}
 	rows, err := s.db.QueryContext(ctx, `
-SELECT DISTINCT beneficiary_user_id
-FROM distribution_commissions
-WHERE program_id = (SELECT id FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company')
-  AND status = 'FROZEN' AND frozen_until <= NOW()
+SELECT beneficiary_user_id
+FROM (
+    SELECT DISTINCT beneficiary_user_id
+    FROM distribution_commissions
+    WHERE program_id = (SELECT id FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company')
+      AND status = 'FROZEN' AND frozen_until <= NOW()
+    UNION
+    SELECT DISTINCT beneficiary_user_id
+    FROM shop_commission_records
+    WHERE tenant_id = 1 AND status = 'FROZEN' AND frozen_until <= NOW()
+) due_users
 ORDER BY beneficiary_user_id
 LIMIT $1`, limit)
 	if err != nil {

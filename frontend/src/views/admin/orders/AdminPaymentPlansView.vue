@@ -1,6 +1,22 @@
 <template>
   <AppLayout>
     <div class="space-y-4">
+      <section class="overflow-hidden rounded-2xl border border-primary-200 bg-primary-50 p-5 dark:border-primary-900/60 dark:bg-primary-950/20">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p class="text-xs font-semibold tracking-[0.14em] text-primary-700 dark:text-primary-300">{{ t('payment.admin.plansPageKicker') }}</p>
+            <h1 class="mt-2 text-xl font-semibold text-gray-950 dark:text-white">{{ t('payment.admin.plansPageTitle') }}</h1>
+            <p class="mt-2 max-w-3xl text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('payment.admin.plansPageDesc') }}</p>
+          </div>
+          <button @click="openPlanEdit(null)" class="btn btn-primary shrink-0">{{ t('payment.admin.createPlan') }}</button>
+        </div>
+        <div class="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          <div v-for="step in saleSteps" :key="step" class="rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-xs font-medium text-gray-700 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-gray-200">
+            {{ step }}
+          </div>
+        </div>
+      </section>
+
       <!-- Actions -->
       <div class="flex items-center justify-end gap-2">
         <button @click="loadPlans" :disabled="plansLoading" class="btn btn-secondary" :title="t('common.refresh')">
@@ -10,7 +26,6 @@
           <Icon name="sync" size="md" :class="syncingPlans ? 'animate-spin' : ''" />
           <span>{{ t('payment.admin.syncPlans') }}</span>
         </button>
-        <button @click="openPlanEdit(null)" class="btn btn-primary">{{ t('payment.admin.createPlan') }}</button>
       </div>
 
       <!-- Plans Table -->
@@ -33,9 +48,8 @@
         </template>
         <template #cell-price="{ value, row }">
           <div class="text-sm">
-            <span class="font-medium text-gray-900 dark:text-white">${{ (value ?? 0).toFixed(2) }}</span>
-            <span v-if="row.currency" class="ml-1 text-xs text-gray-400">{{ row.currency }}</span>
-            <span v-if="row.original_price" class="ml-1 text-xs text-gray-400 line-through">${{ row.original_price.toFixed(2) }}</span>
+            <span class="font-medium text-gray-900 dark:text-white">{{ salePriceLabel(value ?? 0) }}</span>
+            <span v-if="row.original_price" class="ml-1 text-xs text-gray-400 line-through">{{ salePriceLabel(row.original_price) }}</span>
           </div>
         </template>
         <template #cell-validity_days="{ value, row }">
@@ -141,6 +155,13 @@ const showPlanDialog = ref(false)
 const showDeletePlanDialog = ref(false)
 const editingPlan = ref<SubscriptionPlan | null>(null)
 const deletingPlanId = ref<number | null>(null)
+const saleSteps = computed(() => [
+  t('payment.admin.planSaleStepCreate'),
+  t('payment.admin.planSaleStepBind'),
+  t('payment.admin.planSaleStepPrice'),
+  t('payment.admin.planSaleStepPublish'),
+  t('payment.admin.planSaleStepAuto'),
+])
 
 const planColumns = computed((): Column[] => [
   { key: 'id', label: 'ID' },
@@ -152,6 +173,19 @@ const planColumns = computed((): Column[] => [
   { key: 'sort_order', label: t('payment.admin.sortOrder') },
   { key: 'actions', label: t('common.actions') },
 ])
+
+function subscriptionRate(): number {
+  return Number(paymentConfig.value?.subscription_usd_to_cny_rate) || 0
+}
+
+function salePrice(value: number): number {
+  const rate = subscriptionRate()
+  return Math.round((rate > 0 ? value * rate : value) * 100) / 100
+}
+
+function salePriceLabel(value: number): string {
+  return new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' }).format(salePrice(value))
+}
 
 async function loadPlans() {
   plansLoading.value = true

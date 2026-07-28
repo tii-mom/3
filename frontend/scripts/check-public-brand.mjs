@@ -56,7 +56,13 @@ for (const root of roots) {
 
 for (const root of publicDocs) {
   const path = join(workspaceRoot, root)
-  const info = await stat(path)
+  let info
+  try {
+    info = await stat(path)
+  } catch (error) {
+    if (error?.code === 'ENOENT') continue
+    throw error
+  }
   if (info.isDirectory()) await scan(path, legacyPublicDocsPattern)
   else await scanFile(path, legacyPublicDocsPattern)
 }

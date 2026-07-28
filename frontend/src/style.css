@@ -976,6 +976,20 @@
   --sidebar-feature-fg: #bfdbfe;
 }
 
+.app-sidebar-redesign .sidebar-link-featured-shop {
+  --sidebar-feature-accent: #f97316;
+  --sidebar-feature-bg: color-mix(in srgb, #f97316 9%, var(--ui-surface));
+  --sidebar-feature-bg-hover: color-mix(in srgb, #f97316 15%, var(--ui-surface));
+  --sidebar-feature-fg: color-mix(in srgb, #ea580c 78%, var(--ui-ink));
+}
+
+.dark .app-sidebar-redesign .sidebar-link-featured-shop {
+  --sidebar-feature-accent: #fb923c;
+  --sidebar-feature-bg: color-mix(in srgb, #fb923c 13%, var(--ui-surface));
+  --sidebar-feature-bg-hover: color-mix(in srgb, #fb923c 19%, var(--ui-surface));
+  --sidebar-feature-fg: #fed7aa;
+}
+
 .app-sidebar-redesign .sidebar-link:focus-visible,
 .app-header-redesign button:focus-visible,
 .app-header-redesign a:focus-visible {

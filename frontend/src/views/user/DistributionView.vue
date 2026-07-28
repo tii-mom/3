@@ -47,7 +47,7 @@
               </div>
             </div>
             <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-              <button type="button" class="btn btn-primary inline-flex items-center justify-center gap-2 whitespace-nowrap" :disabled="!inviteLink" @click="scrollToShare">
+              <button type="button" class="btn btn-primary inline-flex items-center justify-center gap-2 whitespace-nowrap" :disabled="!inviteLink" @click="openSharePoster">
                 <Icon name="grid" size="sm" />
                 {{ t('finance.distribution.createShareCard') }}
               </button>
@@ -125,7 +125,7 @@
             </div>
 
             <aside id="compute-company-share-panel" class="space-y-6">
-              <ComputeCompanyShareCard :invite-link="inviteLink" :invite-code="inviteDetail?.aff_code || ''" />
+              <ComputeCompanyShareCard ref="shareCardRef" :invite-link="inviteLink" :invite-code="inviteDetail?.aff_code || ''" />
               <section class="border border-gray-200 bg-white p-5 dark:border-dark-700 dark:bg-dark-900">
                 <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('finance.distribution.walletRules') }}</h2>
                 <dl class="mt-4 grid gap-3 text-sm">
@@ -591,6 +591,7 @@ const teamSegments = computed(() => {
 })
 const teamChartTotal = computed(() => teamSegments.value.reduce((total, segment) => total + segment.count, 0))
 const analyticsRanges = ['7d', '30d', '90d'] as const
+const shareCardRef = ref<InstanceType<typeof ComputeCompanyShareCard> | null>(null)
 function cny(minor: number) { return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'CNY' }).format(minor / 100) }
 function formatCount(value: number) { return new Intl.NumberFormat().format(value) }
 function formatCompactNumber(value: number) {
@@ -630,9 +631,9 @@ function formatDateTime(value?: string) {
   if (Number.isNaN(date.getTime())) return '-'
   return new Intl.DateTimeFormat(undefined, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(date)
 }
-function scrollToShare() {
+function openSharePoster() {
   activeTab.value = 'overview'
-  requestAnimationFrame(() => document.getElementById('compute-company-share-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  requestAnimationFrame(() => shareCardRef.value?.openPreview())
 }
 type DistributionPreviewModule = typeof import('./distributionPreviewData')
 let previewModule: DistributionPreviewModule | undefined
