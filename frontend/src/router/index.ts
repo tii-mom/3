@@ -358,7 +358,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: false,
-      title: 'My Subscriptions',
+      title: '我的订阅',
       titleKey: 'userSubscriptions.title',
       descriptionKey: 'userSubscriptions.description'
     }
@@ -370,7 +370,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: false,
-      title: 'Purchase Subscription',
+      title: '充值 / 订阅',
       titleKey: 'nav.buySubscription',
       descriptionKey: 'purchase.description',
       requiresPayment: true
@@ -383,7 +383,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: false,
-      title: 'Shop',
+      title: '商城',
       titleKey: 'nav.shop'
     }
   },
@@ -394,7 +394,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: false,
-      title: 'AI Tools',
+      title: 'AI 工具箱',
       titleKey: 'nav.aiTools'
     }
   },
@@ -405,7 +405,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: false,
-      title: 'My Orders',
+      title: '我的订单',
       titleKey: 'nav.myOrders',
       requiresPayment: true
     }
@@ -417,7 +417,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: false,
-      title: 'Payment',
+      title: '扫码支付',
       titleKey: 'payment.qr.scanToPay',
       requiresPayment: true
     }
@@ -429,7 +429,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       requiresAdmin: false,
-      title: 'Payment Result',
+      title: '支付结果',
       titleKey: 'payment.result.success',
       requiresPayment: false
     }
@@ -441,7 +441,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       requiresAdmin: false,
-      title: 'Stripe Payment',
+      title: '银行卡支付',
       titleKey: 'payment.stripePay',
       requiresPayment: false
     }
@@ -453,7 +453,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       requiresAdmin: false,
-      title: 'Airwallex Payment',
+      title: 'Airwallex 支付',
       titleKey: 'payment.airwallexPay',
       requiresPayment: false
     }
@@ -465,7 +465,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       requiresAdmin: false,
-      title: 'Payment',
+      title: '支付',
       requiresPayment: false
     }
   },
@@ -785,7 +785,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: true,
-      title: 'Subscription Plans',
+      title: '订阅套餐',
       titleKey: 'nav.paymentPlans'
     }
   },
@@ -796,7 +796,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: true,
-      title: 'Shop Management',
+      title: '商城管理',
       titleKey: 'nav.shopManagement'
     }
   },
@@ -807,7 +807,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: true,
-      title: 'AI Tools Management',
+      title: '工具箱管理',
       titleKey: 'nav.aiToolsManagement'
     }
   },

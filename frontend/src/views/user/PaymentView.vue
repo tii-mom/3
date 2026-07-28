@@ -1,6 +1,83 @@
 <template>
   <AppLayout>
-    <div class="mx-auto max-w-4xl space-y-6">
+    <div class="mx-auto max-w-6xl space-y-6 p-4 sm:p-6 lg:p-8">
+      <section
+        v-if="paymentPhase === 'select'"
+        class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900"
+      >
+        <div class="grid gap-0 xl:grid-cols-[1.25fr_0.75fr]">
+          <div class="p-6 sm:p-8">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="rounded-full bg-primary-500/10 px-3 py-1 text-xs font-medium text-primary-700 dark:bg-primary-500/15 dark:text-primary-300">
+                3API 充值 / 订阅
+              </span>
+              <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-dark-800 dark:text-dark-300">
+                {{ activeTab === 'subscription' ? '正在选择订阅套餐' : '正在为账户充值' }}
+              </span>
+            </div>
+
+            <div class="mt-4 flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <h1 class="text-2xl font-semibold tracking-tight text-gray-950 dark:text-white sm:text-3xl">
+                  充值和订阅，一页完成
+                </h1>
+                <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-dark-400">
+                  选择充值或订阅套餐，确认支付后系统会自动生成订单；订阅成功后可在“我的订阅”查看额度和到期时间。
+                </p>
+              </div>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 active:translate-y-px dark:border-dark-700 dark:bg-dark-800 dark:text-dark-200 dark:hover:border-dark-600 dark:hover:bg-dark-700"
+                @click="router.push('/subscriptions')"
+              >
+                查看我的订阅
+              </button>
+            </div>
+
+            <div class="mt-6 grid gap-3 sm:grid-cols-3">
+              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-dark-700 dark:bg-dark-800/60">
+                <p class="text-xs font-medium text-slate-500 dark:text-dark-400">当前余额</p>
+                <p class="mt-2 text-2xl font-semibold text-gray-950 dark:text-white">
+                  ${{ user?.balance?.toFixed(2) || '0.00' }}
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-dark-400">可用于余额扣费</p>
+              </div>
+              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-dark-700 dark:bg-dark-800/60">
+                <p class="text-xs font-medium text-slate-500 dark:text-dark-400">可售套餐</p>
+                <p class="mt-2 text-2xl font-semibold text-gray-950 dark:text-white">
+                  {{ loading ? '...' : checkout.plans.length }}
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-dark-400">后台上架后自动显示</p>
+              </div>
+              <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-dark-700 dark:bg-dark-800/60">
+                <p class="text-xs font-medium text-slate-500 dark:text-dark-400">支付方式</p>
+                <p class="mt-2 text-2xl font-semibold text-gray-950 dark:text-white">
+                  {{ loading ? '...' : enabledMethods.length }}
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-dark-400">选择可用方式付款</p>
+              </div>
+            </div>
+          </div>
+
+          <aside class="border-t border-slate-200 bg-slate-50/80 p-6 dark:border-dark-700 dark:bg-dark-800/60 xl:border-l xl:border-t-0">
+            <div class="flex h-full flex-col justify-between gap-5">
+              <div>
+                <p class="text-sm font-medium text-slate-500 dark:text-dark-400">操作提醒</p>
+                <h2 class="mt-2 text-xl font-semibold text-gray-950 dark:text-white">
+                  支付成功后自动生效
+                </h2>
+                <p class="mt-3 text-sm leading-6 text-slate-500 dark:text-dark-400">
+                  充值到账看余额，订阅开通看额度。无需填写复杂参数，也不需要手动绑定套餐。
+                </p>
+              </div>
+              <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 dark:border-dark-700 dark:bg-dark-900 dark:text-dark-300">
+                如果付款后页面还在确认中，请先等待自动刷新；不要重复创建同一笔订单。
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
       <div v-if="loading" class="flex items-center justify-center py-20">
         <div class="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
       </div>
@@ -476,6 +553,7 @@ function onPaymentDone() {
   selectedPlan.value = null
   if (wasSubscription) {
     subscriptionStore.fetchActiveSubscriptions(true).catch(() => {})
+    void router.push('/subscriptions')
   }
 }
 

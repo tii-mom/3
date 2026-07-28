@@ -1,4 +1,5 @@
 <template>
+  <AppLayout>
   <div class="space-y-6 p-4 sm:p-6 lg:p-8">
     <section class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm dark:border-dark-700 dark:bg-dark-900">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -219,6 +220,7 @@
       </form>
     </div>
   </div>
+  </AppLayout>
 </template>
 
 <script setup lang="ts">
@@ -226,6 +228,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { adminShopAPI, type ShopBanner, type ShopOrder, type ShopProduct, type ShopProductPayload } from '@/api/shop'
 import { useAppStore } from '@/stores'
+import AppLayout from '@/components/layout/AppLayout.vue'
 
 type TabKey = 'products' | 'banners' | 'orders'
 
