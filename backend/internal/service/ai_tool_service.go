@@ -65,7 +65,7 @@ ORDER BY sort_order ASC, id ASC`)
 		}
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	items := []AITool{}
 	for rows.Next() {

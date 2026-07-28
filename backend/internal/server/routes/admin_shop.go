@@ -108,7 +108,7 @@ func detectShopAssetContentType(fileHeader *multipart.FileHeader) (string, error
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	buf := make([]byte, 512)
 	n, err := file.Read(buf)
 	if err != nil && err != io.EOF {

@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"strconv"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
@@ -90,13 +89,4 @@ func (h *ShopHandler) MyOrders(c *gin.Context) {
 		return
 	}
 	response.Paginated(c, items, total, page, pageSize)
-}
-
-func parseShopIDParam(c *gin.Context, name string) (int64, bool) {
-	id, err := strconv.ParseInt(c.Param(name), 10, 64)
-	if err != nil || id <= 0 {
-		response.BadRequest(c, "Invalid ID")
-		return 0, false
-	}
-	return id, true
 }

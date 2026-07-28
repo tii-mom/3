@@ -139,7 +139,7 @@ ORDER BY sort_order ASC, id DESC`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []ShopProduct{}
 	for rows.Next() {
 		item, err := scanShopProduct(rows)
@@ -172,7 +172,7 @@ ORDER BY sort_order ASC, id DESC`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []ShopBanner{}
 	for rows.Next() {
 		var item ShopBanner
@@ -357,7 +357,7 @@ func (s *ShopService) createPendingShopOrder(ctx context.Context, userID, produc
 	if err != nil {
 		return 0, 0, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	var name, desc, imageURL, productType, grantRaw, status string
 	var priceMinor, originalMinor int64
 	var commissionBPS int
@@ -424,7 +424,7 @@ func (s *ShopService) FulfillPaidPaymentOrder(ctx context.Context, paymentOrderI
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	var order ShopOrder
 	var paidAt sql.NullTime
 	err = tx.QueryRowContext(ctx, `
