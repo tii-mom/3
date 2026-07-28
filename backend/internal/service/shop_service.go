@@ -573,7 +573,7 @@ LIMIT $`+strconv.Itoa(len(args)-1)+` OFFSET $`+strconv.Itoa(len(args)), args...)
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []ShopOrder{}
 	for rows.Next() {
 		item, err := scanShopOrder(rows)
