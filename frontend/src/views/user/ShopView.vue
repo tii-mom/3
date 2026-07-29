@@ -289,7 +289,7 @@ async function buy(product: ShopProduct) {
     const res = await shopAPI.createOrder({
       product_id: product.id,
       payment_type: normalizeVisibleMethod(method) || method,
-      return_url: `${window.location.origin}/shop`,
+      return_url: `${window.location.origin}/payment/result`,
       is_mobile: /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent),
     })
     payDialog.url = res.data.payment.pay_url || ''
