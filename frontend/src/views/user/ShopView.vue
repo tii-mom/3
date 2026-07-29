@@ -4,7 +4,7 @@
       <section class="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900">
         <div v-if="banners.length" class="relative isolate overflow-hidden bg-slate-950">
           <img
-            :src="activeBanner.image_url || defaultBannerImage"
+            :src="shopImage(activeBanner.image_url) || defaultBannerImage"
             :alt="activeBanner.title"
             class="h-56 w-full object-cover opacity-45 sm:h-72"
           >
@@ -26,10 +26,10 @@
           </div>
         </div>
         <div v-else class="shop-hero-empty">
-          <div>
-            <p class="mb-3 text-sm font-semibold text-primary-600 dark:text-primary-300">3API 商城</p>
+          <div class="max-w-2xl">
+            <p class="mb-3 inline-flex rounded-full bg-orange-100 px-3 py-1 text-sm font-semibold text-orange-700 dark:bg-orange-400/15 dark:text-orange-100">3API 商城</p>
             <h1 class="text-2xl font-bold text-gray-950 dark:text-white sm:text-4xl">购买平台商品，付款后自动发放</h1>
-            <p class="mt-3 max-w-2xl text-sm text-gray-600 dark:text-gray-300">精选平台商品，支付成功后自动生成订单记录；推广奖励进入算力公司钱包。</p>
+            <p class="mt-3 text-sm font-medium leading-6 text-gray-700 dark:text-gray-100">精选平台商品，支付成功后自动生成订单记录；推广奖励进入算力公司钱包。</p>
           </div>
         </div>
       </section>
@@ -43,7 +43,7 @@
           <option v-for="method in paymentMethods" :key="method" :value="method">{{ paymentLabel(method) }}</option>
         </select>
         <div v-else class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
-          支付暂未开启
+          支付暂未开启，请联系管理员
         </div>
       </section>
 
@@ -64,7 +64,7 @@
           class="group overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl dark:border-dark-700 dark:bg-dark-900"
         >
           <div class="relative h-44 overflow-hidden bg-gradient-to-br from-orange-50 via-white to-slate-100 dark:from-dark-800 dark:via-dark-800 dark:to-dark-900">
-            <img :src="product.image_url || defaultProductImage" :alt="product.name" class="h-full w-full object-cover transition duration-500 group-hover:scale-105">
+            <img :src="shopImage(product.image_url) || defaultProductImage" :alt="product.name" class="h-full w-full object-cover transition duration-500 group-hover:scale-105">
             <span class="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-gray-900 shadow-sm dark:bg-dark-950/80 dark:text-white">
               {{ productTypeLabel(product.product_type) }}
             </span>
@@ -79,16 +79,26 @@
                 <div class="text-2xl font-black text-gray-950 dark:text-white">¥{{ formatMoney(product.price_cny_minor) }}</div>
                 <div v-if="product.original_price_cny_minor > product.price_cny_minor" class="text-xs text-gray-400 line-through">¥{{ formatMoney(product.original_price_cny_minor) }}</div>
               </div>
-              <div v-if="product.commission_bps > 0" class="rounded-2xl bg-emerald-50 px-3 py-2 text-right text-xs text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-                推广奖励<br><b>{{ (product.commission_bps / 100).toFixed(0) }}%</b>
+              <div v-if="product.commission_bps > 0" class="flex items-center gap-2 rounded-2xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
+                <div class="text-right">
+                  推广奖励<br><b>{{ (product.commission_bps / 100).toFixed(0) }}%</b>
+                </div>
+                <button
+                  type="button"
+                  class="rounded-xl bg-white px-2.5 py-1.5 text-xs font-bold text-emerald-700 shadow-sm transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-400/15 dark:text-emerald-100 dark:hover:bg-emerald-400/25"
+                  :disabled="!inviteDetail?.aff_code"
+                  @click.stop="copyProductPromotionLink(product)"
+                >
+                  复制链接
+                </button>
               </div>
             </div>
             <button
               class="btn-primary w-full justify-center rounded-2xl py-3"
-              :disabled="creatingProductID === product.id || !paymentType"
+              :disabled="creatingProductID === product.id || !availablePaymentType(product)"
               @click="buy(product)"
             >
-              {{ !paymentType ? '支付暂未开启' : creatingProductID === product.id ? '正在创建订单...' : '立即购买' }}
+              {{ !availablePaymentType(product) ? '支付暂未开启' : creatingProductID === product.id ? '正在创建订单...' : '立即购买' }}
             </button>
           </div>
         </article>
@@ -127,30 +137,44 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
-import { shopAPI, type ShopBanner, type ShopOrder, type ShopProduct } from '@/api/shop'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import { resolveShopAssetUrl, shopAPI, type ShopBanner, type ShopOrder, type ShopProduct } from '@/api/shop'
 import { paymentAPI } from '@/api/payment'
+import userAPI from '@/api/user'
 import { useAppStore } from '@/stores'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import { getVisibleMethods, normalizeVisibleMethod } from '@/components/payment/paymentFlow'
+import { useClipboard } from '@/composables/useClipboard'
+import type { MethodLimit } from '@/types/payment'
+import type { UserAffiliateDetail } from '@/types'
 
 const appStore = useAppStore()
+const route = useRoute()
+const { copyToClipboard } = useClipboard()
 const loading = ref(true)
 const banners = ref<ShopBanner[]>([])
 const products = ref<ShopProduct[]>([])
 const orders = ref<ShopOrder[]>([])
-const paymentMethods = ref<string[]>([])
+const paymentMethodLimits = ref<Record<string, MethodLimit>>({})
 const paymentType = ref('')
 const creatingProductID = ref<number | null>(null)
 const activeBannerIndex = ref(0)
+const inviteDetail = ref<UserAffiliateDetail | null>(null)
 const payDialog = reactive({ open: false, url: '', qr: '' })
 
 const defaultBannerImage = 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1600&q=80'
 const defaultProductImage = 'data:image/svg+xml;utf8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600"%3E%3Cdefs%3E%3ClinearGradient id="g" x1="0" y1="0" x2="1" y2="1"%3E%3Cstop offset="0" stop-color="%23fff7ed"/%3E%3Cstop offset="1" stop-color="%23fed7aa"/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width="900" height="600" fill="url(%23g)"/%3E%3Ccircle cx="702" cy="108" r="92" fill="%23fb923c" opacity=".20"/%3E%3Ccircle cx="152" cy="480" r="132" fill="%230ea5e9" opacity=".12"/%3E%3Ctext x="72" y="292" font-family="Arial, sans-serif" font-size="64" font-weight="800" fill="%237c2d12"%3E3API%3C/text%3E%3Ctext x="72" y="350" font-family="Arial, sans-serif" font-size="32" fill="%239a3412"%3E%E5%B9%B3%E5%8F%B0%E5%95%86%E5%93%81%3C/text%3E%3C/svg%3E'
 
 const activeBanner = computed(() => banners.value[activeBannerIndex.value] || banners.value[0])
+const paymentMethods = computed(() => Object.keys(paymentMethodLimits.value))
 
 function formatMoney(minor: number): string {
   return (minor / 100).toFixed(2)
+}
+
+function shopImage(url?: string | null): string {
+  return resolveShopAssetUrl(url)
 }
 
 function productTypeLabel(type: string): string {
@@ -158,7 +182,9 @@ function productTypeLabel(type: string): string {
 }
 
 function paymentLabel(method: string): string {
-  const labels: Record<string, string> = { alipay: '支付宝', wxpay: '微信支付', stripe: '银行卡', easypay: '聚合支付' }
+  const label = paymentMethodLimits.value[method]?.display_name
+  if (label) return label
+  const labels: Record<string, string> = { alipay: '支付宝', wxpay: '微信支付', stripe: '银行卡', airwallex: '空中云汇', easypay: '聚合支付' }
   return labels[method] || method
 }
 
@@ -171,16 +197,60 @@ function scrollToProduct(productID: number) {
   document.getElementById(`shop-product-${productID}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
+function amountFitsMethod(product: ShopProduct, method: string): boolean {
+  const limits = paymentMethodLimits.value[method]
+  if (!limits || limits.available === false) return false
+  const amount = product.price_cny_minor / 100
+  if (limits.single_min > 0 && amount < limits.single_min) return false
+  if (limits.single_max > 0 && amount > limits.single_max) return false
+  return true
+}
+
+function availablePaymentType(product: ShopProduct): string {
+  if (paymentType.value && amountFitsMethod(product, paymentType.value)) {
+    return paymentType.value
+  }
+  return paymentMethods.value.find(method => amountFitsMethod(product, method)) || ''
+}
+
+function buildProductPromotionLink(product: ShopProduct): string {
+  const code = inviteDetail.value?.aff_code?.trim()
+  if (!code || typeof window === 'undefined') return ''
+  const url = new URL('/shop', window.location.origin || 'https://3api.shop')
+  url.searchParams.set('product', String(product.id))
+  url.searchParams.set('aff', code)
+  return url.toString()
+}
+
+async function copyProductPromotionLink(product: ShopProduct) {
+  const link = buildProductPromotionLink(product)
+  if (!link) {
+    appStore.showToast('warning', '推广码暂未获取，请稍后再试', 2500)
+    return
+  }
+  await copyToClipboard(link, '推广链接已复制')
+}
+
+async function scrollToQueryProduct() {
+  const raw = Array.isArray(route.query.product) ? route.query.product[0] : route.query.product
+  const id = Number(raw)
+  if (!Number.isFinite(id) || id <= 0) return
+  await nextTick()
+  scrollToProduct(id)
+}
+
 async function loadCheckoutMethods() {
   try {
     const res = await paymentAPI.getCheckoutInfo()
-    const methods = Object.entries(res.data.methods || {})
-      .filter(([, limits]) => limits.available)
-      .map(([key]) => key)
-    paymentMethods.value = methods
-    paymentType.value = methods[0] || ''
+    const visible = getVisibleMethods(res.data.methods || {})
+    paymentMethodLimits.value = Object.fromEntries(
+      Object.entries(visible).filter(([, limits]) => limits?.available !== false)
+    )
+    if (!paymentType.value || !paymentMethodLimits.value[paymentType.value]) {
+      paymentType.value = paymentMethods.value[0] || ''
+    }
   } catch {
-    paymentMethods.value = []
+    paymentMethodLimits.value = {}
     paymentType.value = ''
   }
 }
@@ -204,19 +274,21 @@ async function loadData() {
     appStore.showToast('error', error?.message || '商城加载失败', 3000)
   } finally {
     loading.value = false
+    await scrollToQueryProduct()
   }
 }
 
 async function buy(product: ShopProduct) {
-  if (!paymentType.value) {
-    appStore.showToast('warning', '请先选择支付方式', 2500)
+  const method = availablePaymentType(product)
+  if (!method) {
+    appStore.showToast('warning', '当前商品暂无可用支付方式，请联系管理员开启支付渠道', 3000)
     return
   }
   creatingProductID.value = product.id
   try {
     const res = await shopAPI.createOrder({
       product_id: product.id,
-      payment_type: paymentType.value,
+      payment_type: normalizeVisibleMethod(method) || method,
       return_url: `${window.location.origin}/shop`,
       is_mobile: /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent),
     })
@@ -231,6 +303,14 @@ async function buy(product: ShopProduct) {
   }
 }
 
+async function loadAffiliateDetail() {
+  try {
+    inviteDetail.value = await userAPI.getAffiliateDetail()
+  } catch {
+    inviteDetail.value = null
+  }
+}
+
 function closePayDialog() {
   payDialog.open = false
   payDialog.url = ''
@@ -238,7 +318,9 @@ function closePayDialog() {
   void loadOrders()
 }
 
-onMounted(loadData)
+onMounted(() => {
+  void Promise.all([loadData(), loadAffiliateDetail()])
+})
 </script>
 
 <style scoped>
@@ -254,7 +336,7 @@ onMounted(loadData)
 
 :global(.dark) .shop-hero-empty {
   background:
-    radial-gradient(circle at top left, rgba(16, 185, 129, 0.24), transparent 34rem),
-    linear-gradient(135deg, rgba(15,23,42,1), rgba(2,6,23,1));
+    radial-gradient(circle at top left, rgba(251, 146, 60, 0.22), transparent 30rem),
+    linear-gradient(135deg, rgb(15, 23, 42), rgb(2, 6, 23));
 }
 </style>

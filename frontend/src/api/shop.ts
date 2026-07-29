@@ -1,4 +1,5 @@
 import { apiClient } from './client'
+import { buildApiUrl } from './url'
 import type { BasePaginationResponse } from '@/types'
 import type { CreateOrderResult } from '@/types/payment'
 
@@ -84,6 +85,23 @@ export interface ShopBannerPayload {
   product_id?: number | null
   enabled: boolean
   sort_order?: number
+}
+
+export function resolveShopAssetUrl(url?: string | null): string {
+  const raw = String(url || '').trim()
+  if (!raw) return ''
+  if (/^(data|blob):/i.test(raw)) return raw
+  if (/^https?:\/\//i.test(raw) || raw.startsWith('//')) return raw
+
+  const normalized = raw.startsWith('/') ? raw : `/${raw}`
+  if (normalized.startsWith('/api/v1/shop/assets/')) {
+    return buildApiUrl(normalized)
+  }
+  if (normalized.startsWith('/shop/assets/')) {
+    return buildApiUrl(normalized)
+  }
+
+  return raw
 }
 
 export const shopAPI = {

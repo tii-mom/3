@@ -14,6 +14,7 @@ import { getSetupStatus } from '@/api/setup'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
 import { resolveRouteDocumentTitle } from './title'
 import { shouldBootstrapAuthForRoute } from './authBootstrap'
+import { resolveAffiliateReferralCode } from '@/utils/oauthAffiliate'
 
 /**
  * Route definitions with lazy loading
@@ -887,6 +888,7 @@ router.beforeEach(async (to, _from, next) => {
   const adminSettingsStore = useAdminSettingsStore()
   const requiresAuth = to.meta.requiresAuth !== false // Default to true
   const requiresAdmin = to.meta.requiresAdmin === true
+  resolveAffiliateReferralCode(to.query.aff, to.query.aff_code)
 
   // Restore auth only when the target route needs identity. Public marketing
   // and SEO pages should not probe /auth/csrf for anonymous visitors.

@@ -9,8 +9,6 @@
           <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">适合售卖平台商品；推广佣金自动进入算力公司钱包。</p>
         </div>
         <div class="flex flex-wrap gap-2">
-          <button type="button" class="btn-secondary rounded-2xl px-4 py-2.5" @click="goBack">返回后台</button>
-          <button type="button" class="btn-secondary rounded-2xl px-4 py-2.5" @click="router.push('/shop')">预览商城</button>
           <button v-if="tab === 'products'" class="btn-primary rounded-2xl px-4 py-2.5" @click="openProductDialog()">新增商品</button>
           <button v-else-if="tab === 'banners'" class="btn-primary rounded-2xl px-4 py-2.5" @click="openBannerDialog()">新增轮播</button>
         </div>
@@ -39,7 +37,7 @@
             <tr v-for="product in products" :key="product.id">
               <td class="px-5 py-4">
                 <div class="flex items-center gap-3">
-                  <img :src="product.image_url || defaultProductImage" class="h-12 w-12 rounded-2xl object-cover" alt="">
+                  <img :src="shopImage(product.image_url) || defaultProductImage" class="h-12 w-12 rounded-2xl object-cover" alt="">
                   <div>
                     <div class="font-semibold text-gray-950 dark:text-white">{{ product.name }}</div>
                     <div class="line-clamp-1 text-xs text-gray-500">{{ product.description }}</div>
@@ -62,7 +60,7 @@
 
     <section v-else-if="tab === 'banners'" class="grid gap-4 lg:grid-cols-2">
       <article v-for="banner in banners" :key="banner.id" class="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900">
-        <img :src="banner.image_url || defaultBannerImage" class="h-40 w-full object-cover" alt="">
+        <img :src="shopImage(banner.image_url) || defaultBannerImage" class="h-40 w-full object-cover" alt="">
         <div class="p-5">
           <div class="flex items-start justify-between gap-3">
             <div>
@@ -163,7 +161,7 @@
           <aside class="rounded-3xl border border-gray-200 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-800/70">
             <p class="text-sm font-semibold text-gray-900 dark:text-white">商品图片</p>
             <div class="mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-900">
-              <img :src="productForm.image_url || defaultProductImage" alt="商品预览图" class="h-44 w-full object-cover">
+              <img :src="shopImage(productForm.image_url) || defaultProductImage" alt="商品预览图" class="h-44 w-full object-cover">
             </div>
             <input ref="productFileInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="hidden" @change="handleProductImageChange">
             <button type="button" class="btn-secondary mt-3 w-full justify-center rounded-2xl px-4 py-2.5" :disabled="uploadingProductImage" @click="productFileInput?.click()">
@@ -173,7 +171,7 @@
               <span>或粘贴图片地址</span>
               <input v-model="productForm.image_url" class="input-field w-full" placeholder="https://...">
             </label>
-            <p class="mt-3 text-xs leading-5 text-gray-500 dark:text-gray-400">建议使用 16:9 或 4:3 图片，支持 JPG、PNG、WebP、GIF，最大 5MB。</p>
+            <p class="mt-3 text-xs leading-5 text-gray-500 dark:text-gray-400">建议使用 16:9 或 4:3 图片，支持 JPG、PNG、WebP、GIF，最大 5MB。本地上传会自动保存到商城素材库。</p>
           </aside>
         </div>
         <div class="mt-6 flex justify-end gap-3">
@@ -204,7 +202,7 @@
           <aside class="rounded-3xl border border-gray-200 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-800/70">
             <p class="text-sm font-semibold text-gray-900 dark:text-white">轮播图片</p>
             <div class="mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-900">
-              <img :src="bannerForm.image_url || defaultBannerImage" alt="轮播预览图" class="h-36 w-full object-cover">
+              <img :src="shopImage(bannerForm.image_url) || defaultBannerImage" alt="轮播预览图" class="h-36 w-full object-cover">
             </div>
             <input ref="bannerFileInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="hidden" @change="handleBannerImageChange">
             <button type="button" class="btn-secondary mt-3 w-full justify-center rounded-2xl px-4 py-2.5" :disabled="uploadingBannerImage" @click="bannerFileInput?.click()">
@@ -225,15 +223,13 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { adminShopAPI, type ShopBanner, type ShopOrder, type ShopProduct, type ShopProductPayload } from '@/api/shop'
+import { adminShopAPI, resolveShopAssetUrl, type ShopBanner, type ShopOrder, type ShopProduct, type ShopProductPayload } from '@/api/shop'
 import { useAppStore } from '@/stores'
 import AppLayout from '@/components/layout/AppLayout.vue'
 
 type TabKey = 'products' | 'banners' | 'orders'
 
 const appStore = useAppStore()
-const router = useRouter()
 const tab = ref<TabKey>('products')
 const tabs: Array<{ key: TabKey; label: string }> = [
   { key: 'products', label: '商品管理' },
@@ -298,6 +294,10 @@ function money(minor: number) {
   return (minor / 100).toFixed(2)
 }
 
+function shopImage(url?: string | null) {
+  return resolveShopAssetUrl(url)
+}
+
 function typeLabel(type: string) {
   return type === 'platform_usd_balance' ? '额度商品' : '平台商品'
 }
@@ -318,10 +318,6 @@ function orderStatusLabel(status: string) {
 
 function formatDate(value: string) {
   return value ? new Date(value).toLocaleString('zh-CN') : '-'
-}
-
-function goBack() {
-  void router.push('/admin/dashboard')
 }
 
 async function loadProducts() {
