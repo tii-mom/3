@@ -21,11 +21,11 @@ func NewTAIInternalHandler(platformUserID int64) *TAIInternalHandler {
 // ─── DTOs ──────────────────────────────────────────────────────────
 
 type UsageReportRequest struct {
-	Period       string  `json:"period"`        // e.g. "2026-07-29"
-	TotalCalls   int64   `json:"total_calls"`
-	TotalTokens  int64   `json:"total_tokens"`
+	Period        string  `json:"period"` // e.g. "2026-07-29"
+	TotalCalls    int64   `json:"total_calls"`
+	TotalTokens   int64   `json:"total_tokens"`
 	TotalTAISpent float64 `json:"total_tai_spent"`
-	ActivePets   int     `json:"active_pets"`
+	ActivePets    int     `json:"active_pets"`
 }
 
 type AccountStatusResponse struct {
@@ -75,9 +75,9 @@ func (h *TAIInternalHandler) BalanceCheck(c *gin.Context) {
 	threshold := 10.0 // minimum USD balance before alerting
 
 	c.JSON(http.StatusOK, gin.H{
-		"balance":        balance,
-		"sufficient":     balance > threshold,
-		"threshold":      threshold,
+		"balance":         balance,
+		"sufficient":      balance > threshold,
+		"threshold":       threshold,
 		"recommend_topup": balance < threshold*2,
 	})
 }
