@@ -117,6 +117,24 @@ func (h *PaymentHandler) RetryFulfillment(c *gin.Context) {
 	response.Success(c, gin.H{"message": "fulfillment retried"})
 }
 
+// SyncSubscriptionKeyBindings synchronizes API Key bindings for a subscription order.
+// POST /api/v1/admin/payment/orders/:id/sync-subscription-keys
+func (h *PaymentHandler) SyncSubscriptionKeyBindings(c *gin.Context) {
+	orderID, ok := parseIDParam(c, "id")
+	if !ok {
+		return
+	}
+	migrated, err := h.paymentService.RepairSubscriptionKeyBindings(c.Request.Context(), orderID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{
+		"message":        "subscription key bindings synced",
+		"migrated_count": migrated,
+	})
+}
+
 type AdminConfirmSubscriptionPaymentRequest struct {
 	Reference string `json:"reference"`
 }

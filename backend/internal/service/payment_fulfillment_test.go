@@ -986,5 +986,380 @@ func TestExecuteSubscriptionFulfillmentDoesNotDuplicateWorkAfterLegacySuccessAud
 	require.Zero(t, subRepo.createCalls)
 }
 
+func TestExecuteSubscriptionFulfillmentMigratesSubscriptionBoundAPIKeys(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentConfigServiceTestClient(t)
+	ensurePaymentAuditOrderActionUniqueIndex(t, ctx, client)
+
+	user, err := client.User.Create().
+		SetEmail("subscription-migration@example.com").
+		SetPasswordHash("hash").
+		SetUsername("subscription-migration-user").
+		Save(ctx)
+	require.NoError(t, err)
+
+	anthropicStandardGroup, err := client.Group.Create().
+		SetName("Anthropic Standard").
+		SetPlatform(PlatformAnthropic).
+		SetSubscriptionType(SubscriptionTypeStandard).
+		SetStatus(payment.EntityStatusActive).
+		SetRateMultiplier(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	openaiStandardGroup, err := client.Group.Create().
+		SetName("OpenAI Standard").
+		SetPlatform(PlatformOpenAI).
+		SetSubscriptionType(SubscriptionTypeStandard).
+		SetStatus(payment.EntityStatusActive).
+		SetRateMultiplier(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	anthropicSubscriptionGroup, err := client.Group.Create().
+		SetName("Anthropic Subscription").
+		SetPlatform(PlatformAnthropic).
+		SetSubscriptionType(SubscriptionTypeSubscription).
+		SetStatus(payment.EntityStatusActive).
+		SetRateMultiplier(1).
+		SetDefaultValidityDays(30).
+		Save(ctx)
+	require.NoError(t, err)
+
+	key1, err := client.APIKey.Create().
+		SetUserID(user.ID).
+		SetKey("sub-migrate-key-1").
+		SetName("anthropic-standard-key").
+		SetGroupID(anthropicStandardGroup.ID).
+		Save(ctx)
+	require.NoError(t, err)
+
+	key2, err := client.APIKey.Create().
+		SetUserID(user.ID).
+		SetKey("sub-migrate-key-2").
+		SetName("openai-standard-key").
+		SetGroupID(openaiStandardGroup.ID).
+		Save(ctx)
+	require.NoError(t, err)
+
+	key3, err := client.APIKey.Create().
+		SetUserID(user.ID).
+		SetKey("sub-migrate-key-3").
+		SetName("anthropic-wholesale-key").
+		SetGroupID(anthropicStandardGroup.ID).
+		SetKeyType("tenant_wholesale").
+		Save(ctx)
+	require.NoError(t, err)
+
+	order := createPaymentFulfillmentSubscriptionOrder(t, ctx, client, OrderStatusPaid, time.Now())
+	order, err = client.PaymentOrder.UpdateOneID(order.ID).
+		SetUserID(user.ID).
+		SetUserEmail(user.Email).
+		SetUserName(user.Username).
+		SetSubscriptionGroupID(anthropicSubscriptionGroup.ID).
+		Save(ctx)
+	require.NoError(t, err)
+
+	groupRepo := &subscriptionGroupRepoStub{
+		group: &Group{
+			ID:                  anthropicSubscriptionGroup.ID,
+			Platform:            PlatformAnthropic,
+			Status:              payment.EntityStatusActive,
+			SubscriptionType:    SubscriptionTypeSubscription,
+			DefaultValidityDays: 30,
+		},
+	}
+	subRepo := newSubscriptionUserSubRepoStub()
+	authCache := &authCacheInvalidatorStub{}
+	svc := &PaymentService{
+		entClient:            client,
+		groupRepo:            groupRepo,
+		subscriptionSvc:      NewSubscriptionService(groupRepo, subRepo, nil, nil, nil),
+		authCacheInvalidator: authCache,
+	}
+
+	require.NoError(t, svc.ExecuteSubscriptionFulfillment(ctx, order.ID))
+
+	reloadedOrder, err := client.PaymentOrder.Get(ctx, order.ID)
+	require.NoError(t, err)
+	require.Equal(t, OrderStatusCompleted, reloadedOrder.Status)
+
+	updatedKey1, err := client.APIKey.Get(ctx, key1.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updatedKey1.GroupID)
+	require.Equal(t, anthropicSubscriptionGroup.ID, *updatedKey1.GroupID)
+
+	updatedKey2, err := client.APIKey.Get(ctx, key2.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updatedKey2.GroupID)
+	require.Equal(t, openaiStandardGroup.ID, *updatedKey2.GroupID)
+
+	updatedKey3, err := client.APIKey.Get(ctx, key3.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updatedKey3.GroupID)
+	require.Equal(t, anthropicStandardGroup.ID, *updatedKey3.GroupID)
+
+	require.Equal(t, 1, subRepo.createCalls)
+	require.Equal(t, []int64{user.ID}, authCache.userIDs)
+}
+
+func TestMigrateSubscriptionBoundAPIKeysMovesSamePlatformStandardKeys(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentConfigServiceTestClient(t)
+
+	user, err := client.User.Create().
+		SetEmail("subscription-migrate-only@example.com").
+		SetPasswordHash("hash").
+		SetUsername("subscription-migrate-only-user").
+		Save(ctx)
+	require.NoError(t, err)
+
+	anthropicStandardGroup, err := client.Group.Create().
+		SetName("Anthropic Standard Only").
+		SetPlatform(PlatformAnthropic).
+		SetSubscriptionType(SubscriptionTypeStandard).
+		SetStatus(payment.EntityStatusActive).
+		SetRateMultiplier(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	openaiStandardGroup, err := client.Group.Create().
+		SetName("OpenAI Standard Only").
+		SetPlatform(PlatformOpenAI).
+		SetSubscriptionType(SubscriptionTypeStandard).
+		SetStatus(payment.EntityStatusActive).
+		SetRateMultiplier(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	anthropicSubscriptionGroup, err := client.Group.Create().
+		SetName("Anthropic Subscription Only").
+		SetPlatform(PlatformAnthropic).
+		SetSubscriptionType(SubscriptionTypeSubscription).
+		SetStatus(payment.EntityStatusActive).
+		SetRateMultiplier(1).
+		SetDefaultValidityDays(30).
+		Save(ctx)
+	require.NoError(t, err)
+
+	key1, err := client.APIKey.Create().
+		SetUserID(user.ID).
+		SetKey("sub-migrate-only-key-1").
+		SetName("anthropic-standard-key").
+		SetGroupID(anthropicStandardGroup.ID).
+		Save(ctx)
+	require.NoError(t, err)
+
+	key2, err := client.APIKey.Create().
+		SetUserID(user.ID).
+		SetKey("sub-migrate-only-key-2").
+		SetName("openai-standard-key").
+		SetGroupID(openaiStandardGroup.ID).
+		Save(ctx)
+	require.NoError(t, err)
+
+	key3, err := client.APIKey.Create().
+		SetUserID(user.ID).
+		SetKey("sub-migrate-only-key-3").
+		SetName("anthropic-wholesale-key").
+		SetGroupID(anthropicStandardGroup.ID).
+		SetKeyType("tenant_wholesale").
+		Save(ctx)
+	require.NoError(t, err)
+
+	groupRepo := &subscriptionGroupRepoStub{
+		group: &Group{
+			ID:                  anthropicSubscriptionGroup.ID,
+			Platform:            PlatformAnthropic,
+			Status:              payment.EntityStatusActive,
+			SubscriptionType:    SubscriptionTypeSubscription,
+			DefaultValidityDays: 30,
+		},
+	}
+	svc := &PaymentService{
+		entClient: client,
+	}
+
+	migrated, err := svc.migrateSubscriptionBoundAPIKeys(ctx, user.ID, groupRepo.group)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), migrated)
+
+	updatedKey1, err := client.APIKey.Get(ctx, key1.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updatedKey1.GroupID)
+	require.Equal(t, anthropicSubscriptionGroup.ID, *updatedKey1.GroupID)
+
+	updatedKey2, err := client.APIKey.Get(ctx, key2.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updatedKey2.GroupID)
+	require.Equal(t, openaiStandardGroup.ID, *updatedKey2.GroupID)
+
+	updatedKey3, err := client.APIKey.Get(ctx, key3.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updatedKey3.GroupID)
+	require.Equal(t, anthropicStandardGroup.ID, *updatedKey3.GroupID)
+}
+
+func TestRepairSubscriptionKeyBindingsForOrderMigratesCurrentSubscriptionKeysOnly(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentConfigServiceTestClient(t)
+	ensurePaymentAuditOrderActionUniqueIndex(t, ctx, client)
+
+	user, err := client.User.Create().
+		SetEmail("subscription-repair@example.com").
+		SetPasswordHash("hash").
+		SetUsername("subscription-repair-user").
+		Save(ctx)
+	require.NoError(t, err)
+
+	anthropicStandardGroup, err := client.Group.Create().
+		SetName("Anthropic Standard Repair").
+		SetPlatform(PlatformAnthropic).
+		SetSubscriptionType(SubscriptionTypeStandard).
+		SetStatus(payment.EntityStatusActive).
+		SetRateMultiplier(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	openaiStandardGroup, err := client.Group.Create().
+		SetName("OpenAI Standard Repair").
+		SetPlatform(PlatformOpenAI).
+		SetSubscriptionType(SubscriptionTypeStandard).
+		SetStatus(payment.EntityStatusActive).
+		SetRateMultiplier(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	anthropicSubscriptionGroup, err := client.Group.Create().
+		SetName("Anthropic Subscription Repair").
+		SetPlatform(PlatformAnthropic).
+		SetSubscriptionType(SubscriptionTypeSubscription).
+		SetStatus(payment.EntityStatusActive).
+		SetRateMultiplier(1).
+		SetDefaultValidityDays(30).
+		Save(ctx)
+	require.NoError(t, err)
+
+	key1, err := client.APIKey.Create().
+		SetUserID(user.ID).
+		SetKey("repair-key-1").
+		SetName("anthropic-standard-key").
+		SetGroupID(anthropicStandardGroup.ID).
+		Save(ctx)
+	require.NoError(t, err)
+
+	key2, err := client.APIKey.Create().
+		SetUserID(user.ID).
+		SetKey("repair-key-2").
+		SetName("openai-standard-key").
+		SetGroupID(openaiStandardGroup.ID).
+		Save(ctx)
+	require.NoError(t, err)
+
+	key3, err := client.APIKey.Create().
+		SetUserID(user.ID).
+		SetKey("repair-key-3").
+		SetName("anthropic-wholesale-key").
+		SetGroupID(anthropicStandardGroup.ID).
+		SetKeyType("tenant_wholesale").
+		Save(ctx)
+	require.NoError(t, err)
+
+	now := time.Now()
+	subRepo := newSubscriptionUserSubRepoStub()
+	subRepo.seed(&UserSubscription{
+		ID:         88,
+		UserID:     user.ID,
+		GroupID:    anthropicSubscriptionGroup.ID,
+		StartsAt:   now.Add(-time.Hour),
+		ExpiresAt:  now.Add(30 * 24 * time.Hour),
+		Status:     SubscriptionStatusActive,
+		AssignedAt: now.Add(-time.Hour),
+		Notes:      "payment order repair test",
+	})
+
+	order, err := client.PaymentOrder.Create().
+		SetUserID(user.ID).
+		SetUserEmail(user.Email).
+		SetUserName(user.Username).
+		SetAmount(80).
+		SetPayAmount(80).
+		SetFeeRate(0).
+		SetRechargeCode("PAY-REPAIR-" + strconv.FormatInt(time.Now().UnixNano(), 10)).
+		SetOutTradeNo("sub2_repair_" + strconv.FormatInt(time.Now().UnixNano(), 10)).
+		SetPaymentType(payment.TypeAlipay).
+		SetPaymentTradeNo("trade-repair").
+		SetOrderType(payment.OrderTypeSubscription).
+		SetPlanID(100).
+		SetSubscriptionGroupID(anthropicSubscriptionGroup.ID).
+		SetSubscriptionDays(30).
+		SetStatus(OrderStatusCompleted).
+		SetPaidAt(now.Add(-time.Hour)).
+		SetCompletedAt(now).
+		SetExpiresAt(now.Add(time.Hour)).
+		SetClientIP("127.0.0.1").
+		SetSrcHost("api.example.com").
+		Save(ctx)
+	require.NoError(t, err)
+
+	groupRepo := &subscriptionGroupRepoStub{
+		group: &Group{
+			ID:                  anthropicSubscriptionGroup.ID,
+			Platform:            PlatformAnthropic,
+			Status:              payment.EntityStatusActive,
+			SubscriptionType:    SubscriptionTypeSubscription,
+			DefaultValidityDays: 30,
+		},
+	}
+	subscriptionSvc := NewSubscriptionService(groupRepo, subRepo, nil, client, nil)
+	authCache := &authCacheInvalidatorStub{}
+	svc := &PaymentService{
+		entClient:            client,
+		groupRepo:            groupRepo,
+		subscriptionSvc:      subscriptionSvc,
+		authCacheInvalidator: authCache,
+	}
+
+	beforeOrder, err := client.PaymentOrder.Get(ctx, order.ID)
+	require.NoError(t, err)
+	beforeSubscription, err := subRepo.GetByID(ctx, 88)
+	require.NoError(t, err)
+
+	migrated, err := svc.RepairSubscriptionKeyBindings(ctx, order.ID)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), migrated)
+
+	migratedAgain, err := svc.RepairSubscriptionKeyBindings(ctx, order.ID)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), migratedAgain)
+
+	updatedKey1, err := client.APIKey.Get(ctx, key1.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updatedKey1.GroupID)
+	require.Equal(t, anthropicSubscriptionGroup.ID, *updatedKey1.GroupID)
+
+	updatedKey2, err := client.APIKey.Get(ctx, key2.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updatedKey2.GroupID)
+	require.Equal(t, openaiStandardGroup.ID, *updatedKey2.GroupID)
+
+	updatedKey3, err := client.APIKey.Get(ctx, key3.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updatedKey3.GroupID)
+	require.Equal(t, anthropicStandardGroup.ID, *updatedKey3.GroupID)
+
+	afterOrder, err := client.PaymentOrder.Get(ctx, order.ID)
+	require.NoError(t, err)
+	require.Equal(t, beforeOrder.Status, afterOrder.Status)
+	require.True(t, beforeOrder.CompletedAt.Equal(*afterOrder.CompletedAt))
+
+	afterSubscription, err := subRepo.GetByID(ctx, 88)
+	require.NoError(t, err)
+	require.Equal(t, beforeSubscription.Status, afterSubscription.Status)
+	require.True(t, beforeSubscription.ExpiresAt.Equal(afterSubscription.ExpiresAt))
+
+	require.Equal(t, []int64{user.ID}, authCache.userIDs)
+}
+
 var _ AffiliateRepository = (*paymentFulfillmentAffiliateRepoStub)(nil)
 var _ SettingRepository = (*paymentFulfillmentSettingRepoStub)(nil)

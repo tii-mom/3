@@ -12,6 +12,7 @@ import (
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/internal/payment"
@@ -530,15 +531,18 @@ func (s *PaymentService) doSub(ctx context.Context, o *dbent.PaymentOrder, lease
 	if err != nil || g.Status != payment.EntityStatusActive {
 		return fmt.Errorf("group %d no longer exists or inactive", gid)
 	}
-	if err := s.ensurePaymentSubscriptionAssigned(ctx, o, gid, days); err != nil {
+	if err := s.ensurePaymentSubscriptionAssigned(ctx, o, g, days); err != nil {
 		return err
 	}
 	return s.markCompleted(ctx, o, lease, "SUBSCRIPTION_SUCCESS")
 }
 
-func (s *PaymentService) ensurePaymentSubscriptionAssigned(ctx context.Context, o *dbent.PaymentOrder, groupID int64, days int) error {
+func (s *PaymentService) ensurePaymentSubscriptionAssigned(ctx context.Context, o *dbent.PaymentOrder, subscriptionGroup *Group, days int) error {
 	if s.subscriptionSvc == nil {
 		return errors.New("subscription service is unavailable")
+	}
+	if subscriptionGroup == nil {
+		return errors.New("subscription group is unavailable")
 	}
 
 	tx, err := s.entClient.Tx(ctx)
@@ -557,7 +561,7 @@ func (s *PaymentService) ensurePaymentSubscriptionAssigned(ctx context.Context, 
 	recoveredFromNote := false
 	if !alreadyAssigned {
 		orderNote := paymentSubscriptionOrderNote(o.ID)
-		existing, lookupErr := s.subscriptionSvc.userSubRepo.GetByUserIDAndGroupID(txCtx, o.UserID, groupID)
+		existing, lookupErr := s.subscriptionSvc.userSubRepo.GetByUserIDAndGroupID(txCtx, o.UserID, subscriptionGroup.ID)
 		switch {
 		case lookupErr == nil && existing != nil && hasPaymentSubscriptionOrderNote(existing.Notes, orderNote):
 			recoveredFromNote = true
@@ -566,7 +570,7 @@ func (s *PaymentService) ensurePaymentSubscriptionAssigned(ctx context.Context, 
 		default:
 			if _, _, err := s.subscriptionSvc.assignOrExtendSubscription(txCtx, &AssignSubscriptionInput{
 				UserID:       o.UserID,
-				GroupID:      groupID,
+				GroupID:      subscriptionGroup.ID,
 				ValidityDays: days,
 				AssignedBy:   0,
 				Notes:        orderNote,
@@ -576,7 +580,7 @@ func (s *PaymentService) ensurePaymentSubscriptionAssigned(ctx context.Context, 
 		}
 
 		detail, _ := json.Marshal(map[string]any{
-			"groupID":           groupID,
+			"groupID":           subscriptionGroup.ID,
 			"validityDays":      days,
 			"recoveredFromNote": recoveredFromNote,
 		})
@@ -590,24 +594,92 @@ func (s *PaymentService) ensurePaymentSubscriptionAssigned(ctx context.Context, 
 				_ = tx.Rollback()
 				claimed, checkErr := hasPaymentSubscriptionAssignmentAudit(ctx, s.entClient, o.ID)
 				if checkErr == nil && claimed {
-					return s.subscriptionSvc.invalidateSubscriptionCaches(o.UserID, groupID)
+					migrated, migrateErr := s.migrateSubscriptionBoundAPIKeys(ctx, o.UserID, subscriptionGroup)
+					if migrateErr != nil {
+						return fmt.Errorf("migrate api keys after recovered subscription assignment: %w", migrateErr)
+					}
+					if migrated > 0 && s.authCacheInvalidator != nil {
+						s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, o.UserID)
+					}
+					return s.subscriptionSvc.invalidateSubscriptionCaches(o.UserID, subscriptionGroup.ID)
 				}
 			}
 			return fmt.Errorf("record subscription assignment audit: %w", err)
 		}
 	} else {
-		slog.Info("subscription already assigned for order, skipping", "orderID", o.ID, "groupID", groupID)
+		slog.Info("subscription already assigned for order, skipping", "orderID", o.ID, "groupID", subscriptionGroup.ID)
 	}
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit subscription fulfillment tx: %w", err)
 	}
+
+	migrated, err := s.migrateSubscriptionBoundAPIKeys(ctx, o.UserID, subscriptionGroup)
+	if err != nil {
+		return fmt.Errorf("migrate api keys after subscription fulfillment: %w", err)
+	}
+	if migrated > 0 && s.authCacheInvalidator != nil {
+		s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, o.UserID)
+	}
 	// Assignment cache invalidation is deferred while this transaction is open,
 	// then performed synchronously against the committed subscription.
-	if err := s.subscriptionSvc.invalidateSubscriptionCaches(o.UserID, groupID); err != nil {
+	if err := s.subscriptionSvc.invalidateSubscriptionCaches(o.UserID, subscriptionGroup.ID); err != nil {
 		return fmt.Errorf("invalidate subscription cache after fulfillment: %w", err)
 	}
 	return nil
+}
+
+func (s *PaymentService) migrateSubscriptionBoundAPIKeys(ctx context.Context, userID int64, subscriptionGroup *Group) (int64, error) {
+	if s == nil || s.entClient == nil || subscriptionGroup == nil {
+		return 0, nil
+	}
+	if !subscriptionGroup.IsSubscriptionType() {
+		return 0, nil
+	}
+	platform := strings.TrimSpace(subscriptionGroup.Platform)
+	if platform == "" {
+		return 0, nil
+	}
+
+	client := s.entClient
+	if tx := dbent.TxFromContext(ctx); tx != nil {
+		client = tx.Client()
+	}
+
+	keys, err := client.APIKey.Query().
+		Where(
+			apikey.UserIDEQ(userID),
+			apikey.DeletedAtIsNil(),
+			apikey.KeyTypeNEQ("tenant_wholesale"),
+			apikey.GroupIDNEQ(subscriptionGroup.ID),
+		).
+		WithGroup().
+		All(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("load api keys for subscription migration: %w", err)
+	}
+
+	var updated int64
+	for _, key := range keys {
+		if key == nil || key.Edges.Group == nil {
+			continue
+		}
+		group := key.Edges.Group
+		if !strings.EqualFold(strings.TrimSpace(group.Platform), platform) {
+			continue
+		}
+		if group.Status != payment.EntityStatusActive || group.SubscriptionType == SubscriptionTypeSubscription {
+			continue
+		}
+		if _, err := client.APIKey.UpdateOneID(key.ID).
+			SetGroupID(subscriptionGroup.ID).
+			SetUpdatedAt(time.Now()).
+			Save(ctx); err != nil {
+			return updated, fmt.Errorf("update api key subscription group: %w", err)
+		}
+		updated++
+	}
+	return updated, nil
 }
 
 func hasPaymentSubscriptionAssignmentAudit(ctx context.Context, client *dbent.Client, orderID int64) (bool, error) {
@@ -684,6 +756,58 @@ func (s *PaymentService) RetryFulfillment(ctx context.Context, oid int64) error 
 	}
 	s.writeAuditLog(ctx, oid, "RECHARGE_RETRY", "admin", map[string]any{"detail": "admin manual retry"})
 	return s.executeFulfillment(ctx, oid)
+}
+
+// RepairSubscriptionKeyBindings syncs the user's ordinary API Keys to the
+// subscription group attached to a subscription order. It does not change the
+// order state, subscription term, balance, or usage history.
+func (s *PaymentService) RepairSubscriptionKeyBindings(ctx context.Context, oid int64) (int64, error) {
+	o, err := s.entClient.PaymentOrder.Get(ctx, oid)
+	if err != nil {
+		return 0, infraerrors.NotFound("NOT_FOUND", "order not found")
+	}
+	if o.OrderType != payment.OrderTypeSubscription {
+		return 0, infraerrors.BadRequest("INVALID_ORDER_TYPE", "only subscription orders can repair key bindings")
+	}
+	if psIsRefundStatus(o.Status) {
+		return 0, infraerrors.BadRequest("INVALID_STATUS", "refund-related order cannot repair key bindings")
+	}
+	if o.SubscriptionGroupID == nil {
+		return 0, infraerrors.BadRequest("INVALID_STATUS", "missing subscription group")
+	}
+	if s.subscriptionSvc == nil {
+		return 0, errors.New("subscription service is unavailable")
+	}
+	if _, err := s.subscriptionSvc.GetActiveSubscription(ctx, o.UserID, *o.SubscriptionGroupID); err != nil {
+		if errors.Is(err, ErrSubscriptionNotFound) {
+			return 0, infraerrors.NotFound("SUBSCRIPTION_NOT_FOUND", "active subscription not found")
+		}
+		return 0, fmt.Errorf("check active subscription: %w", err)
+	}
+	if s.groupRepo == nil {
+		return 0, errors.New("group repository is unavailable")
+	}
+	subscriptionGroup, err := s.groupRepo.GetByID(ctx, *o.SubscriptionGroupID)
+	if err != nil {
+		return 0, fmt.Errorf("load subscription group: %w", err)
+	}
+	if subscriptionGroup.Status != payment.EntityStatusActive || !subscriptionGroup.IsSubscriptionType() {
+		return 0, errors.New("subscription group is unavailable")
+	}
+	migrated, err := s.migrateSubscriptionBoundAPIKeys(ctx, o.UserID, subscriptionGroup)
+	if err != nil {
+		return 0, err
+	}
+	if migrated > 0 && s.authCacheInvalidator != nil {
+		s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, o.UserID)
+	}
+	s.writeAuditLog(ctx, o.ID, "SUBSCRIPTION_KEYS_REPAIRED", "admin", map[string]any{
+		"userID":        o.UserID,
+		"groupID":       *o.SubscriptionGroupID,
+		"migratedCount": migrated,
+		"orderStatus":   o.Status,
+	})
+	return migrated, nil
 }
 
 // AdminConfirmSubscriptionPayment marks a pending subscription order as paid by
