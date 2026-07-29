@@ -111,46 +111,64 @@
         </div>
         <div v-if="orders.length === 0" class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">暂无商城订单</div>
         <div v-else class="divide-y divide-gray-100 dark:divide-dark-700">
-          <div v-for="order in orders" :key="order.id" class="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div v-for="order in orders" :key="order.id" class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div class="font-semibold text-gray-950 dark:text-white">{{ order.snapshot_name }}</div>
               <div class="text-xs text-gray-500 dark:text-gray-400">订单 #{{ order.id }} · {{ statusLabel(order.status) }}</div>
             </div>
-            <div class="text-sm font-bold text-gray-950 dark:text-white">¥{{ formatMoney(order.snapshot_price_cny_minor) }}</div>
+            <div class="flex items-center gap-3 sm:justify-end">
+              <div class="text-sm font-bold text-gray-950 dark:text-white">¥{{ formatMoney(order.snapshot_price_cny_minor) }}</div>
+              <button
+                v-if="canCancelOrder(order)"
+                type="button"
+                class="rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60 dark:border-dark-600 dark:text-gray-300 dark:hover:border-red-500/30 dark:hover:bg-red-500/10 dark:hover:text-red-200"
+                :disabled="cancellingOrderID === order.id"
+                @click="cancelShopPaymentOrder(order)"
+              >
+                {{ cancellingOrderID === order.id ? '取消中...' : '取消订单' }}
+              </button>
+            </div>
           </div>
         </div>
       </section>
 
-      <div v-if="payDialog.open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-        <div class="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl dark:bg-dark-900">
-          <h3 class="text-lg font-bold text-gray-950 dark:text-white">请完成支付</h3>
-          <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">支付成功后订单会自动处理，你也可以回到订单列表刷新查看。</p>
-          <div v-if="payDialog.qr" class="mt-5 rounded-2xl bg-gray-50 p-4 text-center dark:bg-dark-800">
-            <img :src="payDialog.qr" alt="支付二维码" class="mx-auto h-56 w-56 rounded-xl bg-white p-2">
-          </div>
-          <a v-if="payDialog.url" :href="payDialog.url" target="_blank" rel="noopener noreferrer" class="btn-primary mt-5 w-full justify-center rounded-2xl py-3">打开支付页面</a>
-          <button class="btn-secondary mt-3 w-full justify-center rounded-2xl py-3" @click="closePayDialog">我已完成 / 稍后查看</button>
-        </div>
-      </div>
+      <BaseDialog :show="payDialog.open" title="请完成支付" width="narrow" @close="closePayDialog">
+        <PaymentStatusPanel
+          v-if="payDialog.open"
+          :order-id="payDialog.orderId"
+          :qr-code="payDialog.qrCode"
+          :expires-at="payDialog.expiresAt"
+          :payment-type="payDialog.paymentType"
+          :pay-url="payDialog.payUrl"
+          order-type="shop"
+          @done="closePayDialog"
+          @success="handlePaymentSuccess"
+          @settled="handlePaymentSettled"
+        />
+      </BaseDialog>
     </div>
   </AppLayout>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { resolveShopAssetUrl, shopAPI, type ShopBanner, type ShopOrder, type ShopProduct } from '@/api/shop'
 import { paymentAPI } from '@/api/payment'
 import userAPI from '@/api/user'
 import { useAppStore } from '@/stores'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import { getVisibleMethods, normalizeVisibleMethod } from '@/components/payment/paymentFlow'
+import BaseDialog from '@/components/common/BaseDialog.vue'
+import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
+import { getPaymentPopupFeatures } from '@/components/payment/providerConfig'
+import { decidePaymentLaunch, getVisibleMethods, normalizeVisibleMethod } from '@/components/payment/paymentFlow'
 import { useClipboard } from '@/composables/useClipboard'
-import type { MethodLimit } from '@/types/payment'
+import type { MethodLimit, OrderType } from '@/types/payment'
 import type { UserAffiliateDetail } from '@/types'
 
 const appStore = useAppStore()
 const route = useRoute()
+const router = useRouter()
 const { copyToClipboard } = useClipboard()
 const loading = ref(true)
 const banners = ref<ShopBanner[]>([])
@@ -159,9 +177,18 @@ const orders = ref<ShopOrder[]>([])
 const paymentMethodLimits = ref<Record<string, MethodLimit>>({})
 const paymentType = ref('')
 const creatingProductID = ref<number | null>(null)
+const cancellingOrderID = ref<number | null>(null)
 const activeBannerIndex = ref(0)
 const inviteDetail = ref<UserAffiliateDetail | null>(null)
-const payDialog = reactive({ open: false, url: '', qr: '' })
+const alipayForceQRCode = ref(false)
+const payDialog = reactive({
+  open: false,
+  orderId: 0,
+  qrCode: '',
+  expiresAt: '',
+  paymentType: '',
+  payUrl: '',
+})
 
 const defaultBannerImage = 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1600&q=80'
 const defaultProductImage = 'data:image/svg+xml;utf8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600"%3E%3Cdefs%3E%3ClinearGradient id="g" x1="0" y1="0" x2="1" y2="1"%3E%3Cstop offset="0" stop-color="%23fff7ed"/%3E%3Cstop offset="1" stop-color="%23fed7aa"/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width="900" height="600" fill="url(%23g)"/%3E%3Ccircle cx="702" cy="108" r="92" fill="%23fb923c" opacity=".20"/%3E%3Ccircle cx="152" cy="480" r="132" fill="%230ea5e9" opacity=".12"/%3E%3Ctext x="72" y="292" font-family="Arial, sans-serif" font-size="64" font-weight="800" fill="%237c2d12"%3E3API%3C/text%3E%3Ctext x="72" y="350" font-family="Arial, sans-serif" font-size="32" fill="%239a3412"%3E%E5%B9%B3%E5%8F%B0%E5%95%86%E5%93%81%3C/text%3E%3C/svg%3E'
@@ -188,9 +215,23 @@ function paymentLabel(method: string): string {
   return labels[method] || method
 }
 
+function isMobileDevice(): boolean {
+  if (typeof window === 'undefined') return false
+  return /Mobile|Android|iPhone|iPad/i.test(window.navigator.userAgent)
+}
+
+function isWechatBrowser(): boolean {
+  if (typeof window === 'undefined') return false
+  return /MicroMessenger/i.test(window.navigator.userAgent)
+}
+
 function statusLabel(status: string): string {
   const labels: Record<string, string> = { pending: '待支付', paid: '已支付', fulfilled: '已完成', cancelled: '已取消', refunded: '已退款', failed: '失败' }
   return labels[status] || status
+}
+
+function canCancelOrder(order: ShopOrder): boolean {
+  return order.status === 'pending' && !!order.payment_order_id
 }
 
 function scrollToProduct(productID: number) {
@@ -243,6 +284,7 @@ async function loadCheckoutMethods() {
   try {
     const res = await paymentAPI.getCheckoutInfo()
     const visible = getVisibleMethods(res.data.methods || {})
+    alipayForceQRCode.value = !!res.data.alipay_force_qrcode
     paymentMethodLimits.value = Object.fromEntries(
       Object.entries(visible).filter(([, limits]) => limits?.available !== false)
     )
@@ -250,6 +292,7 @@ async function loadCheckoutMethods() {
       paymentType.value = paymentMethods.value[0] || ''
     }
   } catch {
+    alipayForceQRCode.value = false
     paymentMethodLimits.value = {}
     paymentType.value = ''
   }
@@ -285,16 +328,83 @@ async function buy(product: ShopProduct) {
     return
   }
   creatingProductID.value = product.id
+  const visibleMethod = normalizeVisibleMethod(method) || method
+  const forceQRCode = !!(alipayForceQRCode.value && visibleMethod === 'alipay')
+  const orderType: OrderType = 'shop'
   try {
     const res = await shopAPI.createOrder({
       product_id: product.id,
-      payment_type: normalizeVisibleMethod(method) || method,
+      payment_type: visibleMethod,
       return_url: `${window.location.origin}/payment/result`,
-      is_mobile: /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent),
+      is_mobile: forceQRCode ? false : isMobileDevice(),
     })
-    payDialog.url = res.data.payment.pay_url || ''
-    payDialog.qr = res.data.payment.qr_code || ''
+    const payment = res.data.payment
+    const stripeMethod = visibleMethod === 'stripe'
+      ? ''
+      : visibleMethod === 'wxpay' ? 'wechat_pay' : 'alipay'
+    const stripeRouteUrl = payment.client_secret && visibleMethod !== 'airwallex'
+      ? router.resolve({
+        path: '/payment/stripe',
+        query: {
+          order_id: String(payment.order_id),
+          client_secret: payment.client_secret,
+          method: stripeMethod || undefined,
+          resume_token: payment.resume_token || undefined,
+        },
+      }).href
+      : ''
+    const airwallexRouteUrl = payment.client_secret && payment.intent_id
+      ? router.resolve({
+        path: '/payment/airwallex',
+        query: {
+          order_id: String(payment.order_id),
+          out_trade_no: payment.out_trade_no || undefined,
+          resume_token: payment.resume_token || undefined,
+        },
+      }).href
+      : ''
+    const decision = decidePaymentLaunch(payment, {
+      visibleMethod,
+      orderType,
+      isMobile: isMobileDevice(),
+      isWechatBrowser: isWechatBrowser(),
+      forceQRCode,
+      stripePopupUrl: stripeRouteUrl,
+      stripeRouteUrl,
+      airwallexRouteUrl,
+    })
+
+    if (decision.kind === 'unhandled') {
+      appStore.showToast('error', '支付方式暂不可用，请换一个支付方式再试', 3000)
+      return
+    }
+    if (decision.kind === 'wechat_oauth' && decision.oauth?.authorize_url) {
+      window.location.href = decision.oauth.authorize_url
+      return
+    }
+    if (decision.kind === 'wechat_jsapi') {
+      appStore.showToast('warning', '当前微信内支付需要跳转处理，请换用支付宝或在浏览器中打开商城', 4000)
+      return
+    }
+
+    payDialog.orderId = decision.paymentState.orderId
+    payDialog.qrCode = decision.paymentState.qrCode
+    payDialog.expiresAt = decision.paymentState.expiresAt
+    payDialog.paymentType = decision.paymentState.paymentType
+    payDialog.payUrl = decision.paymentState.payUrl
     payDialog.open = true
+
+    if (decision.kind === 'stripe_route' || decision.kind === 'airwallex_route') {
+      window.location.href = decision.paymentState.payUrl
+      return
+    }
+    if (decision.kind === 'stripe_popup' || decision.kind === 'redirect_waiting') {
+      const win = window.open(decision.paymentState.payUrl, 'paymentPopup', getPaymentPopupFeatures())
+      if (!win || win.closed) {
+        window.location.href = decision.paymentState.payUrl
+        return
+      }
+    }
     await loadOrders()
   } catch (error: any) {
     appStore.showToast('error', error?.message || '创建订单失败', 3000)
@@ -311,10 +421,35 @@ async function loadAffiliateDetail() {
   }
 }
 
+async function cancelShopPaymentOrder(order: ShopOrder) {
+  if (!order.payment_order_id || cancellingOrderID.value) return
+  cancellingOrderID.value = order.id
+  try {
+    await paymentAPI.cancelOrder(order.payment_order_id)
+    appStore.showToast('success', '订单已取消', 2200)
+    await loadOrders()
+  } catch (error: any) {
+    appStore.showToast('error', error?.message || '取消订单失败，请刷新后再试', 3000)
+  } finally {
+    cancellingOrderID.value = null
+  }
+}
+
 function closePayDialog() {
   payDialog.open = false
-  payDialog.url = ''
-  payDialog.qr = ''
+  payDialog.orderId = 0
+  payDialog.qrCode = ''
+  payDialog.expiresAt = ''
+  payDialog.paymentType = ''
+  payDialog.payUrl = ''
+  void loadOrders()
+}
+
+function handlePaymentSuccess() {
+  void loadOrders()
+}
+
+function handlePaymentSettled() {
   void loadOrders()
 }
 

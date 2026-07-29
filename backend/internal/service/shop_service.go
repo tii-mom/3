@@ -419,6 +419,20 @@ func (s *ShopService) AttachPaymentOrder(ctx context.Context, shopOrderID, userI
 	return nil
 }
 
+func (s *ShopService) MarkPaymentOrderClosed(ctx context.Context, paymentOrderID int64, status string) error {
+	status = strings.TrimSpace(status)
+	if status != "cancelled" && status != "failed" {
+		return infraerrors.BadRequest("SHOP_ORDER_STATUS_INVALID", "shop order status is invalid")
+	}
+	_, err := s.db.ExecContext(ctx, `
+UPDATE shop_orders
+SET status = $2, fulfillment_status = 'failed', updated_at = NOW()
+WHERE tenant_id = 1
+  AND payment_order_id = $1
+  AND status = 'pending'`, paymentOrderID, status)
+	return err
+}
+
 func (s *ShopService) FulfillPaidPaymentOrder(ctx context.Context, paymentOrderID int64) error {
 	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {

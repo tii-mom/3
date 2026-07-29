@@ -10,14 +10,17 @@ INSERT INTO groups (
     platform,
     created_at,
     updated_at
-) VALUES (
+)
+SELECT
     'tai-pets',
     0.6000,          -- 40% discount vs retail
     'active',
     'openai',         -- default platform; pets use OpenAI-compatible endpoint
     NOW(),
     NOW()
-) ON CONFLICT (name) DO NOTHING;
+WHERE NOT EXISTS (
+    SELECT 1 FROM groups WHERE name = 'tai-pets'
+);
 
 -- NOTE: After running this migration, manually:
 -- 1. Create a platform user: username = "tai-platform"

@@ -137,6 +137,15 @@ func (s *PaymentService) cancelCore(ctx context.Context, o *dbent.PaymentOrder, 
 			auditAction = "ORDER_EXPIRED"
 		}
 		s.writeAuditLog(ctx, o.ID, auditAction, op, map[string]any{"detail": ad})
+		if o.OrderType == payment.OrderTypeShop && s.shopService != nil {
+			shopStatus := "cancelled"
+			if fs == OrderStatusExpired {
+				shopStatus = "failed"
+			}
+			if err := s.shopService.MarkPaymentOrderClosed(ctx, o.ID, shopStatus); err != nil {
+				slog.Error("sync shop order closed status failed", "orderID", o.ID, "status", shopStatus, "error", err)
+			}
+		}
 	}
 	return checkPaidResultCancelled, nil
 }
