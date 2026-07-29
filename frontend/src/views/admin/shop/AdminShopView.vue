@@ -5,8 +5,8 @@
       <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p class="text-sm font-semibold text-primary-600 dark:text-primary-300">商城管理</p>
-          <h1 class="mt-1 text-2xl font-bold text-gray-950 dark:text-white">商品上架、轮播展示、订单查看</h1>
-          <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">适合售卖平台商品；推广佣金自动进入算力公司钱包。</p>
+          <h1 class="mt-1 text-2xl font-bold text-gray-950 dark:text-white">商品上架、轮播展示、订单发货</h1>
+          <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">适合售卖平台商品；用户付款后在订单里手动填写发货信息，推广佣金进入算力公司钱包。</p>
         </div>
         <div class="flex flex-wrap gap-2">
           <button v-if="tab === 'products'" class="btn-primary rounded-2xl px-4 py-2.5" @click="openProductDialog()">新增商品</button>
@@ -80,6 +80,16 @@
     </section>
 
     <section v-else class="rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4 dark:border-dark-700">
+        <div>
+          <h2 class="text-lg font-bold text-gray-950 dark:text-white">商城订单</h2>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">付款后先进入待发货，管理员填写内容后再发货给用户。</p>
+        </div>
+        <div class="flex flex-wrap gap-2 text-xs font-semibold">
+          <span class="rounded-full bg-amber-50 px-3 py-1.5 text-amber-700 dark:bg-amber-500/10 dark:text-amber-200">待发货 {{ pendingOrdersCount }}</span>
+          <span class="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">已发货 {{ fulfilledOrdersCount }}</span>
+        </div>
+      </div>
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-100 text-sm dark:divide-dark-700">
           <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500 dark:bg-dark-800 dark:text-gray-400">
@@ -90,6 +100,7 @@
               <th class="px-5 py-3">状态</th>
               <th class="px-5 py-3">佣金</th>
               <th class="px-5 py-3">时间</th>
+              <th class="px-5 py-3 text-right">操作</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100 dark:divide-dark-700">
@@ -100,9 +111,23 @@
               </td>
               <td class="px-5 py-4">{{ order.user_email || order.user_id }}</td>
               <td class="px-5 py-4 font-semibold">¥{{ money(order.snapshot_price_cny_minor) }}</td>
-              <td class="px-5 py-4">{{ orderStatusLabel(order.status) }}</td>
+              <td class="px-5 py-4">
+                <div class="font-semibold text-gray-900 dark:text-white">{{ orderStatusLabel(order) }}</div>
+                <div v-if="order.fulfillment_note" class="mt-1 max-w-xs truncate text-xs text-amber-600 dark:text-amber-300">发货内容：{{ order.fulfillment_note }}</div>
+              </td>
               <td class="px-5 py-4">{{ order.snapshot_commission_bps > 0 ? `${(order.snapshot_commission_bps / 100).toFixed(0)}%` : '无' }}</td>
               <td class="px-5 py-4 text-xs text-gray-500">{{ formatDate(order.created_at) }}</td>
+              <td class="px-5 py-4 text-right">
+                <button
+                  v-if="canFulfillOrder(order)"
+                  type="button"
+                  class="btn-primary rounded-xl px-3 py-1.5 text-xs"
+                  @click="openFulfillDialog(order)"
+                >
+                  手动发货
+                </button>
+                <span v-else class="text-xs text-gray-400">-</span>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -217,6 +242,31 @@
         </div>
       </form>
     </div>
+
+    <div v-if="fulfillDialog.open" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/55 p-4 backdrop-blur-sm">
+      <form class="shop-modal w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl dark:bg-dark-900" @submit.prevent="confirmFulfillOrder">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="text-sm font-semibold text-primary-600 dark:text-primary-300">商城订单</p>
+            <h3 class="mt-1 text-xl font-bold text-gray-950 dark:text-white">手动发货</h3>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">用户会在商城订单里看到这段发货信息。</p>
+          </div>
+          <button type="button" class="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-dark-800 dark:hover:text-white" aria-label="关闭" @click="fulfillDialog.open = false">✕</button>
+        </div>
+        <div class="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm dark:border-dark-700 dark:bg-dark-800/70">
+          <div class="font-semibold text-gray-950 dark:text-white">#{{ fulfillDialog.orderId }} {{ fulfillDialog.orderName }}</div>
+          <div class="mt-1 text-gray-500 dark:text-gray-400">请填写交付内容、领取方式、卡密、下载链接或后续联系方式，用户会在订单里直接看到。</div>
+        </div>
+        <label class="shop-field mt-5">
+          <span>发货内容</span>
+          <textarea v-model="fulfillDialog.note" class="input-field min-h-32 w-full" placeholder="例如：安装包下载地址、账号信息、服务联系说明等。" required></textarea>
+        </label>
+        <div class="mt-6 flex justify-end gap-3">
+          <button type="button" class="btn-secondary rounded-2xl px-4 py-2.5" @click="fulfillDialog.open = false">取消</button>
+          <button class="btn-primary rounded-2xl px-4 py-2.5" :disabled="fulfillingOrder">{{ fulfillingOrder ? '发送中...' : '发送给用户' }}</button>
+        </div>
+      </form>
+    </div>
   </div>
   </AppLayout>
 </template>
@@ -239,6 +289,7 @@ const tabs: Array<{ key: TabKey; label: string }> = [
 const products = ref<ShopProduct[]>([])
 const banners = ref<ShopBanner[]>([])
 const orders = ref<ShopOrder[]>([])
+const fulfillingOrder = ref(false)
 const productFileInput = ref<HTMLInputElement | null>(null)
 const bannerFileInput = ref<HTMLInputElement | null>(null)
 const uploadingProductImage = ref(false)
@@ -270,6 +321,12 @@ const bannerForm = reactive({
   enabled: true,
   sort_order: 0,
 })
+const fulfillDialog = reactive({
+  open: false,
+  orderId: 0,
+  orderName: '',
+  note: '',
+})
 
 const productPrice = computed({
   get: () => productForm.price_cny_minor / 100,
@@ -283,6 +340,8 @@ const productCommissionPercent = computed({
   get: () => (productForm.commission_bps || 0) / 100,
   set: (value: number) => { productForm.commission_bps = Math.round(Number(value || 0) * 100) }
 })
+const pendingOrdersCount = computed(() => orders.value.filter(order => order.status === 'paid' && order.fulfillment_status === 'pending').length)
+const fulfilledOrdersCount = computed(() => orders.value.filter(order => order.fulfillment_status === 'fulfilled' || order.status === 'fulfilled').length)
 
 watch(tab, () => {
   if (tab.value === 'products') void loadProducts()
@@ -312,8 +371,10 @@ function statusClass(status: string) {
   return 'bg-gray-100 text-gray-500 dark:bg-dark-800 dark:text-gray-300'
 }
 
-function orderStatusLabel(status: string) {
-  return ({ pending: '待支付', paid: '已支付', fulfilled: '已完成', cancelled: '已取消', refunded: '已退款', failed: '失败' } as Record<string, string>)[status] || status
+function orderStatusLabel(order: ShopOrder) {
+  if (order.fulfillment_status === 'fulfilled' || order.status === 'fulfilled') return '已发货'
+  if (order.status === 'paid' && order.fulfillment_status === 'pending') return '待发货'
+  return ({ pending: '待支付', paid: '已支付', cancelled: '已取消', refunded: '已退款', failed: '失败' } as Record<string, string>)[order.status] || order.status
 }
 
 function formatDate(value: string) {
@@ -333,6 +394,35 @@ async function loadBanners() {
 async function loadOrders() {
   const res = await adminShopAPI.listOrders({ page: 1, page_size: 50 })
   orders.value = res.data.items || []
+}
+
+function canFulfillOrder(order: ShopOrder) {
+  return order.status === 'paid' && order.fulfillment_status === 'pending'
+}
+
+function openFulfillDialog(order: ShopOrder) {
+  fulfillDialog.open = true
+  fulfillDialog.orderId = order.id
+  fulfillDialog.orderName = order.snapshot_name
+  fulfillDialog.note = order.fulfillment_note || ''
+}
+
+async function confirmFulfillOrder() {
+  if (!fulfillDialog.orderId || !fulfillDialog.note.trim()) return
+  fulfillingOrder.value = true
+  try {
+    await adminShopAPI.fulfillOrder(fulfillDialog.orderId, { fulfillment_note: fulfillDialog.note.trim() })
+    appStore.showToast('success', '订单已发货', 2500)
+    fulfillDialog.open = false
+    fulfillDialog.orderId = 0
+    fulfillDialog.orderName = ''
+    fulfillDialog.note = ''
+    await loadOrders()
+  } catch (error: any) {
+    appStore.showToast('error', error?.message || '发货失败', 3000)
+  } finally {
+    fulfillingOrder.value = false
+  }
 }
 
 function openProductDialog(product?: ShopProduct) {

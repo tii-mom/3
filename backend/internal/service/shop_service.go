@@ -81,6 +81,7 @@ type ShopOrder struct {
 	SnapshotPriceCNYMinor int64   `json:"snapshot_price_cny_minor"`
 	SnapshotGrantUSD      string  `json:"snapshot_grant_usd_amount"`
 	SnapshotCommissionBPS int     `json:"snapshot_commission_bps"`
+	FulfillmentNote       string  `json:"fulfillment_note"`
 	UserEmail             string  `json:"user_email,omitempty"`
 	CreatedAt             string  `json:"created_at"`
 	PaidAt                *string `json:"paid_at,omitempty"`
@@ -433,6 +434,63 @@ WHERE tenant_id = 1
 	return err
 }
 
+func (s *ShopService) AdminFulfillOrder(ctx context.Context, orderID int64, note string) error {
+	note = strings.TrimSpace(note)
+	if note == "" {
+		return infraerrors.BadRequest("INVALID_INPUT", "fulfillment note is required")
+	}
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var order ShopOrder
+	var paymentOrderID sql.NullInt64
+	var paidAt sql.NullTime
+	var fulfilledAt sql.NullTime
+	err = tx.QueryRowContext(ctx, `
+SELECT id, user_id, product_id, payment_order_id, status, fulfillment_status, commission_status,
+       snapshot_name, snapshot_description, snapshot_image_url, snapshot_product_type,
+       snapshot_price_cny_minor, snapshot_grant_usd_amount::text, snapshot_commission_bps,
+       fulfillment_note, paid_at, fulfilled_at
+FROM shop_orders
+WHERE tenant_id = 1 AND id = $1
+FOR UPDATE`, orderID).Scan(&order.ID, &order.UserID, &order.ProductID, &paymentOrderID, &order.Status, &order.FulfillmentStatus, &order.CommissionStatus,
+		&order.SnapshotName, &order.SnapshotDescription, &order.SnapshotImageURL, &order.SnapshotProductType,
+		&order.SnapshotPriceCNYMinor, &order.SnapshotGrantUSD, &order.SnapshotCommissionBPS,
+		&order.FulfillmentNote, &paidAt, &fulfilledAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return infraerrors.NotFound("SHOP_ORDER_NOT_FOUND", "shop order not found")
+	}
+	if err != nil {
+		return err
+	}
+	if order.SnapshotProductType == ShopProductTypePlatformUSDBalance {
+		return infraerrors.BadRequest("SHOP_ORDER_NOT_MANUAL", "platform balance products are fulfilled automatically")
+	}
+	if order.Status != "paid" || order.FulfillmentStatus != "pending" {
+		return infraerrors.Conflict("SHOP_ORDER_NOT_READY", "shop order is not ready for manual fulfillment")
+	}
+	now := time.Now()
+	if _, err := tx.ExecContext(ctx, `
+UPDATE shop_orders
+SET status = 'fulfilled',
+    fulfillment_status = 'fulfilled',
+    fulfillment_note = $2,
+    fulfilled_at = COALESCE(fulfilled_at, $3),
+    updated_at = NOW()
+WHERE id = $1`, orderID, note, now); err != nil {
+		return err
+	}
+	if paymentOrderID.Valid {
+		if _, err := tx.ExecContext(ctx, `UPDATE payment_orders SET status = $2, completed_at = COALESCE(completed_at, NOW()), updated_at = NOW() WHERE id = $1`, paymentOrderID.Int64, OrderStatusCompleted); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 func (s *ShopService) FulfillPaidPaymentOrder(ctx context.Context, paymentOrderID int64) error {
 	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
@@ -444,17 +502,29 @@ func (s *ShopService) FulfillPaidPaymentOrder(ctx context.Context, paymentOrderI
 	err = tx.QueryRowContext(ctx, `
 SELECT id, user_id, product_id, status, fulfillment_status, commission_status, snapshot_name, snapshot_description,
        snapshot_image_url, snapshot_product_type, snapshot_price_cny_minor, snapshot_grant_usd_amount::text,
-       snapshot_commission_bps, paid_at
+       snapshot_commission_bps, fulfillment_note, paid_at
 FROM shop_orders
 WHERE tenant_id = 1 AND payment_order_id = $1
 FOR UPDATE`, paymentOrderID).Scan(&order.ID, &order.UserID, &order.ProductID, &order.Status, &order.FulfillmentStatus, &order.CommissionStatus,
 		&order.SnapshotName, &order.SnapshotDescription, &order.SnapshotImageURL, &order.SnapshotProductType,
-		&order.SnapshotPriceCNYMinor, &order.SnapshotGrantUSD, &order.SnapshotCommissionBPS, &paidAt)
+		&order.SnapshotPriceCNYMinor, &order.SnapshotGrantUSD, &order.SnapshotCommissionBPS, &order.FulfillmentNote, &paidAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return infraerrors.NotFound("SHOP_ORDER_NOT_FOUND", "shop order not found")
 	}
 	if err != nil {
 		return err
+	}
+	if order.SnapshotProductType == ShopProductTypeVirtual {
+		if order.Status == "fulfilled" || (order.Status == "paid" && order.FulfillmentStatus == "pending") {
+			_, err = tx.ExecContext(ctx, `UPDATE payment_orders SET status = $2, completed_at = COALESCE(completed_at, NOW()), updated_at = NOW() WHERE id = $1 AND status <> $2`, paymentOrderID, OrderStatusCompleted)
+			if err != nil {
+				return err
+			}
+			return tx.Commit()
+		}
+		if order.Status != "pending" {
+			return infraerrors.BadRequest("INVALID_STATUS", "order cannot fulfill in status "+order.Status)
+		}
 	}
 	if order.FulfillmentStatus == "fulfilled" {
 		_, err = tx.ExecContext(ctx, `UPDATE payment_orders SET status = $2, completed_at = COALESCE(completed_at, NOW()), updated_at = NOW() WHERE id = $1 AND status <> $2`, paymentOrderID, OrderStatusCompleted)
@@ -487,8 +557,14 @@ FOR UPDATE`, paymentOrderID).Scan(&order.ID, &order.UserID, &order.ProductID, &o
 	if affected, _ := result.RowsAffected(); affected != 1 {
 		return infraerrors.Conflict("SHOP_PRODUCT_SOLD_OUT", "product is sold out")
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE shop_orders SET status = 'fulfilled', fulfillment_status = 'fulfilled', paid_at = COALESCE(paid_at, $2), fulfilled_at = COALESCE(fulfilled_at, $2), updated_at = NOW() WHERE id = $1`, order.ID, now); err != nil {
-		return err
+	if order.SnapshotProductType == ShopProductTypePlatformUSDBalance {
+		if _, err := tx.ExecContext(ctx, `UPDATE shop_orders SET status = 'fulfilled', fulfillment_status = 'fulfilled', paid_at = COALESCE(paid_at, $2), fulfilled_at = COALESCE(fulfilled_at, $2), updated_at = NOW() WHERE id = $1`, order.ID, now); err != nil {
+			return err
+		}
+	} else {
+		if _, err := tx.ExecContext(ctx, `UPDATE shop_orders SET status = 'paid', fulfillment_status = 'pending', paid_at = COALESCE(paid_at, $2), updated_at = NOW() WHERE id = $1`, order.ID, now); err != nil {
+			return err
+		}
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE payment_orders SET status = $2, completed_at = COALESCE(completed_at, NOW()), updated_at = NOW() WHERE id = $1`, paymentOrderID, OrderStatusCompleted); err != nil {
 		return err
@@ -578,7 +654,7 @@ func (s *ShopService) listOrders(ctx context.Context, userID int64, page, pageSi
 SELECT o.id, o.user_id, o.product_id, o.payment_order_id, o.status, o.fulfillment_status, o.commission_status,
        o.snapshot_name, o.snapshot_description, o.snapshot_image_url, o.snapshot_product_type,
        o.snapshot_price_cny_minor, o.snapshot_grant_usd_amount::text, o.snapshot_commission_bps,
-       COALESCE(u.email, ''), o.created_at, o.paid_at, o.fulfilled_at
+       o.fulfillment_note, COALESCE(u.email, ''), o.created_at, o.paid_at, o.fulfilled_at
 FROM shop_orders o
 LEFT JOIN users u ON u.id = o.user_id
 WHERE `+where+`
@@ -678,7 +754,7 @@ func scanShopOrder(rows productScanner) (ShopOrder, error) {
 	err := rows.Scan(&item.ID, &item.UserID, &item.ProductID, &paymentOrderID, &item.Status, &item.FulfillmentStatus,
 		&item.CommissionStatus, &item.SnapshotName, &item.SnapshotDescription, &item.SnapshotImageURL,
 		&item.SnapshotProductType, &item.SnapshotPriceCNYMinor, &item.SnapshotGrantUSD,
-		&item.SnapshotCommissionBPS, &item.UserEmail, &created, &paidAt, &fulfilledAt)
+		&item.SnapshotCommissionBPS, &item.FulfillmentNote, &item.UserEmail, &created, &paidAt, &fulfilledAt)
 	if err != nil {
 		return item, err
 	}

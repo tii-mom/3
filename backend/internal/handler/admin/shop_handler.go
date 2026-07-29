@@ -40,6 +40,10 @@ type shopBannerRequest struct {
 	SortOrder  int    `json:"sort_order"`
 }
 
+type shopFulfillOrderRequest struct {
+	FulfillmentNote string `json:"fulfillment_note"`
+}
+
 func (h *ShopHandler) ListProducts(c *gin.Context) {
 	items, err := h.shopService.AdminListProducts(c.Request.Context())
 	if err != nil {
@@ -154,6 +158,23 @@ func (h *ShopHandler) ListOrders(c *gin.Context) {
 		return
 	}
 	response.Paginated(c, items, total, page, pageSize)
+}
+
+func (h *ShopHandler) FulfillOrder(c *gin.Context) {
+	id, ok := parseAdminShopIDParam(c)
+	if !ok {
+		return
+	}
+	var req shopFulfillOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if err := h.shopService.AdminFulfillOrder(c.Request.Context(), id, req.FulfillmentNote); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"message": "order fulfilled"})
 }
 
 func parseAdminShopIDParam(c *gin.Context) (int64, bool) {

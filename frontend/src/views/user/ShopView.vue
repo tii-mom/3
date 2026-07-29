@@ -25,11 +25,14 @@
             </div>
           </div>
         </div>
-        <div v-else class="shop-hero-empty">
-          <div class="max-w-2xl">
-            <p class="mb-3 inline-flex rounded-full bg-orange-100 px-3 py-1 text-sm font-semibold text-orange-700 dark:bg-orange-400/15 dark:text-orange-100">3API 商城</p>
-            <h1 class="text-2xl font-bold text-gray-950 dark:text-white sm:text-4xl">购买平台商品，付款后自动发放</h1>
-            <p class="mt-3 text-sm font-medium leading-6 text-gray-700 dark:text-gray-100">精选平台商品，支付成功后自动生成订单记录；推广奖励进入算力公司钱包。</p>
+        <div v-else class="relative isolate flex min-h-56 items-center overflow-hidden bg-slate-950 p-6 text-white sm:p-10">
+          <div class="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(251,146,60,0.34),transparent_24rem),radial-gradient(circle_at_78%_12%,rgba(14,165,233,0.22),transparent_24rem)]"></div>
+          <div class="absolute inset-0 bg-[linear-gradient(135deg,rgba(15,23,42,0.96),rgba(2,6,23,0.88))]"></div>
+          <div class="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-orange-200/50 to-transparent"></div>
+          <div class="relative max-w-2xl">
+            <p class="mb-3 inline-flex rounded-full border border-orange-200/30 bg-orange-300/15 px-3 py-1 text-sm font-semibold text-orange-100 shadow-sm">3API 商城</p>
+            <h1 class="text-2xl font-bold tracking-tight text-white sm:text-4xl">购买平台商品，付款后等待后台处理</h1>
+            <p class="mt-3 max-w-xl text-sm font-medium leading-6 text-slate-200 sm:text-base">精选平台商品，支付成功后生成订单；管理员处理发货，推广奖励进入算力公司钱包。</p>
           </div>
         </div>
       </section>
@@ -37,13 +40,27 @@
       <section class="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
         <div>
           <h2 class="text-xl font-bold text-gray-950 dark:text-white">精选商品</h2>
-          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">选择商品后直接付款，支付成功后自动到账或完成记录。</p>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">选择商品后直接付款，支付成功后会进入订单，等待管理员处理发货。</p>
         </div>
         <select v-if="paymentMethods.length > 0" v-model="paymentType" class="input-field min-w-40">
           <option v-for="method in paymentMethods" :key="method" :value="method">{{ paymentLabel(method) }}</option>
         </select>
         <div v-else class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
           支付暂未开启，请联系管理员
+        </div>
+      </section>
+
+      <section class="rounded-3xl border border-orange-100 bg-gradient-to-br from-orange-50 via-white to-white p-5 shadow-sm dark:border-orange-400/20 dark:from-orange-500/10 dark:via-dark-900 dark:to-dark-900">
+        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p class="text-sm font-semibold text-orange-600 dark:text-orange-200">售后服务</p>
+            <h2 class="mt-1 text-lg font-bold text-gray-950 dark:text-white">购买后需要帮助，可以联系平台客服</h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">付款、发货、安装、使用问题，都可以通过下面的客服信息处理。</p>
+          </div>
+          <div class="rounded-2xl border border-orange-200 bg-white/85 px-4 py-3 text-sm shadow-sm dark:border-orange-400/20 dark:bg-white/5">
+            <div class="text-xs font-semibold text-orange-700 dark:text-orange-200">客服信息</div>
+            <div class="mt-1 whitespace-pre-wrap break-words font-semibold text-gray-950 dark:text-white">{{ afterSalesContact || '管理员暂未填写客服联系方式，请前往后台系统设置补充。' }}</div>
+          </div>
         </div>
       </section>
 
@@ -72,7 +89,7 @@
           <div class="space-y-4 p-5">
             <div>
               <h3 class="line-clamp-1 text-lg font-bold text-gray-950 dark:text-white">{{ product.name }}</h3>
-              <p class="mt-2 line-clamp-2 min-h-[2.5rem] text-sm leading-5 text-gray-500 dark:text-gray-400">{{ product.description || '付款后自动处理。' }}</p>
+              <p class="mt-2 line-clamp-2 min-h-[2.5rem] text-sm leading-5 text-gray-500 dark:text-gray-400">{{ product.description || '付款后等待管理员发货。' }}</p>
             </div>
             <div class="flex items-end justify-between gap-3">
               <div>
@@ -109,12 +126,16 @@
           <h2 class="text-lg font-bold text-gray-950 dark:text-white">我的商城订单</h2>
           <button class="btn-secondary rounded-xl px-3 py-2 text-sm" @click="loadOrders">刷新</button>
         </div>
+        <div v-if="orders.some(order => order.status === 'paid' && order.fulfillment_status === 'pending')" class="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+          你有待发货的商城订单，管理员处理后会在这里显示发货内容。
+        </div>
         <div v-if="orders.length === 0" class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">暂无商城订单</div>
         <div v-else class="divide-y divide-gray-100 dark:divide-dark-700">
           <div v-for="order in orders" :key="order.id" class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div class="font-semibold text-gray-950 dark:text-white">{{ order.snapshot_name }}</div>
-              <div class="text-xs text-gray-500 dark:text-gray-400">订单 #{{ order.id }} · {{ statusLabel(order.status) }}</div>
+              <div class="text-xs text-gray-500 dark:text-gray-400">订单 #{{ order.id }} · {{ orderLabel(order) }}</div>
+              <div v-if="order.fulfillment_note" class="mt-1 text-xs text-amber-600 dark:text-amber-300">发货内容：{{ order.fulfillment_note }}</div>
             </div>
             <div class="flex items-center gap-3 sm:justify-end">
               <div class="text-sm font-bold text-gray-950 dark:text-white">¥{{ formatMoney(order.snapshot_price_cny_minor) }}</div>
@@ -195,6 +216,7 @@ const defaultProductImage = 'data:image/svg+xml;utf8,%3Csvg xmlns="http://www.w3
 
 const activeBanner = computed(() => banners.value[activeBannerIndex.value] || banners.value[0])
 const paymentMethods = computed(() => Object.keys(paymentMethodLimits.value))
+const afterSalesContact = computed(() => appStore.contactInfo?.trim() || '')
 
 function formatMoney(minor: number): string {
   return (minor / 100).toFixed(2)
@@ -228,6 +250,12 @@ function isWechatBrowser(): boolean {
 function statusLabel(status: string): string {
   const labels: Record<string, string> = { pending: '待支付', paid: '已支付', fulfilled: '已完成', cancelled: '已取消', refunded: '已退款', failed: '失败' }
   return labels[status] || status
+}
+
+function orderLabel(order: ShopOrder): string {
+  if (order.status === 'paid' && order.fulfillment_status === 'pending') return '待发货'
+  if (order.fulfillment_status === 'fulfilled' || order.status === 'fulfilled') return '已发货'
+  return statusLabel(order.status)
 }
 
 function canCancelOrder(order: ShopOrder): boolean {
@@ -454,24 +482,6 @@ function handlePaymentSettled() {
 }
 
 onMounted(() => {
-  void Promise.all([loadData(), loadAffiliateDetail()])
+  void Promise.all([appStore.fetchPublicSettings(), loadData(), loadAffiliateDetail()])
 })
 </script>
-
-<style scoped>
-.shop-hero-empty {
-  display: flex;
-  min-height: 14rem;
-  align-items: center;
-  background:
-    radial-gradient(circle at top left, rgba(16, 185, 129, 0.18), transparent 34rem),
-    linear-gradient(135deg, rgba(255,255,255,1), rgba(243,244,246,1));
-  padding: 2rem;
-}
-
-:global(.dark) .shop-hero-empty {
-  background:
-    radial-gradient(circle at top left, rgba(251, 146, 60, 0.22), transparent 30rem),
-    linear-gradient(135deg, rgb(15, 23, 42), rgb(2, 6, 23));
-}
-</style>

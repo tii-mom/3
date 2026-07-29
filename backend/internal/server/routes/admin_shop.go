@@ -45,6 +45,7 @@ func RegisterAdminShopRoutes(
 		adminGroup.DELETE("/banners/:id", shopHandler.DeleteBanner)
 
 		adminGroup.GET("/orders", shopHandler.ListOrders)
+		adminGroup.POST("/orders/:id/fulfill", shopHandler.FulfillOrder)
 
 		adminGroup.POST("/assets", uploadShopAsset(dataDir))
 	}

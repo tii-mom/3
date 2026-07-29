@@ -53,6 +53,7 @@ export interface ShopOrder {
   snapshot_price_cny_minor: number
   snapshot_grant_usd_amount: string
   snapshot_commission_bps: number
+  fulfillment_note: string
   created_at: string
   paid_at?: string
   fulfilled_at?: string
@@ -146,6 +147,9 @@ export const adminShopAPI = {
   },
   listOrders(params?: { page?: number; page_size?: number }) {
     return apiClient.get<BasePaginationResponse<ShopOrder>>('/admin/shop/orders', { params })
+  },
+  fulfillOrder(id: number, data: { fulfillment_note: string }) {
+    return apiClient.post(`/admin/shop/orders/${id}/fulfill`, data)
   },
   uploadAsset(file: File) {
     const formData = new FormData()
