@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"log"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -117,6 +118,7 @@ func registerRoutes(
 
 	// API v1
 	v1 := r.Group("/api/v1")
+	routes.RegisterTAIInternalRoutes(v1, handler.NewTAIInternalHandler(0), os.Getenv("TAI_INTERNAL_SECRET"))
 
 	// 注册各模块路由
 	routes.RegisterAuthRoutes(v1, h, jwtAuth, auditLog, redisClient, settingService)
