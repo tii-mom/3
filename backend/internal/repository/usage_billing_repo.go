@@ -283,6 +283,12 @@ func applySubscriptionFirstBilling(ctx context.Context, tx *sql.Tx, cmd *service
 		if err != nil {
 			return 0, 0, err
 		}
+		// Subscription limits use zero to mean that the window is unlimited.
+		// Do not let an unlimited daily/weekly/monthly window force the entire
+		// request onto wallet balance.
+		if !limit.IsPositive() {
+			continue
+		}
 		used := decimal.Zero
 		if pair[0].Valid && strings.TrimSpace(pair[0].String) != "" {
 			used, err = decimal.NewFromString(pair[0].String)

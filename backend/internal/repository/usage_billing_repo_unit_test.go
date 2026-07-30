@@ -136,6 +136,36 @@ func TestApplySubscriptionFirstBillingSplitsAcrossRemainingWindow(t *testing.T) 
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestApplySubscriptionFirstBillingIgnoresUnlimitedZeroWindow(t *testing.T) {
+	ctx := context.Background()
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	mock.ExpectBegin()
+	tx, err := db.BeginTx(ctx, nil)
+	require.NoError(t, err)
+	mock.ExpectQuery(`SELECT us\.daily_usage_usd::text`).
+		WithArgs(int64(9)).
+		WillReturnRows(sqlmock.NewRows([]string{"daily", "weekly", "monthly", "daily_limit", "weekly_limit", "monthly_limit"}).
+			AddRow("0", "0", "0", "120", "0", "3600"))
+	mock.ExpectExec(`UPDATE user_subscriptions us`).
+		WithArgs(5.0, int64(9)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	subscriptionCost, balanceCost, err := applySubscriptionFirstBilling(ctx, tx, &service.UsageBillingCommand{
+		SubscriptionID:   &[]int64{9}[0],
+		SubscriptionCost: 5,
+		BalanceFallback:  true,
+	})
+	require.NoError(t, err)
+	require.InDelta(t, 5, subscriptionCost, 0.000001)
+	require.Zero(t, balanceCost)
+	require.NoError(t, tx.Commit())
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestApplySubscriptionFirstBillingUsesBalanceWhenSubscriptionIsExhausted(t *testing.T) {
 	ctx := context.Background()
 	db, mock, err := sqlmock.New()
