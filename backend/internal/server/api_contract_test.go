@@ -558,6 +558,8 @@ func TestAPIContracts(t *testing.T) {
 						Stream:                true,
 						DurationMs:            ptr(100),
 						FirstTokenMs:          ptr(50),
+						AttemptCount:          1,
+						FailoverCount:         0,
 						CreatedAt:             deps.now,
 					},
 				})
@@ -599,6 +601,8 @@ func TestAPIContracts(t *testing.T) {
 							"stream": true,
 							"duration_ms": 100,
 							"first_token_ms": 50,
+							"attempt_count": 1,
+							"failover_count": 0,
 							"image_count": 0,
 							"image_size": null,
 							"image_input_size": null,
