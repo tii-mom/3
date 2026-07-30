@@ -215,6 +215,16 @@ func FirstTokenMs(v int) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldFirstTokenMs, v))
 }
 
+// AttemptCount applies equality check predicate on the "attempt_count" field. It's identical to AttemptCountEQ.
+func AttemptCount(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldAttemptCount, v))
+}
+
+// FailoverCount applies equality check predicate on the "failover_count" field. It's identical to FailoverCountEQ.
+func FailoverCount(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldFailoverCount, v))
+}
+
 // UserAgent applies equality check predicate on the "user_agent" field. It's identical to UserAgentEQ.
 func UserAgent(v string) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldUserAgent, v))
@@ -1678,6 +1688,86 @@ func FirstTokenMsIsNil() predicate.UsageLog {
 // FirstTokenMsNotNil applies the NotNil predicate on the "first_token_ms" field.
 func FirstTokenMsNotNil() predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldNotNull(FieldFirstTokenMs))
+}
+
+// AttemptCountEQ applies the EQ predicate on the "attempt_count" field.
+func AttemptCountEQ(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldAttemptCount, v))
+}
+
+// AttemptCountNEQ applies the NEQ predicate on the "attempt_count" field.
+func AttemptCountNEQ(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldAttemptCount, v))
+}
+
+// AttemptCountIn applies the In predicate on the "attempt_count" field.
+func AttemptCountIn(vs ...int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldAttemptCount, vs...))
+}
+
+// AttemptCountNotIn applies the NotIn predicate on the "attempt_count" field.
+func AttemptCountNotIn(vs ...int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldAttemptCount, vs...))
+}
+
+// AttemptCountGT applies the GT predicate on the "attempt_count" field.
+func AttemptCountGT(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldAttemptCount, v))
+}
+
+// AttemptCountGTE applies the GTE predicate on the "attempt_count" field.
+func AttemptCountGTE(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldAttemptCount, v))
+}
+
+// AttemptCountLT applies the LT predicate on the "attempt_count" field.
+func AttemptCountLT(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldAttemptCount, v))
+}
+
+// AttemptCountLTE applies the LTE predicate on the "attempt_count" field.
+func AttemptCountLTE(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldAttemptCount, v))
+}
+
+// FailoverCountEQ applies the EQ predicate on the "failover_count" field.
+func FailoverCountEQ(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldFailoverCount, v))
+}
+
+// FailoverCountNEQ applies the NEQ predicate on the "failover_count" field.
+func FailoverCountNEQ(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldFailoverCount, v))
+}
+
+// FailoverCountIn applies the In predicate on the "failover_count" field.
+func FailoverCountIn(vs ...int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldFailoverCount, vs...))
+}
+
+// FailoverCountNotIn applies the NotIn predicate on the "failover_count" field.
+func FailoverCountNotIn(vs ...int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldFailoverCount, vs...))
+}
+
+// FailoverCountGT applies the GT predicate on the "failover_count" field.
+func FailoverCountGT(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldFailoverCount, v))
+}
+
+// FailoverCountGTE applies the GTE predicate on the "failover_count" field.
+func FailoverCountGTE(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldFailoverCount, v))
+}
+
+// FailoverCountLT applies the LT predicate on the "failover_count" field.
+func FailoverCountLT(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldFailoverCount, v))
+}
+
+// FailoverCountLTE applies the LTE predicate on the "failover_count" field.
+func FailoverCountLTE(v int) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldFailoverCount, v))
 }
 
 // UserAgentEQ applies the EQ predicate on the "user_agent" field.

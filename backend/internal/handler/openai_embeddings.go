@@ -109,6 +109,7 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 	if maxAccountSwitches <= 0 {
 		maxAccountSwitches = 3
 	}
+	setOpsAttemptStatsFromCounts(c, switchCount, nil)
 	routingStart := time.Now()
 
 	for {
@@ -208,11 +209,13 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 				h.gatewayService.RecordOpenAIAccountSwitch()
 				failedAccountIDs[account.ID] = struct{}{}
 				lastFailoverErr = failoverErr
+				setOpsAttemptStatsFromCounts(c, switchCount, nil)
 				if switchCount >= maxAccountSwitches {
 					h.handleFailoverExhausted(c, failoverErr, false)
 					return
 				}
 				switchCount++
+				setOpsAttemptStatsFromCounts(c, switchCount, nil)
 				reqLog.Warn("openai_embeddings.upstream_failover_switching",
 					zap.Int64("account_id", account.ID),
 					zap.Int("upstream_status", failoverErr.StatusCode),
@@ -238,6 +241,8 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 		inboundEndpoint := GetInboundEndpoint(c)
 		upstreamEndpoint := GetUpstreamEndpoint(c, account.Platform)
 		quotaPlatform := service.QuotaPlatform(c.Request.Context(), apiKey)
+		attemptCount, failoverCount := usageAttemptStatsFromCounts(switchCount, nil)
+		service.SetOpsAttemptStats(c, attemptCount, failoverCount)
 
 		h.submitOpenAIUsageRecordTask(c.Request.Context(), result, func(ctx context.Context) {
 			if err := h.gatewayService.RecordUsage(ctx, &service.OpenAIRecordUsageInput{
@@ -253,6 +258,8 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 				APIKeyService:      h.apiKeyService,
 				QuotaPlatform:      quotaPlatform,
 				ChannelUsageFields: channelMapping.ToUsageFields(reqModel, result.UpstreamModel),
+				AttemptCount:       attemptCount,
+				FailoverCount:      failoverCount,
 			}); err != nil {
 				logger.L().With(
 					zap.String("component", "handler.openai_gateway.embeddings"),

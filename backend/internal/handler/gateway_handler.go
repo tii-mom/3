@@ -296,6 +296,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 	if platform == service.PlatformGemini {
 		fs := NewFailoverState(h.maxAccountSwitchesGemini, hasBoundSession)
+		fs.SetOpsAttemptStats(c)
 
 		// 单账号分组提前设置 SingleAccountRetry 标记，让 Service 层首次 503 就不设模型限流标记。
 		// 避免单账号分组收到 503 (MODEL_CAPACITY_EXHAUSTED) 时设 29s 限流，导致后续请求连续快速失败。
@@ -456,6 +457,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 						return
 					}
 					action := fs.HandleFailoverError(c.Request.Context(), h.gatewayService, account.ID, account.Platform, account.GetPoolModeRetryCount(), failoverErr)
+					fs.SetOpsAttemptStats(c)
 					switch action {
 					case FailoverContinue:
 						continue
@@ -528,6 +530,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			// ForceCacheBilling 提前拍成标量，避免 worker 闭包保活 failover 状态里的响应体。
 			forceCacheBilling := fs.ForceCacheBilling
 			quotaPlatform := service.QuotaPlatform(c.Request.Context(), apiKey)
+			attemptCount, failoverCount := fs.AttemptStats()
+			service.SetOpsAttemptStats(c, attemptCount, failoverCount)
 			h.submitUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
 				if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
 					Result:             result,
@@ -544,6 +548,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					ForceCacheBilling:  forceCacheBilling,
 					APIKeyService:      h.apiKeyService,
 					ChannelUsageFields: channelMapping.ToUsageFields(reqModel, result.UpstreamModel),
+					AttemptCount:       attemptCount,
+					FailoverCount:      failoverCount,
 				}); err != nil {
 					logger.L().With(
 						zap.String("component", "handler.gateway.messages"),
@@ -577,6 +583,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 	for {
 		fs := NewFailoverState(h.maxAccountSwitches, hasBoundSession)
+		fs.SetOpsAttemptStats(c)
 		retryWithFallback := false
 
 		for {
@@ -879,6 +886,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 						return
 					}
 					action := fs.HandleFailoverError(c.Request.Context(), h.gatewayService, account.ID, account.Platform, account.GetPoolModeRetryCount(), failoverErr)
+					fs.SetOpsAttemptStats(c)
 					switch action {
 					case FailoverContinue:
 						continue
@@ -961,6 +969,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			// ForceCacheBilling 提前拍成标量，避免 worker 闭包保活 failover 状态里的响应体。
 			forceCacheBilling := fs.ForceCacheBilling
 			quotaPlatform := service.QuotaPlatform(c.Request.Context(), currentAPIKey)
+			attemptCount, failoverCount := fs.AttemptStats()
+			service.SetOpsAttemptStats(c, attemptCount, failoverCount)
 			h.submitUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
 				if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
 					Result:             result,
@@ -977,6 +987,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					ForceCacheBilling:  forceCacheBilling,
 					APIKeyService:      h.apiKeyService,
 					ChannelUsageFields: channelMapping.ToUsageFields(reqModel, result.UpstreamModel),
+					AttemptCount:       attemptCount,
+					FailoverCount:      failoverCount,
 				}); err != nil {
 					logger.L().With(
 						zap.String("component", "handler.gateway.messages"),

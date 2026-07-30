@@ -22,6 +22,8 @@ const (
 	OpsUpstreamLatencyMsKey  = "ops_upstream_latency_ms"
 	OpsResponseLatencyMsKey  = "ops_response_latency_ms"
 	OpsTimeToFirstTokenMsKey = "ops_time_to_first_token_ms"
+	OpsAttemptCountKey       = "ops_attempt_count"
+	OpsFailoverCountKey      = "ops_failover_count"
 	// OpenAI WS 关键观测字段
 	OpsOpenAIWSQueueWaitMsKey = "ops_openai_ws_queue_wait_ms"
 	OpsOpenAIWSConnPickMsKey  = "ops_openai_ws_conn_pick_ms"
@@ -69,6 +71,50 @@ func SetOpsLatencyMs(c *gin.Context, key string, value int64) {
 		return
 	}
 	c.Set(key, value)
+}
+
+func SetOpsAttemptStats(c *gin.Context, attemptCount, failoverCount int) {
+	if c == nil {
+		return
+	}
+	attemptCount, failoverCount = NormalizeUsageAttemptCounters(attemptCount, failoverCount)
+	c.Set(OpsAttemptCountKey, attemptCount)
+	c.Set(OpsFailoverCountKey, failoverCount)
+}
+
+func GetOpsAttemptStats(c *gin.Context) (attemptCount, failoverCount int, ok bool) {
+	if c == nil {
+		return 0, 0, false
+	}
+	attemptCount, attemptOK := getGinInt(c, OpsAttemptCountKey)
+	failoverCount, failoverOK := getGinInt(c, OpsFailoverCountKey)
+	if !attemptOK && !failoverOK {
+		return 0, 0, false
+	}
+	attemptCount, failoverCount = NormalizeUsageAttemptCounters(attemptCount, failoverCount)
+	return attemptCount, failoverCount, true
+}
+
+func getGinInt(c *gin.Context, key string) (int, bool) {
+	if c == nil {
+		return 0, false
+	}
+	v, ok := c.Get(key)
+	if !ok {
+		return 0, false
+	}
+	switch t := v.(type) {
+	case int:
+		return t, true
+	case int64:
+		return int(t), true
+	case int32:
+		return int(t), true
+	case float64:
+		return int(t), true
+	default:
+		return 0, false
+	}
 }
 
 func MarkOpsClientBusinessLimited(c *gin.Context, reason string) {

@@ -78,6 +78,10 @@ const (
 	FieldDurationMs = "duration_ms"
 	// FieldFirstTokenMs holds the string denoting the first_token_ms field in the database.
 	FieldFirstTokenMs = "first_token_ms"
+	// FieldAttemptCount holds the string denoting the attempt_count field in the database.
+	FieldAttemptCount = "attempt_count"
+	// FieldFailoverCount holds the string denoting the failover_count field in the database.
+	FieldFailoverCount = "failover_count"
 	// FieldUserAgent holds the string denoting the user_agent field in the database.
 	FieldUserAgent = "user_agent"
 	// FieldIPAddress holds the string denoting the ip_address field in the database.
@@ -188,6 +192,8 @@ var Columns = []string{
 	FieldStream,
 	FieldDurationMs,
 	FieldFirstTokenMs,
+	FieldAttemptCount,
+	FieldFailoverCount,
 	FieldUserAgent,
 	FieldIPAddress,
 	FieldImageCount,
@@ -260,6 +266,10 @@ var (
 	DefaultBillingType int8
 	// DefaultStream holds the default value on creation for the "stream" field.
 	DefaultStream bool
+	// DefaultAttemptCount holds the default value on creation for the "attempt_count" field.
+	DefaultAttemptCount int
+	// DefaultFailoverCount holds the default value on creation for the "failover_count" field.
+	DefaultFailoverCount int
 	// UserAgentValidator is a validator for the "user_agent" field. It is called by the builders before save.
 	UserAgentValidator func(string) error
 	// IPAddressValidator is a validator for the "ip_address" field. It is called by the builders before save.
@@ -450,6 +460,16 @@ func ByDurationMs(opts ...sql.OrderTermOption) OrderOption {
 // ByFirstTokenMs orders the results by the first_token_ms field.
 func ByFirstTokenMs(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldFirstTokenMs, opts...).ToFunc()
+}
+
+// ByAttemptCount orders the results by the attempt_count field.
+func ByAttemptCount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAttemptCount, opts...).ToFunc()
+}
+
+// ByFailoverCount orders the results by the failover_count field.
+func ByFailoverCount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFailoverCount, opts...).ToFunc()
 }
 
 // ByUserAgent orders the results by the user_agent field.

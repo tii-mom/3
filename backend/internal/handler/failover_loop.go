@@ -63,6 +63,33 @@ func NewFailoverState(maxSwitches int, hasBoundSession bool) *FailoverState {
 	}
 }
 
+func (s *FailoverState) AttemptStats() (attemptCount, failoverCount int) {
+	if s == nil {
+		return service.NormalizeUsageAttemptCounters(1, 0)
+	}
+	return usageAttemptStatsFromCounts(s.SwitchCount, s.SameAccountRetryCount)
+}
+
+func (s *FailoverState) SetOpsAttemptStats(c *gin.Context) {
+	attemptCount, failoverCount := s.AttemptStats()
+	service.SetOpsAttemptStats(c, attemptCount, failoverCount)
+}
+
+func usageAttemptStatsFromCounts(switchCount int, sameAccountRetryCount map[int64]int) (attemptCount, failoverCount int) {
+	retryCount := 0
+	for _, count := range sameAccountRetryCount {
+		if count > 0 {
+			retryCount += count
+		}
+	}
+	return service.NormalizeUsageAttemptCounters(1+switchCount+retryCount, switchCount)
+}
+
+func setOpsAttemptStatsFromCounts(c *gin.Context, switchCount int, sameAccountRetryCount map[int64]int) {
+	attemptCount, failoverCount := usageAttemptStatsFromCounts(switchCount, sameAccountRetryCount)
+	service.SetOpsAttemptStats(c, attemptCount, failoverCount)
+}
+
 // HandleFailoverError 处理 UpstreamFailoverError，返回下一步动作。
 // 包含：缓存计费判断、同账号重试、临时封禁、切换计数、Antigravity 延时。
 func (s *FailoverState) HandleFailoverError(

@@ -111,6 +111,7 @@ func (h *OpenAIGatewayHandler) AlphaSearch(c *gin.Context) {
 	var lastFailoverErr *service.UpstreamFailoverError
 	switchCount := 0
 	var oauth429FailoverState service.OpenAIOAuth429FailoverState
+	setOpsAttemptStatsFromCounts(c, switchCount, nil)
 	routingStart := time.Now()
 
 	for {
@@ -170,7 +171,9 @@ func (h *OpenAIGatewayHandler) AlphaSearch(c *gin.Context) {
 		if err == nil {
 			h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, account.GetMappedModel(requestedModel), true, nil)
 			if result != nil {
-				h.recordAlphaSearchUsage(c, apiKey, account, subscription, channelMapping, requestedModel, body, result, subject.UserID)
+				attemptCount, failoverCount := usageAttemptStatsFromCounts(switchCount, nil)
+				service.SetOpsAttemptStats(c, attemptCount, failoverCount)
+				h.recordAlphaSearchUsage(c, apiKey, account, subscription, channelMapping, requestedModel, body, result, subject.UserID, attemptCount, failoverCount)
 			}
 			return
 		}
@@ -200,11 +203,13 @@ func (h *OpenAIGatewayHandler) AlphaSearch(c *gin.Context) {
 		h.gatewayService.RecordOpenAIAccountSwitch()
 		failedAccountIDs[account.ID] = struct{}{}
 		lastFailoverErr = failoverErr
+		setOpsAttemptStatsFromCounts(c, switchCount, nil)
 		if switchCount >= h.maxAccountSwitches {
 			h.handleFailoverExhausted(c, failoverErr, false)
 			return
 		}
 		switchCount++
+		setOpsAttemptStatsFromCounts(c, switchCount, nil)
 		if h.gatewayService.ShouldStopOpenAIOAuth429Failover(account, failoverErr.StatusCode, switchCount, &oauth429FailoverState) {
 			h.handleFailoverExhausted(c, failoverErr, false)
 			return
@@ -230,6 +235,8 @@ func (h *OpenAIGatewayHandler) recordAlphaSearchUsage(
 	body []byte,
 	result *service.OpenAIForwardResult,
 	userID int64,
+	attemptCount int,
+	failoverCount int,
 ) {
 	userAgent := c.GetHeader("User-Agent")
 	clientIP := ip.GetClientIP(c)
@@ -253,6 +260,8 @@ func (h *OpenAIGatewayHandler) recordAlphaSearchUsage(
 			APIKeyService:      h.apiKeyService,
 			QuotaPlatform:      quotaPlatform,
 			ChannelUsageFields: channelMapping.ToUsageFields(requestedModel, result.UpstreamModel),
+			AttemptCount:       attemptCount,
+			FailoverCount:      failoverCount,
 		}); err != nil {
 			logger.L().With(
 				zap.String("component", "handler.openai_gateway.alpha_search"),

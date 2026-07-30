@@ -188,6 +188,7 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 	if maxAccountSwitches <= 0 {
 		maxAccountSwitches = 3
 	}
+	setOpsAttemptStatsFromCounts(c, switchCount, sameAccountRetryCount)
 	routingStart := time.Now()
 	requiredCapability := grokMediaRequiredCapability(endpoint)
 
@@ -287,6 +288,7 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 					return
 				}
 				switchCount++
+				setOpsAttemptStatsFromCounts(c, switchCount, sameAccountRetryCount)
 				continue
 			}
 		}
@@ -347,6 +349,7 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 					retryLimit := account.GetPoolModeRetryCount()
 					if sameAccountRetryCount[account.ID] < retryLimit {
 						sameAccountRetryCount[account.ID]++
+						setOpsAttemptStatsFromCounts(c, switchCount, sameAccountRetryCount)
 						reqLog.Warn("grok_media.pool_mode_same_account_retry",
 							zap.Int64("account_id", account.ID),
 							zap.Int("upstream_status", failoverErr.StatusCode),
@@ -364,11 +367,13 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 				h.gatewayService.RecordOpenAIAccountSwitch()
 				failedAccountIDs[account.ID] = struct{}{}
 				lastFailoverErr = failoverErr
+				setOpsAttemptStatsFromCounts(c, switchCount, sameAccountRetryCount)
 				if switchCount >= maxAccountSwitches {
 					h.handleFailoverExhausted(c, failoverErr, false)
 					return
 				}
 				switchCount++
+				setOpsAttemptStatsFromCounts(c, switchCount, sameAccountRetryCount)
 				if h.gatewayService.ShouldStopOpenAIOAuth429Failover(account, failoverErr.StatusCode, switchCount, &oauth429FailoverState) {
 					h.handleFailoverExhausted(c, failoverErr, false)
 					return
@@ -405,7 +410,9 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 			}
 		}
 		if shouldRecordGrokMediaUsage(endpoint, requestModel) {
-			recordGrokMediaUsage(c, h, reqLog, apiKey, subject, subscription, account, result, requestModel, body, requestID)
+			attemptCount, failoverCount := usageAttemptStatsFromCounts(switchCount, sameAccountRetryCount)
+			service.SetOpsAttemptStats(c, attemptCount, failoverCount)
+			recordGrokMediaUsage(c, h, reqLog, apiKey, subject, subscription, account, result, requestModel, body, requestID, attemptCount, failoverCount)
 		}
 		reqLog.Debug("grok_media.request_completed",
 			zap.Int64("account_id", account.ID),
@@ -462,6 +469,8 @@ func recordGrokMediaUsage(
 	requestModel string,
 	body []byte,
 	requestID string,
+	attemptCount int,
+	failoverCount int,
 ) {
 	userAgent := c.GetHeader("User-Agent")
 	clientIP := ip.GetClientIP(c)
@@ -491,6 +500,8 @@ func recordGrokMediaUsage(
 			APIKeyService:      h.apiKeyService,
 			QuotaPlatform:      quotaPlatform,
 			ChannelUsageFields: channelUsageFields,
+			AttemptCount:       attemptCount,
+			FailoverCount:      failoverCount,
 		}); err != nil {
 			logger.L().With(
 				zap.String("component", "handler.openai_gateway.grok_media"),

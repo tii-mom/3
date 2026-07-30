@@ -42099,6 +42099,10 @@ type UsageLogMutation struct {
 	addduration_ms               *int
 	first_token_ms               *int
 	addfirst_token_ms            *int
+	attempt_count                *int
+	addattempt_count             *int
+	failover_count               *int
+	addfailover_count            *int
 	user_agent                   *string
 	ip_address                   *string
 	image_count                  *int
@@ -43888,6 +43892,118 @@ func (m *UsageLogMutation) ResetFirstTokenMs() {
 	delete(m.clearedFields, usagelog.FieldFirstTokenMs)
 }
 
+// SetAttemptCount sets the "attempt_count" field.
+func (m *UsageLogMutation) SetAttemptCount(i int) {
+	m.attempt_count = &i
+	m.addattempt_count = nil
+}
+
+// AttemptCount returns the value of the "attempt_count" field in the mutation.
+func (m *UsageLogMutation) AttemptCount() (r int, exists bool) {
+	v := m.attempt_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAttemptCount returns the old "attempt_count" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldAttemptCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAttemptCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAttemptCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAttemptCount: %w", err)
+	}
+	return oldValue.AttemptCount, nil
+}
+
+// AddAttemptCount adds i to the "attempt_count" field.
+func (m *UsageLogMutation) AddAttemptCount(i int) {
+	if m.addattempt_count != nil {
+		*m.addattempt_count += i
+	} else {
+		m.addattempt_count = &i
+	}
+}
+
+// AddedAttemptCount returns the value that was added to the "attempt_count" field in this mutation.
+func (m *UsageLogMutation) AddedAttemptCount() (r int, exists bool) {
+	v := m.addattempt_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAttemptCount resets all changes to the "attempt_count" field.
+func (m *UsageLogMutation) ResetAttemptCount() {
+	m.attempt_count = nil
+	m.addattempt_count = nil
+}
+
+// SetFailoverCount sets the "failover_count" field.
+func (m *UsageLogMutation) SetFailoverCount(i int) {
+	m.failover_count = &i
+	m.addfailover_count = nil
+}
+
+// FailoverCount returns the value of the "failover_count" field in the mutation.
+func (m *UsageLogMutation) FailoverCount() (r int, exists bool) {
+	v := m.failover_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFailoverCount returns the old "failover_count" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldFailoverCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFailoverCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFailoverCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFailoverCount: %w", err)
+	}
+	return oldValue.FailoverCount, nil
+}
+
+// AddFailoverCount adds i to the "failover_count" field.
+func (m *UsageLogMutation) AddFailoverCount(i int) {
+	if m.addfailover_count != nil {
+		*m.addfailover_count += i
+	} else {
+		m.addfailover_count = &i
+	}
+}
+
+// AddedFailoverCount returns the value that was added to the "failover_count" field in this mutation.
+func (m *UsageLogMutation) AddedFailoverCount() (r int, exists bool) {
+	v := m.addfailover_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetFailoverCount resets all changes to the "failover_count" field.
+func (m *UsageLogMutation) ResetFailoverCount() {
+	m.failover_count = nil
+	m.addfailover_count = nil
+}
+
 // SetUserAgent sets the "user_agent" field.
 func (m *UsageLogMutation) SetUserAgent(s string) {
 	m.user_agent = &s
@@ -44703,7 +44819,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 45)
+	fields := make([]string, 0, 47)
 	if m.user != nil {
 		fields = append(fields, usagelog.FieldUserID)
 	}
@@ -44799,6 +44915,12 @@ func (m *UsageLogMutation) Fields() []string {
 	}
 	if m.first_token_ms != nil {
 		fields = append(fields, usagelog.FieldFirstTokenMs)
+	}
+	if m.attempt_count != nil {
+		fields = append(fields, usagelog.FieldAttemptCount)
+	}
+	if m.failover_count != nil {
+		fields = append(fields, usagelog.FieldFailoverCount)
 	}
 	if m.user_agent != nil {
 		fields = append(fields, usagelog.FieldUserAgent)
@@ -44911,6 +45033,10 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.DurationMs()
 	case usagelog.FieldFirstTokenMs:
 		return m.FirstTokenMs()
+	case usagelog.FieldAttemptCount:
+		return m.AttemptCount()
+	case usagelog.FieldFailoverCount:
+		return m.FailoverCount()
 	case usagelog.FieldUserAgent:
 		return m.UserAgent()
 	case usagelog.FieldIPAddress:
@@ -45010,6 +45136,10 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldDurationMs(ctx)
 	case usagelog.FieldFirstTokenMs:
 		return m.OldFirstTokenMs(ctx)
+	case usagelog.FieldAttemptCount:
+		return m.OldAttemptCount(ctx)
+	case usagelog.FieldFailoverCount:
+		return m.OldFailoverCount(ctx)
 	case usagelog.FieldUserAgent:
 		return m.OldUserAgent(ctx)
 	case usagelog.FieldIPAddress:
@@ -45269,6 +45399,20 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetFirstTokenMs(v)
 		return nil
+	case usagelog.FieldAttemptCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAttemptCount(v)
+		return nil
+	case usagelog.FieldFailoverCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFailoverCount(v)
+		return nil
 	case usagelog.FieldUserAgent:
 		v, ok := value.(string)
 		if !ok {
@@ -45422,6 +45566,12 @@ func (m *UsageLogMutation) AddedFields() []string {
 	if m.addfirst_token_ms != nil {
 		fields = append(fields, usagelog.FieldFirstTokenMs)
 	}
+	if m.addattempt_count != nil {
+		fields = append(fields, usagelog.FieldAttemptCount)
+	}
+	if m.addfailover_count != nil {
+		fields = append(fields, usagelog.FieldFailoverCount)
+	}
 	if m.addimage_count != nil {
 		fields = append(fields, usagelog.FieldImageCount)
 	}
@@ -45475,6 +45625,10 @@ func (m *UsageLogMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedDurationMs()
 	case usagelog.FieldFirstTokenMs:
 		return m.AddedFirstTokenMs()
+	case usagelog.FieldAttemptCount:
+		return m.AddedAttemptCount()
+	case usagelog.FieldFailoverCount:
+		return m.AddedFailoverCount()
 	case usagelog.FieldImageCount:
 		return m.AddedImageCount()
 	case usagelog.FieldVideoCount:
@@ -45615,6 +45769,20 @@ func (m *UsageLogMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddFirstTokenMs(v)
+		return nil
+	case usagelog.FieldAttemptCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAttemptCount(v)
+		return nil
+	case usagelog.FieldFailoverCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFailoverCount(v)
 		return nil
 	case usagelog.FieldImageCount:
 		v, ok := value.(int)
@@ -45882,6 +46050,12 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldFirstTokenMs:
 		m.ResetFirstTokenMs()
+		return nil
+	case usagelog.FieldAttemptCount:
+		m.ResetAttemptCount()
+		return nil
+	case usagelog.FieldFailoverCount:
+		m.ResetFailoverCount()
 		return nil
 	case usagelog.FieldUserAgent:
 		m.ResetUserAgent()

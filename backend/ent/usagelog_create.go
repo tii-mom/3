@@ -435,6 +435,34 @@ func (_c *UsageLogCreate) SetNillableFirstTokenMs(v *int) *UsageLogCreate {
 	return _c
 }
 
+// SetAttemptCount sets the "attempt_count" field.
+func (_c *UsageLogCreate) SetAttemptCount(v int) *UsageLogCreate {
+	_c.mutation.SetAttemptCount(v)
+	return _c
+}
+
+// SetNillableAttemptCount sets the "attempt_count" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableAttemptCount(v *int) *UsageLogCreate {
+	if v != nil {
+		_c.SetAttemptCount(*v)
+	}
+	return _c
+}
+
+// SetFailoverCount sets the "failover_count" field.
+func (_c *UsageLogCreate) SetFailoverCount(v int) *UsageLogCreate {
+	_c.mutation.SetFailoverCount(v)
+	return _c
+}
+
+// SetNillableFailoverCount sets the "failover_count" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableFailoverCount(v *int) *UsageLogCreate {
+	if v != nil {
+		_c.SetFailoverCount(*v)
+	}
+	return _c
+}
+
 // SetUserAgent sets the "user_agent" field.
 func (_c *UsageLogCreate) SetUserAgent(v string) *UsageLogCreate {
 	_c.mutation.SetUserAgent(v)
@@ -733,6 +761,14 @@ func (_c *UsageLogCreate) defaults() {
 		v := usagelog.DefaultStream
 		_c.mutation.SetStream(v)
 	}
+	if _, ok := _c.mutation.AttemptCount(); !ok {
+		v := usagelog.DefaultAttemptCount
+		_c.mutation.SetAttemptCount(v)
+	}
+	if _, ok := _c.mutation.FailoverCount(); !ok {
+		v := usagelog.DefaultFailoverCount
+		_c.mutation.SetFailoverCount(v)
+	}
 	if _, ok := _c.mutation.ImageCount(); !ok {
 		v := usagelog.DefaultImageCount
 		_c.mutation.SetImageCount(v)
@@ -850,6 +886,12 @@ func (_c *UsageLogCreate) check() error {
 	}
 	if _, ok := _c.mutation.Stream(); !ok {
 		return &ValidationError{Name: "stream", err: errors.New(`ent: missing required field "UsageLog.stream"`)}
+	}
+	if _, ok := _c.mutation.AttemptCount(); !ok {
+		return &ValidationError{Name: "attempt_count", err: errors.New(`ent: missing required field "UsageLog.attempt_count"`)}
+	}
+	if _, ok := _c.mutation.FailoverCount(); !ok {
+		return &ValidationError{Name: "failover_count", err: errors.New(`ent: missing required field "UsageLog.failover_count"`)}
 	}
 	if v, ok := _c.mutation.UserAgent(); ok {
 		if err := usagelog.UserAgentValidator(v); err != nil {
@@ -1041,6 +1083,14 @@ func (_c *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.FirstTokenMs(); ok {
 		_spec.SetField(usagelog.FieldFirstTokenMs, field.TypeInt, value)
 		_node.FirstTokenMs = &value
+	}
+	if value, ok := _c.mutation.AttemptCount(); ok {
+		_spec.SetField(usagelog.FieldAttemptCount, field.TypeInt, value)
+		_node.AttemptCount = value
+	}
+	if value, ok := _c.mutation.FailoverCount(); ok {
+		_spec.SetField(usagelog.FieldFailoverCount, field.TypeInt, value)
+		_node.FailoverCount = value
 	}
 	if value, ok := _c.mutation.UserAgent(); ok {
 		_spec.SetField(usagelog.FieldUserAgent, field.TypeString, value)
@@ -1786,6 +1836,42 @@ func (u *UsageLogUpsert) AddFirstTokenMs(v int) *UsageLogUpsert {
 // ClearFirstTokenMs clears the value of the "first_token_ms" field.
 func (u *UsageLogUpsert) ClearFirstTokenMs() *UsageLogUpsert {
 	u.SetNull(usagelog.FieldFirstTokenMs)
+	return u
+}
+
+// SetAttemptCount sets the "attempt_count" field.
+func (u *UsageLogUpsert) SetAttemptCount(v int) *UsageLogUpsert {
+	u.Set(usagelog.FieldAttemptCount, v)
+	return u
+}
+
+// UpdateAttemptCount sets the "attempt_count" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateAttemptCount() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldAttemptCount)
+	return u
+}
+
+// AddAttemptCount adds v to the "attempt_count" field.
+func (u *UsageLogUpsert) AddAttemptCount(v int) *UsageLogUpsert {
+	u.Add(usagelog.FieldAttemptCount, v)
+	return u
+}
+
+// SetFailoverCount sets the "failover_count" field.
+func (u *UsageLogUpsert) SetFailoverCount(v int) *UsageLogUpsert {
+	u.Set(usagelog.FieldFailoverCount, v)
+	return u
+}
+
+// UpdateFailoverCount sets the "failover_count" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateFailoverCount() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldFailoverCount)
+	return u
+}
+
+// AddFailoverCount adds v to the "failover_count" field.
+func (u *UsageLogUpsert) AddFailoverCount(v int) *UsageLogUpsert {
+	u.Add(usagelog.FieldFailoverCount, v)
 	return u
 }
 
@@ -2698,6 +2784,48 @@ func (u *UsageLogUpsertOne) UpdateFirstTokenMs() *UsageLogUpsertOne {
 func (u *UsageLogUpsertOne) ClearFirstTokenMs() *UsageLogUpsertOne {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.ClearFirstTokenMs()
+	})
+}
+
+// SetAttemptCount sets the "attempt_count" field.
+func (u *UsageLogUpsertOne) SetAttemptCount(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetAttemptCount(v)
+	})
+}
+
+// AddAttemptCount adds v to the "attempt_count" field.
+func (u *UsageLogUpsertOne) AddAttemptCount(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddAttemptCount(v)
+	})
+}
+
+// UpdateAttemptCount sets the "attempt_count" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateAttemptCount() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateAttemptCount()
+	})
+}
+
+// SetFailoverCount sets the "failover_count" field.
+func (u *UsageLogUpsertOne) SetFailoverCount(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetFailoverCount(v)
+	})
+}
+
+// AddFailoverCount adds v to the "failover_count" field.
+func (u *UsageLogUpsertOne) AddFailoverCount(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddFailoverCount(v)
+	})
+}
+
+// UpdateFailoverCount sets the "failover_count" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateFailoverCount() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateFailoverCount()
 	})
 }
 
@@ -3812,6 +3940,48 @@ func (u *UsageLogUpsertBulk) UpdateFirstTokenMs() *UsageLogUpsertBulk {
 func (u *UsageLogUpsertBulk) ClearFirstTokenMs() *UsageLogUpsertBulk {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.ClearFirstTokenMs()
+	})
+}
+
+// SetAttemptCount sets the "attempt_count" field.
+func (u *UsageLogUpsertBulk) SetAttemptCount(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetAttemptCount(v)
+	})
+}
+
+// AddAttemptCount adds v to the "attempt_count" field.
+func (u *UsageLogUpsertBulk) AddAttemptCount(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddAttemptCount(v)
+	})
+}
+
+// UpdateAttemptCount sets the "attempt_count" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateAttemptCount() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateAttemptCount()
+	})
+}
+
+// SetFailoverCount sets the "failover_count" field.
+func (u *UsageLogUpsertBulk) SetFailoverCount(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetFailoverCount(v)
+	})
+}
+
+// AddFailoverCount adds v to the "failover_count" field.
+func (u *UsageLogUpsertBulk) AddFailoverCount(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddFailoverCount(v)
+	})
+}
+
+// UpdateFailoverCount sets the "failover_count" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateFailoverCount() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateFailoverCount()
 	})
 }
 

@@ -51,14 +51,16 @@ INSERT INTO ops_error_logs (
   upstream_errors,
   auth_latency_ms,
   routing_latency_ms,
-  upstream_latency_ms,
-  response_latency_ms,
-  time_to_first_token_ms,
-  created_at,
-  api_key_prefix
-) VALUES (
-  $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38
-)`
+	  upstream_latency_ms,
+	  response_latency_ms,
+	  time_to_first_token_ms,
+	  attempt_count,
+	  failover_count,
+	  created_at,
+	  api_key_prefix
+	) VALUES (
+	  $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40
+	)`
 
 func NewOpsRepository(db *sql.DB) service.OpsRepository {
 	return &opsRepository{db: db}
@@ -165,6 +167,8 @@ func opsInsertErrorLogArgs(input *service.OpsInsertErrorLogInput) []any {
 		opsNullInt64(input.UpstreamLatencyMs),
 		opsNullInt64(input.ResponseLatencyMs),
 		opsNullInt64(input.TimeToFirstTokenMs),
+		input.AttemptCount,
+		input.FailoverCount,
 		input.CreatedAt,
 		opsNullString(input.APIKeyPrefix),
 	}
@@ -257,10 +261,12 @@ SELECT
   COALESCE(a.name, ''),
   e.group_id,
   COALESCE(g.name, ''),
-  CASE WHEN e.client_ip IS NULL THEN NULL ELSE host(e.client_ip) END,
-  COALESCE(e.request_path, ''),
-  e.stream,
-  COALESCE(e.inbound_endpoint, ''),
+	  CASE WHEN e.client_ip IS NULL THEN NULL ELSE host(e.client_ip) END,
+	  COALESCE(e.request_path, ''),
+	  e.stream,
+	  e.attempt_count,
+	  e.failover_count,
+	  COALESCE(e.inbound_endpoint, ''),
   COALESCE(e.upstream_endpoint, ''),
   COALESCE(e.requested_model, ''),
   COALESCE(e.upstream_model, ''),
@@ -330,6 +336,8 @@ LIMIT $` + itoa(len(args)+1) + ` OFFSET $` + itoa(len(args)+2)
 			&clientIP,
 			&item.RequestPath,
 			&item.Stream,
+			&item.AttemptCount,
+			&item.FailoverCount,
 			&item.InboundEndpoint,
 			&item.UpstreamEndpoint,
 			&item.RequestedModel,
@@ -445,9 +453,11 @@ SELECT
   e.auth_latency_ms,
   e.routing_latency_ms,
   e.upstream_latency_ms,
-  e.response_latency_ms,
-  e.time_to_first_token_ms,
-  COALESCE(e.api_key_prefix, ''),
+	  e.response_latency_ms,
+	  e.time_to_first_token_ms,
+	  e.attempt_count,
+	  e.failover_count,
+	  COALESCE(e.api_key_prefix, ''),
   COALESCE(ak.name, ''),
   ak.deleted_at
 FROM ops_error_logs e
@@ -521,6 +531,8 @@ LIMIT 1`
 		&upstreamLatency,
 		&responseLatency,
 		&ttft,
+		&out.AttemptCount,
+		&out.FailoverCount,
 		&out.APIKeyPrefix,
 		&detailAPIKeyName,
 		&detailAPIKeyDeletedAt,

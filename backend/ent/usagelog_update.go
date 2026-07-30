@@ -672,6 +672,48 @@ func (_u *UsageLogUpdate) ClearFirstTokenMs() *UsageLogUpdate {
 	return _u
 }
 
+// SetAttemptCount sets the "attempt_count" field.
+func (_u *UsageLogUpdate) SetAttemptCount(v int) *UsageLogUpdate {
+	_u.mutation.ResetAttemptCount()
+	_u.mutation.SetAttemptCount(v)
+	return _u
+}
+
+// SetNillableAttemptCount sets the "attempt_count" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableAttemptCount(v *int) *UsageLogUpdate {
+	if v != nil {
+		_u.SetAttemptCount(*v)
+	}
+	return _u
+}
+
+// AddAttemptCount adds value to the "attempt_count" field.
+func (_u *UsageLogUpdate) AddAttemptCount(v int) *UsageLogUpdate {
+	_u.mutation.AddAttemptCount(v)
+	return _u
+}
+
+// SetFailoverCount sets the "failover_count" field.
+func (_u *UsageLogUpdate) SetFailoverCount(v int) *UsageLogUpdate {
+	_u.mutation.ResetFailoverCount()
+	_u.mutation.SetFailoverCount(v)
+	return _u
+}
+
+// SetNillableFailoverCount sets the "failover_count" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableFailoverCount(v *int) *UsageLogUpdate {
+	if v != nil {
+		_u.SetFailoverCount(*v)
+	}
+	return _u
+}
+
+// AddFailoverCount adds value to the "failover_count" field.
+func (_u *UsageLogUpdate) AddFailoverCount(v int) *UsageLogUpdate {
+	_u.mutation.AddFailoverCount(v)
+	return _u
+}
+
 // SetUserAgent sets the "user_agent" field.
 func (_u *UsageLogUpdate) SetUserAgent(v string) *UsageLogUpdate {
 	_u.mutation.SetUserAgent(v)
@@ -1251,6 +1293,18 @@ func (_u *UsageLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.FirstTokenMsCleared() {
 		_spec.ClearField(usagelog.FieldFirstTokenMs, field.TypeInt)
+	}
+	if value, ok := _u.mutation.AttemptCount(); ok {
+		_spec.SetField(usagelog.FieldAttemptCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedAttemptCount(); ok {
+		_spec.AddField(usagelog.FieldAttemptCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.FailoverCount(); ok {
+		_spec.SetField(usagelog.FieldFailoverCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedFailoverCount(); ok {
+		_spec.AddField(usagelog.FieldFailoverCount, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.UserAgent(); ok {
 		_spec.SetField(usagelog.FieldUserAgent, field.TypeString, value)
@@ -2129,6 +2183,48 @@ func (_u *UsageLogUpdateOne) ClearFirstTokenMs() *UsageLogUpdateOne {
 	return _u
 }
 
+// SetAttemptCount sets the "attempt_count" field.
+func (_u *UsageLogUpdateOne) SetAttemptCount(v int) *UsageLogUpdateOne {
+	_u.mutation.ResetAttemptCount()
+	_u.mutation.SetAttemptCount(v)
+	return _u
+}
+
+// SetNillableAttemptCount sets the "attempt_count" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableAttemptCount(v *int) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetAttemptCount(*v)
+	}
+	return _u
+}
+
+// AddAttemptCount adds value to the "attempt_count" field.
+func (_u *UsageLogUpdateOne) AddAttemptCount(v int) *UsageLogUpdateOne {
+	_u.mutation.AddAttemptCount(v)
+	return _u
+}
+
+// SetFailoverCount sets the "failover_count" field.
+func (_u *UsageLogUpdateOne) SetFailoverCount(v int) *UsageLogUpdateOne {
+	_u.mutation.ResetFailoverCount()
+	_u.mutation.SetFailoverCount(v)
+	return _u
+}
+
+// SetNillableFailoverCount sets the "failover_count" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableFailoverCount(v *int) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetFailoverCount(*v)
+	}
+	return _u
+}
+
+// AddFailoverCount adds value to the "failover_count" field.
+func (_u *UsageLogUpdateOne) AddFailoverCount(v int) *UsageLogUpdateOne {
+	_u.mutation.AddFailoverCount(v)
+	return _u
+}
+
 // SetUserAgent sets the "user_agent" field.
 func (_u *UsageLogUpdateOne) SetUserAgent(v string) *UsageLogUpdateOne {
 	_u.mutation.SetUserAgent(v)
@@ -2738,6 +2834,18 @@ func (_u *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err 
 	}
 	if _u.mutation.FirstTokenMsCleared() {
 		_spec.ClearField(usagelog.FieldFirstTokenMs, field.TypeInt)
+	}
+	if value, ok := _u.mutation.AttemptCount(); ok {
+		_spec.SetField(usagelog.FieldAttemptCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedAttemptCount(); ok {
+		_spec.AddField(usagelog.FieldAttemptCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.FailoverCount(); ok {
+		_spec.SetField(usagelog.FieldFailoverCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedFailoverCount(); ok {
+		_spec.AddField(usagelog.FieldFailoverCount, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.UserAgent(); ok {
 		_spec.SetField(usagelog.FieldUserAgent, field.TypeString, value)

@@ -155,6 +155,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 
 	// 3. Account selection + failover loop
 	fs := NewFailoverState(h.maxAccountSwitches, false)
+	fs.SetOpsAttemptStats(c)
 
 	for {
 		if requestCtx.Err() != nil {
@@ -238,6 +239,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 					return
 				}
 				action := fs.HandleFailoverError(requestCtx, h.gatewayService, account.ID, account.Platform, account.GetPoolModeRetryCount(), failoverErr)
+				fs.SetOpsAttemptStats(c)
 				switch action {
 				case FailoverContinue:
 					continue
@@ -271,6 +273,8 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		upstreamEndpoint := GetUpstreamEndpoint(c, account.Platform)
 
 		quotaPlatform := service.QuotaPlatform(c.Request.Context(), apiKey)
+		attemptCount, failoverCount := fs.AttemptStats()
+		service.SetOpsAttemptStats(c, attemptCount, failoverCount)
 		h.submitUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
 			if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
 				Result:             result,
@@ -286,6 +290,8 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 				RequestPayloadHash: requestPayloadHash,
 				APIKeyService:      h.apiKeyService,
 				ChannelUsageFields: channelMapping.ToUsageFields(reqModel, result.UpstreamModel),
+				AttemptCount:       attemptCount,
+				FailoverCount:      failoverCount,
 			}); err != nil {
 				reqLog.Error("gateway.responses.record_usage_failed",
 					zap.Int64("account_id", account.ID),

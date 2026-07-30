@@ -116,6 +116,8 @@ type OpsInsertErrorLogInput struct {
 	UpstreamLatencyMs  *int64
 	ResponseLatencyMs  *int64
 	TimeToFirstTokenMs *int64
+	AttemptCount       int
+	FailoverCount      int
 
 	CreatedAt time.Time
 

@@ -158,14 +158,16 @@ type UsageLog struct {
 	// AccountStatsCost 账号统计定价预计算费用（nil = 使用默认公式 total_cost × account_rate_multiplier）
 	AccountStatsCost *float64
 
-	BillingType  int8
-	RequestType  RequestType
-	Stream       bool
-	OpenAIWSMode bool
-	DurationMs   *int
-	FirstTokenMs *int
-	UserAgent    *string
-	IPAddress    *string
+	BillingType   int8
+	RequestType   RequestType
+	Stream        bool
+	OpenAIWSMode  bool
+	DurationMs    *int
+	FirstTokenMs  *int
+	AttemptCount  int
+	FailoverCount int
+	UserAgent     *string
+	IPAddress     *string
 
 	// Cache TTL Override 标记（管理员强制替换了缓存 TTL 计费）
 	CacheTTLOverridden bool
@@ -214,4 +216,28 @@ func (u *UsageLog) SyncRequestTypeAndLegacyFields() {
 	requestType := u.EffectiveRequestType()
 	u.RequestType = requestType
 	u.Stream, u.OpenAIWSMode = ApplyLegacyRequestFields(requestType, u.Stream, u.OpenAIWSMode)
+}
+
+func NormalizeUsageAttemptCounters(attemptCount, failoverCount int) (int, int) {
+	failoverCount = normalizeUsageFailoverCount(failoverCount)
+	attemptCount = normalizeUsageAttemptCount(attemptCount, failoverCount)
+	return attemptCount, failoverCount
+}
+
+func normalizeUsageAttemptCount(attemptCount, failoverCount int) int {
+	if attemptCount <= 0 {
+		attemptCount = 1
+	}
+	minAttempts := normalizeUsageFailoverCount(failoverCount) + 1
+	if attemptCount < minAttempts {
+		attemptCount = minAttempts
+	}
+	return attemptCount
+}
+
+func normalizeUsageFailoverCount(failoverCount int) int {
+	if failoverCount < 0 {
+		return 0
+	}
+	return failoverCount
 }

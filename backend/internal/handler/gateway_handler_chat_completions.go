@@ -161,6 +161,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 	if groupPlatform == service.PlatformGemini {
 		fs = NewFailoverState(h.maxAccountSwitchesGemini, false)
 	}
+	fs.SetOpsAttemptStats(c)
 
 	for {
 		if c.Request.Context().Err() != nil {
@@ -263,6 +264,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 					return
 				}
 				action := fs.HandleFailoverError(c.Request.Context(), h.gatewayService, account.ID, account.Platform, account.GetPoolModeRetryCount(), failoverErr)
+				fs.SetOpsAttemptStats(c)
 				switch action {
 				case FailoverContinue:
 					continue
@@ -296,6 +298,8 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 		upstreamEndpoint := GetUpstreamEndpoint(c, account.Platform)
 
 		quotaPlatform := service.QuotaPlatform(c.Request.Context(), apiKey)
+		attemptCount, failoverCount := fs.AttemptStats()
+		service.SetOpsAttemptStats(c, attemptCount, failoverCount)
 		h.submitUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
 			if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
 				Result:             result,
@@ -311,6 +315,8 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 				RequestPayloadHash: requestPayloadHash,
 				APIKeyService:      h.apiKeyService,
 				ChannelUsageFields: channelMapping.ToUsageFields(reqModel, result.UpstreamModel),
+				AttemptCount:       attemptCount,
+				FailoverCount:      failoverCount,
 			}); err != nil {
 				reqLog.Error("gateway.cc.record_usage_failed",
 					zap.Int64("account_id", account.ID),

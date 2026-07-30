@@ -1261,6 +1261,10 @@ func applyOpsLatencyFieldsFromContext(c *gin.Context, entry *service.OpsInsertEr
 	entry.UpstreamLatencyMs = getContextLatencyMs(c, service.OpsUpstreamLatencyMsKey)
 	entry.ResponseLatencyMs = getContextLatencyMs(c, service.OpsResponseLatencyMsKey)
 	entry.TimeToFirstTokenMs = getContextLatencyMs(c, service.OpsTimeToFirstTokenMsKey)
+	if attemptCount, failoverCount, ok := service.GetOpsAttemptStats(c); ok {
+		entry.AttemptCount = attemptCount
+		entry.FailoverCount = failoverCount
+	}
 }
 
 // applyOpsUpstreamFieldsFromContext captures attempt-level upstream context.

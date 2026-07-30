@@ -406,6 +406,8 @@ export default {
           platform: 'Platform',
           model: 'Model',
           duration: 'Duration',
+          firstToken: 'TTFT',
+          attempts: 'Attempts/Switches',
           status: 'Status',
           requestId: 'Request ID',
           actions: 'Actions'

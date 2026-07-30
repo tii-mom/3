@@ -541,11 +541,47 @@ func (s *OpsService) prepareErrorLogInput(ctx context.Context, entry *OpsInsertE
 		}
 	}
 
+	normalizeOpsErrorAttemptCounters(entry)
+
 	if err := sanitizeOpsUpstreamErrors(entry); err != nil {
 		return nil, false, err
 	}
 
 	return entry, true, nil
+}
+
+func normalizeOpsErrorAttemptCounters(entry *OpsInsertErrorLogInput) {
+	if entry == nil {
+		return
+	}
+	computedFailovers := 0
+	computedAttempts := 0
+	for _, ev := range entry.UpstreamErrors {
+		if ev == nil {
+			continue
+		}
+		if ev.UpstreamStatusCode != 0 || strings.TrimSpace(ev.Message) != "" || strings.TrimSpace(ev.Detail) != "" {
+			computedAttempts++
+		}
+		kind := strings.TrimSpace(ev.Kind)
+		if idx := strings.IndexByte(kind, ':'); idx >= 0 {
+			kind = kind[:idx]
+		}
+		switch kind {
+		case "failover", "retry_exhausted_failover", "failover_on_400":
+			computedFailovers++
+		}
+	}
+	if entry.FailoverCount < 0 {
+		entry.FailoverCount = 0
+	}
+	if entry.FailoverCount == 0 && computedFailovers > 0 {
+		entry.FailoverCount = computedFailovers
+	}
+	if entry.AttemptCount <= 0 {
+		entry.AttemptCount = computedAttempts
+	}
+	entry.AttemptCount, entry.FailoverCount = NormalizeUsageAttemptCounters(entry.AttemptCount, entry.FailoverCount)
 }
 
 func sanitizeOpsUpstreamErrors(entry *OpsInsertErrorLogInput) error {

@@ -406,6 +406,8 @@ export default {
           platform: '平台',
           model: '模型',
           duration: '耗时',
+          firstToken: '首字',
+          attempts: '尝试/切换',
           status: '状态码',
           requestId: '请求ID',
           actions: '操作'

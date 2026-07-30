@@ -60,9 +60,11 @@ type OpsErrorLog struct {
 	GroupID     *int64 `json:"group_id"`
 	GroupName   string `json:"group_name"`
 
-	ClientIP    *string `json:"client_ip"`
-	RequestPath string  `json:"request_path"`
-	Stream      bool    `json:"stream"`
+	ClientIP      *string `json:"client_ip"`
+	RequestPath   string  `json:"request_path"`
+	Stream        bool    `json:"stream"`
+	AttemptCount  int     `json:"attempt_count"`
+	FailoverCount int     `json:"failover_count"`
 
 	InboundEndpoint  string `json:"inbound_endpoint"`
 	UpstreamEndpoint string `json:"upstream_endpoint"`

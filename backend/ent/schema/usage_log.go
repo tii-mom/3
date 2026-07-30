@@ -121,6 +121,12 @@ func (UsageLog) Fields() []ent.Field {
 		field.Int("first_token_ms").
 			Optional().
 			Nillable(),
+		field.Int("attempt_count").
+			Default(1).
+			Comment("本请求实际上游账号尝试次数，至少为 1"),
+		field.Int("failover_count").
+			Default(0).
+			Comment("本请求内账号切换次数"),
 		field.String("user_agent").
 			MaxLen(512).
 			Optional().

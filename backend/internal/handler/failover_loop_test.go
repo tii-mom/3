@@ -903,3 +903,14 @@ func TestFailoverClientGone(t *testing.T) {
 		require.False(t, failoverClientGone(nil))
 	})
 }
+
+func TestFailoverStateAttemptStatsIncludesSameAccountRetries(t *testing.T) {
+	fs := NewFailoverState(3, false)
+	fs.SameAccountRetryCount[101] = 2
+	fs.SwitchCount = 1
+
+	attemptCount, failoverCount := fs.AttemptStats()
+
+	require.Equal(t, 4, attemptCount)
+	require.Equal(t, 1, failoverCount)
+}
