@@ -9,6 +9,24 @@ const siteUrl = 'https://3api.shop'
 
 type SeoPage = (typeof seoPages)[keyof typeof seoPages]
 
+const publicSeoNav = [
+  { path: '/api-relay', label: 'API 中转站' },
+  { path: '/claude-code-api', label: 'Claude Code' },
+  { path: '/openai-api', label: 'OpenAI API' },
+  { path: '/codex-api', label: 'Codex API' },
+  { path: '/cursor-api-key', label: 'Cursor' },
+  { path: '/token-guide', label: 'Token 指南' },
+]
+
+const publicSeoRelatedLinks = [
+  { path: '/claude-code-api', label: 'Claude Code 国内使用', text: 'API Key、Base URL 与模型配置要点' },
+  { path: '/codex-api', label: 'Codex API 配置', text: 'AI 编程客户端接入与用量追踪' },
+  { path: '/cursor-api-key', label: 'Cursor API Key', text: 'Cursor 接入 Claude 和 OpenAI 兼容模型' },
+  { path: '/api-base-url', label: 'Base URL 怎么填', text: '接口地址、密钥和模型名称的区别' },
+  { path: '/openai-api-domestic-payment', label: 'OpenAI API 国内接入', text: '充值、订阅和 API 调用的差异' },
+  { path: '/token-guide', label: 'Token 计费指南', text: '输入、输出和缓存 Token 成本控制' },
+]
+
 function replaceTag(html: string, pattern: RegExp, replacement: string): string {
   return pattern.test(html) ? html.replace(pattern, replacement) : html.replace('</head>', `  ${replacement}\n</head>`)
 }
@@ -17,14 +35,58 @@ function renderSeoBody(page: SeoPage): string {
   const highlights = page.highlights.map((item) => `<article><h2>${escapeHtml(item.title)}</h2><p>${escapeHtml(item.text)}</p></article>`).join('')
   const sections = page.sections.map((section) => `<section><h2>${escapeHtml(section.title)}</h2><p>${escapeHtml(section.body)}</p></section>`).join('')
   const faqs = page.faqs.map((faq) => `<details><summary>${escapeHtml(faq.question)}</summary><p>${escapeHtml(faq.answer)}</p></details>`).join('')
-  return `<div id="seo-snapshot"><header><a href="/">3API</a><nav><a href="/api-relay">API 中转站</a><a href="/openai-api">OpenAI API</a><a href="/codex-api">Codex API</a><a href="/token-guide">Token 指南</a><a href="/compute-company">渠道合作</a></nav></header><main><p class="eyebrow">${escapeHtml(page.eyebrow)}</p><h1>${escapeHtml(page.heading)}</h1><p class="summary">${escapeHtml(page.summary)}</p><a class="cta" href="/register">${escapeHtml(page.primaryCta)}</a><div class="highlights">${highlights}</div><div class="content">${sections}</div><section class="faq"><h2>常见问题</h2>${faqs}</section></main><footer>3API · 独立第三方 AI API 接入平台</footer></div>`
+  const nav = publicSeoNav.map((item) => `<a href="${item.path}">${escapeHtml(item.label)}</a>`).join('')
+  const related = publicSeoRelatedLinks
+    .filter((item) => item.path !== page.path)
+    .slice(0, 4)
+    .map((item) => `<a href="${item.path}"><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(item.text)}</span></a>`)
+    .join('')
+  return `<div id="seo-snapshot"><header><a href="/">3API</a><nav>${nav}</nav></header><main><p class="eyebrow">${escapeHtml(page.eyebrow)}</p><h1>${escapeHtml(page.heading)}</h1><p class="summary">${escapeHtml(page.summary)}</p><a class="cta" href="/register">${escapeHtml(page.primaryCta)}</a><div class="highlights">${highlights}</div><div class="content">${sections}</div><section class="faq"><h2>常见问题</h2>${faqs}</section><section class="related"><h2>相关接入指南</h2>${related}</section></main><footer>3API · 独立第三方 AI API 接入平台</footer></div>`
 }
 
-const snapshotStyle = `<style id="seo-snapshot-style">#seo-snapshot{font-family:system-ui,-apple-system,"PingFang SC",sans-serif;max-width:1120px;margin:auto;padding:24px;color:#171717}#seo-snapshot header{display:flex;justify-content:space-between;gap:24px;padding:12px 0;border-bottom:1px solid #ddd}#seo-snapshot nav{display:flex;gap:18px;flex-wrap:wrap}#seo-snapshot a{color:#b94300}#seo-snapshot main{padding:72px 0}#seo-snapshot .eyebrow{font-size:12px;color:#c84d0b}#seo-snapshot h1{font-size:clamp(40px,7vw,72px);line-height:1.1;max-width:900px}#seo-snapshot .summary{font-size:19px;line-height:1.7;max-width:780px}#seo-snapshot .cta{display:inline-block;margin:20px 0 50px;padding:13px 20px;background:#e85d11;color:white;text-decoration:none}.highlights{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#ccc}.highlights article{padding:24px;background:#fff}.content{margin-top:70px}.content section,.faq details{padding:24px 0;border-top:1px solid #ddd}.content p,.faq p{line-height:1.7;color:#555}@media(max-width:700px){#seo-snapshot header{display:block}#seo-snapshot nav{margin-top:16px}.highlights{grid-template-columns:1fr}}</style>`
+const snapshotStyle = `<style id="seo-snapshot-style">#seo-snapshot{font-family:system-ui,-apple-system,"PingFang SC",sans-serif;max-width:1120px;margin:auto;padding:24px;color:#171717}#seo-snapshot header{display:flex;justify-content:space-between;gap:24px;padding:12px 0;border-bottom:1px solid #ddd}#seo-snapshot nav{display:flex;gap:18px;flex-wrap:wrap}#seo-snapshot a{color:#b94300}#seo-snapshot main{padding:72px 0}#seo-snapshot .eyebrow{font-size:12px;color:#c84d0b}#seo-snapshot h1{font-size:clamp(40px,7vw,72px);line-height:1.1;max-width:900px}#seo-snapshot .summary{font-size:19px;line-height:1.7;max-width:780px}#seo-snapshot .cta{display:inline-block;margin:20px 0 50px;padding:13px 20px;background:#e85d11;color:white;text-decoration:none}.highlights{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#ccc}.highlights article{padding:24px;background:#fff}.content{margin-top:70px}.content section,.faq details{padding:24px 0;border-top:1px solid #ddd}.content p,.faq p,.related span{line-height:1.7;color:#555}.related{margin-top:70px;padding-top:24px;border-top:1px solid #ddd}.related a{display:block;margin:14px 0}.related strong{display:block;color:#171717}.related span{display:block}@media(max-width:700px){#seo-snapshot header{display:block}#seo-snapshot nav{margin-top:16px}.highlights{grid-template-columns:1fr}}</style>`
+
+function renderStructuredData(page: SeoPage | null): string {
+  const organization = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: '3API',
+    url: siteUrl,
+    description: '3API 为国内开发者提供 OpenAI、Claude、Gemini 等模型的统一 API 接入，适配 Claude Code、Codex、Cursor、Agent 和应用开发场景。',
+  }
+  const website = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: '3API',
+    url: siteUrl,
+  }
+  const data: object[] = page ? [
+    organization,
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: '3API', item: siteUrl },
+        { '@type': 'ListItem', position: 2, name: page.heading, item: new URL(page.path, siteUrl).toString() },
+      ],
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: page.faqs.map((faq) => ({
+        '@type': 'Question',
+        name: faq.question,
+        acceptedAnswer: { '@type': 'Answer', text: faq.answer },
+      })),
+    },
+  ] : [organization, website]
+
+  return data.map((item) => `<script type="application/ld+json" data-seo-structured-data="true">${JSON.stringify(item).replace(/</g, '\\u003c')}</script>`).join('')
+}
 
 function withSeoMetadata(html: string, page: SeoPage | null): string {
   const title = page?.title || '3API - AI API 中转站与多模型统一接入'
-  const description = page?.description || '3API 为开发者提供 OpenAI、Claude、Gemini 等模型的统一 API 接入、智能路由、Token 用量统计和按量计费服务。'
+  const description = page?.description || '3API 为国内开发者提供 OpenAI、Claude、Gemini 等模型的统一 API 接入，适配 Claude Code、Codex、Cursor、Agent 和应用开发场景。'
   const path = page?.path || '/'
   const canonical = new URL(path, siteUrl).toString()
   let output = replaceTag(html, /<title>[^<]*<\/title>/i, `<title>${escapeHtml(title)}</title>`)
@@ -33,6 +95,7 @@ function withSeoMetadata(html: string, page: SeoPage | null): string {
   output = replaceTag(output, /<meta\s+property=["']og:title["'][^>]*>/i, `<meta property="og:title" content="${escapeHtml(title)}" />`)
   output = replaceTag(output, /<meta\s+property=["']og:description["'][^>]*>/i, `<meta property="og:description" content="${escapeHtml(description)}" />`)
   output = replaceTag(output, /<meta\s+property=["']og:url["'][^>]*>/i, `<meta property="og:url" content="${canonical}" />`)
+  output = output.replace('</head>', `${renderStructuredData(page)}</head>`)
   return output
 }
 
@@ -62,7 +125,7 @@ function generateSeoFiles(): Plugin {
       const today = new Date().toISOString().slice(0, 10)
       const sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((path) => `  <url><loc>${new URL(path, siteUrl)}</loc><lastmod>${today}</lastmod></url>`).join('\n')}\n</urlset>\n`
       writeFileSync(resolve(outDir, 'sitemap.xml'), sitemap)
-      writeFileSync(resolve(outDir, 'robots.txt'), `User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /dashboard\nDisallow: /keys\nDisallow: /usage\nDisallow: /profile\nDisallow: /login\nDisallow: /register\nSitemap: ${siteUrl}/sitemap.xml\n`)
+      writeFileSync(resolve(outDir, 'robots.txt'), `User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /console\nDisallow: /dashboard\nDisallow: /keys\nDisallow: /usage\nDisallow: /profile\nDisallow: /login\nDisallow: /register\nDisallow: /purchase\nDisallow: /shop\nDisallow: /orders\nDisallow: /payment\nSitemap: ${siteUrl}/sitemap.xml\n`)
     },
   }
 }

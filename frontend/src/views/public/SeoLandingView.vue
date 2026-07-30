@@ -5,6 +5,14 @@ import { getSeoPage } from '@/utils/seo'
 
 const route = useRoute()
 const page = computed(() => getSeoPage(route.meta.seoKey))
+const relatedLinks = computed(() => [
+  { to: '/claude-code-api', label: 'Claude Code 国内使用', text: 'API Key、Base URL 与模型配置要点' },
+  { to: '/codex-api', label: 'Codex API 配置', text: 'AI 编程客户端接入与用量追踪' },
+  { to: '/cursor-api-key', label: 'Cursor API Key', text: 'Cursor 接入 Claude 和 OpenAI 兼容模型' },
+  { to: '/api-base-url', label: 'Base URL 怎么填', text: '接口地址、密钥和模型名称的区别' },
+  { to: '/openai-api-domestic-payment', label: 'OpenAI API 国内接入', text: '充值、订阅和 API 调用的差异' },
+  { to: '/token-guide', label: 'Token 计费指南', text: '输入、输出和缓存 Token 成本控制' },
+].filter((link) => link.to !== route.path).slice(0, 4))
 </script>
 
 <template>
@@ -16,10 +24,11 @@ const page = computed(() => getSeoPage(route.meta.seoKey))
       </router-link>
       <nav class="seo-nav" aria-label="主要导航">
         <router-link to="/api-relay">API 中转站</router-link>
+        <router-link to="/claude-code-api">Claude Code</router-link>
         <router-link to="/openai-api">OpenAI API</router-link>
         <router-link to="/codex-api">Codex</router-link>
+        <router-link to="/cursor-api-key">Cursor</router-link>
         <router-link to="/token-guide">Token 指南</router-link>
-        <router-link to="/compute-company">渠道合作</router-link>
       </nav>
       <router-link to="/login" class="seo-login">登录</router-link>
     </header>
@@ -74,6 +83,19 @@ const page = computed(() => getSeoPage(route.meta.seoKey))
         </details>
       </section>
 
+      <section class="seo-related">
+        <div>
+          <p class="seo-eyebrow">RELATED GUIDES</p>
+          <h2>相关接入指南</h2>
+        </div>
+        <div class="seo-related-grid">
+          <router-link v-for="link in relatedLinks" :key="link.to" :to="link.to">
+            <strong>{{ link.label }}</strong>
+            <span>{{ link.text }}</span>
+          </router-link>
+        </div>
+      </section>
+
       <section class="seo-final">
         <div>
           <p class="seo-eyebrow">START BUILDING</p>
@@ -87,6 +109,7 @@ const page = computed(() => getSeoPage(route.meta.seoKey))
     <footer class="seo-footer">
       <span>© 2026 3API</span>
       <span>独立第三方 AI API 接入平台</span>
+      <router-link to="/claude-code-api">Claude Code 国内使用</router-link>
       <router-link to="/chatgpt-plus-vs-api">Plus 与 API 的区别</router-link>
     </footer>
   </div>
@@ -134,11 +157,19 @@ const page = computed(() => getSeoPage(route.meta.seoKey))
 .seo-faq details:last-child { border-bottom: 1px solid #cdcdc7; }
 .seo-faq summary { cursor: pointer; font-size: 18px; font-weight: 700; }
 .seo-faq p { padding-right: 40px; }
+.seo-related { max-width: 1132px; margin: 0 auto 88px; padding: 0 24px; display: grid; grid-template-columns: .75fr 1.25fr; gap: 34px; }
+.seo-related h2 { margin: 0; font-size: 34px; line-height: 1.2; }
+.seo-related-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 1px solid #d4d4ce; background: #d4d4ce; gap: 1px; }
+.seo-related-grid a { min-height: 126px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; gap: 16px; background: #fff; color: #181818; text-decoration: none; }
+.seo-related-grid a:hover { background: #fff7ed; }
+.seo-related-grid strong { font-size: 17px; }
+.seo-related-grid span { color: #60605a; font-size: 14px; line-height: 1.6; }
 .seo-final { max-width: 1132px; margin: 0 auto 80px; padding: 46px; display: flex; align-items: center; justify-content: space-between; gap: 32px; background: #e7ff64; border: 1px solid #151515; }
 .seo-final h2 { margin: 0; font-size: 36px; }
 .seo-final p:not(.seo-eyebrow) { margin-bottom: 0; color: #49493f; }
 .seo-footer { max-width: 1180px; margin: 0 auto; padding: 28px 24px 44px; display: flex; gap: 24px; border-top: 1px solid #d8d8d2; color: #686862; font-size: 13px; }
-.seo-footer a { margin-left: auto; color: #333; }
+.seo-footer a { color: #333; }
+.seo-footer a:first-of-type { margin-left: auto; }
 @media (max-width: 820px) {
   .seo-header { height: auto; padding-top: 16px; padding-bottom: 16px; flex-wrap: wrap; }
   .seo-nav { order: 3; width: 100%; overflow-x: auto; gap: 18px; }
@@ -150,8 +181,11 @@ const page = computed(() => getSeoPage(route.meta.seoKey))
   .seo-highlights article { border-right: 1px solid #d4d4ce; border-bottom: 0; }
   .seo-highlights article:last-child { border-bottom: 1px solid #d4d4ce; }
   .seo-content-heading, .seo-section { grid-template-columns: 1fr; }
+  .seo-related { grid-template-columns: 1fr; }
+  .seo-related-grid { grid-template-columns: 1fr; }
   .seo-final { margin: 0 24px 60px; padding: 34px 26px; align-items: flex-start; flex-direction: column; }
   .seo-footer { flex-wrap: wrap; }
   .seo-footer a { width: 100%; margin-left: 0; }
+  .seo-footer a:first-of-type { margin-left: 0; }
 }
 </style>

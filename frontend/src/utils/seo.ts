@@ -3,7 +3,7 @@ import seoPages from '@/content/seo-pages.json'
 
 const SITE_URL = 'https://3api.shop'
 const DEFAULT_TITLE = '3API - AI API 中转站与多模型统一接入'
-const DEFAULT_DESCRIPTION = '3API 为开发者提供 OpenAI、Claude、Gemini 等模型的统一 API 接入、智能路由、Token 用量统计和按量计费服务。'
+const DEFAULT_DESCRIPTION = '3API 为国内开发者提供 OpenAI、Claude、Gemini 等模型的统一 API 接入，适配 Claude Code、Codex、Cursor、Agent 和应用开发场景。'
 
 type SeoPage = (typeof seoPages)[keyof typeof seoPages]
 
@@ -75,7 +75,25 @@ export function updateRouteSeo(route: RouteLocationNormalizedLoaded) {
     description: DEFAULT_DESCRIPTION,
   })
 
+  if (isHome) {
+    addStructuredData({
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      name: '3API',
+      url: SITE_URL,
+    })
+  }
+
   if (page) {
+    addStructuredData({
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: '3API', item: SITE_URL },
+        { '@type': 'ListItem', position: 2, name: page.heading, item: canonical },
+      ],
+    })
+
     addStructuredData({
       '@context': 'https://schema.org',
       '@type': 'FAQPage',

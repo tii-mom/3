@@ -58,6 +58,30 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: false, title: 'OpenAI API 接入', seoKey: 'openai-api' }
   },
   {
+    path: '/claude-code-api',
+    name: 'ClaudeCodeApi',
+    component: () => import('@/views/public/SeoLandingView.vue'),
+    meta: { requiresAuth: false, title: 'Claude Code API 配置', seoKey: 'claude-code-api' }
+  },
+  {
+    path: '/cursor-api-key',
+    name: 'CursorApiKey',
+    component: () => import('@/views/public/SeoLandingView.vue'),
+    meta: { requiresAuth: false, title: 'Cursor API Key 配置', seoKey: 'cursor-api-key' }
+  },
+  {
+    path: '/api-base-url',
+    name: 'ApiBaseUrl',
+    component: () => import('@/views/public/SeoLandingView.vue'),
+    meta: { requiresAuth: false, title: 'API Base URL 配置', seoKey: 'api-base-url' }
+  },
+  {
+    path: '/openai-api-domestic-payment',
+    name: 'OpenAiApiDomesticPayment',
+    component: () => import('@/views/public/SeoLandingView.vue'),
+    meta: { requiresAuth: false, title: 'OpenAI API 国内接入', seoKey: 'openai-api-domestic-payment' }
+  },
+  {
     path: '/codex-api',
     name: 'CodexApi',
     component: () => import('@/views/public/SeoLandingView.vue'),

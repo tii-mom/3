@@ -25,7 +25,7 @@ describe('SEO metadata', () => {
     expect(document.title).toContain('OpenAI API')
     expect(document.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe('https://3api.shop/openai-api')
     expect(document.querySelector('meta[name="robots"]')?.getAttribute('content')).toContain('index,follow')
-    expect(document.querySelectorAll('script[data-seo-structured-data]')).toHaveLength(2)
+    expect(document.querySelectorAll('script[data-seo-structured-data]')).toHaveLength(3)
   })
 
   it('keeps authenticated application routes out of search indexes', () => {

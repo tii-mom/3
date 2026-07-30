@@ -628,8 +628,11 @@
       <footer class="max-w-6xl mx-auto px-4 md:px-6 py-10 border-t border-slate-200/80 dark:border-white/[0.06] relative z-10">
         <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400 dark:text-gray-500">
           <p>© {{ new Date().getFullYear() }} {{ siteName }}. {{ t('home.footer.allRightsReserved') }}</p>
-          <div class="flex items-center gap-4">
+          <div class="flex flex-wrap items-center justify-center gap-4">
             <router-link to="/api-relay" class="hover:text-slate-600 dark:hover:text-gray-300 transition-colors">API 中转站</router-link>
+            <router-link to="/claude-code-api" class="hover:text-slate-600 dark:hover:text-gray-300 transition-colors">Claude Code</router-link>
+            <router-link to="/codex-api" class="hover:text-slate-600 dark:hover:text-gray-300 transition-colors">Codex</router-link>
+            <router-link to="/cursor-api-key" class="hover:text-slate-600 dark:hover:text-gray-300 transition-colors">Cursor</router-link>
             <router-link to="/openai-api" class="hover:text-slate-600 dark:hover:text-gray-300 transition-colors">OpenAI API</router-link>
             <router-link to="/token-guide" class="hover:text-slate-600 dark:hover:text-gray-300 transition-colors">Token 指南</router-link>
             <router-link to="/compute-company" class="hover:text-slate-600 dark:hover:text-gray-300 transition-colors">渠道合作</router-link>

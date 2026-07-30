@@ -2,10 +2,10 @@
   "api-relay": {
     "path": "/api-relay",
     "title": "AI API 中转站 - 多模型统一接入与按量计费 | 3API",
-    "description": "3API 为开发者提供 OpenAI、Claude、Gemini 等 AI 模型的统一 API 接入、智能路由、Token 用量统计和按量计费服务。",
+    "description": "3API 为国内开发者提供 OpenAI、Claude、Gemini 等 AI 模型的统一 API 接入，适合 Claude Code、Codex、Cursor、Agent 和应用开发场景。",
     "eyebrow": "AI API GATEWAY",
     "heading": "一个 API 中转站，统一接入主流 AI 模型",
-    "summary": "不必分别维护多套接口和账单。使用一个 API Key 接入后台已开通的模型，并在同一控制台查看请求、Token 和费用。",
+    "summary": "不必分别维护多套接口和账单。使用一个 API Key 接入后台已开通的模型，适配 Claude Code、Codex、Cursor 和 OpenAI 兼容 SDK，并在同一控制台查看请求、Token 和费用。",
     "primaryCta": "开始接入",
     "secondaryCta": "了解 Token 计费",
     "secondaryPath": "/token-guide",
@@ -15,26 +15,27 @@
       { "title": "用量透明", "text": "按请求查看模型、输入 Token、输出 Token 与实际费用。" }
     ],
     "sections": [
-      { "title": "API 中转站适合谁", "body": "适合需要在应用、Agent、IDE 或自动化流程中调用多个 AI 模型的个人开发者与团队。3API 提供的是 API 接入服务，不是 ChatGPT Plus 订阅或代购服务。" },
+      { "title": "API 中转站适合谁", "body": "适合需要在应用、Agent、IDE、Claude Code、Codex、Cursor 或自动化流程中调用多个 AI 模型的个人开发者与团队。3API 提供的是 API 接入服务，不是 ChatGPT Plus 订阅或代购服务。" },
       { "title": "如何判断服务是否可靠", "body": "重点检查模型来源说明、接口兼容性、计费明细、状态监控、故障处理和售后渠道。不要只用单次回答风格判断模型，更应结合模型标识、能力测试和长期调用记录。" },
-      { "title": "从现有项目迁移", "body": "通常只需替换 Base URL 和 API Key，并根据可用模型调整 model 参数。生产项目应先在测试环境验证流式输出、工具调用、超时和重试策略。" }
+      { "title": "从现有项目迁移", "body": "通常只需替换 Base URL 和 API Key，并根据可用模型调整 model 参数。生产项目应先在测试环境验证流式输出、工具调用、超时和重试策略。配置细节可继续阅读 Base URL 和 Claude Code 指南。" }
     ],
     "faqs": [
       { "question": "3API 是 ChatGPT Plus 代购吗？", "answer": "不是。3API 提供面向开发者的 API 接入和用量管理服务，不销售或代购 ChatGPT Plus。" },
       { "question": "是否支持按 Token 统计？", "answer": "支持。控制台可按模型查看输入、输出及缓存相关 Token，用量与价格以实际开通分组为准。" },
-      { "question": "可以接入现有 OpenAI SDK 吗？", "answer": "兼容 OpenAI 接口的模型通常可以通过修改 Base URL 与 API Key 接入，具体端点和模型以文档为准。" }
+      { "question": "可以接入现有 OpenAI SDK 吗？", "answer": "兼容 OpenAI 接口的模型通常可以通过修改 Base URL 与 API Key 接入，具体端点和模型以文档为准。" },
+      { "question": "Claude Code、Codex 和 Cursor 都能用吗？", "answer": "支持自定义接口地址的客户端通常可以接入，但不同客户端对模型列表、流式输出和工具调用的支持不同，建议分别验证。" }
     ]
   },
   "openai-api": {
     "path": "/openai-api",
     "title": "OpenAI API 接入 - 官方账号资源与统一计费 | 3API",
-    "description": "通过 3API 接入基于 OpenAI 官方账号资源提供的模型能力，支持 OpenAI 兼容接口、流式响应、Token 统计和统一 API Key 管理。",
+    "description": "通过 3API 接入基于 OpenAI 官方账号资源提供的模型能力，支持 OpenAI 兼容接口、流式响应、Token 统计、国内开发者 API Key 管理和统一计费。",
     "eyebrow": "OPENAI API",
     "heading": "面向开发者的 OpenAI API 接入",
     "summary": "通过统一接口调用后台实际开放的 OpenAI 模型。上游使用官方账号资源，3API 负责鉴权、调度、计量和转发；3API 本身并非 OpenAI 官方网站。",
     "primaryCta": "创建 API Key",
-    "secondaryCta": "了解接入要点",
-    "secondaryPath": "/openai-api",
+    "secondaryCta": "国内接入避坑",
+    "secondaryPath": "/openai-api-domestic-payment",
     "highlights": [
       { "title": "官方账号资源", "text": "上游账号来自官方服务，页面同时明确第三方接入平台身份。" },
       { "title": "OpenAI 兼容", "text": "降低 SDK、Agent 和已有应用的接口迁移成本。" },
@@ -43,7 +44,7 @@
     "sections": [
       { "title": "官方资源与第三方平台的区别", "body": "官方账号资源说明上游服务来源，不代表 3API 是 OpenAI 或获得其品牌背书。3API 是独立的第三方 API 网关与计费服务商。" },
       { "title": "适合的调用场景", "body": "可用于代码助手、内容处理、结构化输出、工具调用和 Agent 工作流。实际可用模型及功能以控制台为准。" },
-      { "title": "生产接入建议", "body": "为不同环境创建独立密钥，设置额度上限，妥善处理超时、限流和失败重试，并避免把 API Key 写入前端代码或公开仓库。" }
+      { "title": "生产接入建议", "body": "为不同环境创建独立密钥，设置额度上限，妥善处理超时、限流和失败重试，并避免把 API Key 写入前端代码或公开仓库。国内用户还应分清 API 接入、官方充值和 ChatGPT Plus 订阅的区别。" }
     ],
     "faqs": [
       { "question": "3API 是 OpenAI 官方官网吗？", "answer": "不是。3API 是独立第三方 API 接入平台，上游使用官方账号资源。" },
@@ -51,24 +52,128 @@
       { "question": "支持哪些 OpenAI 模型？", "answer": "模型会随上游和平台配置变化，请以登录后控制台展示的可用模型为准。" }
     ]
   },
+  "claude-code-api": {
+    "path": "/claude-code-api",
+    "title": "Claude Code 国内使用教程 - API Key 与 Base URL 配置 | 3API",
+    "description": "3API 面向国内开发者提供 Claude Code API 接入配置说明，覆盖 API Key、Base URL、Token 用量统计、独立密钥和常见连接问题。",
+    "eyebrow": "CLAUDE CODE API",
+    "heading": "国内使用 Claude Code，先把 API 接入配置对",
+    "summary": "Claude Code 的核心门槛往往不是安装命令，而是 API Key、Base URL、模型权限和网络稳定性。3API 提供第三方 API 网关能力，帮助开发者用统一入口接入后台已开通的模型。",
+    "primaryCta": "创建 Claude Code API Key",
+    "secondaryCta": "查看 Base URL 配置",
+    "secondaryPath": "/api-base-url",
+    "highlights": [
+      { "title": "配置清晰", "text": "围绕 API Key、Base URL、模型名称和客户端配置文件整理接入路径。" },
+      { "title": "独立密钥", "text": "为 Claude Code 单独创建密钥，方便限额、统计和团队权限管理。" },
+      { "title": "成本可见", "text": "按模型和请求查看 Token 明细，避免长任务消耗变成黑箱。" }
+    ],
+    "sections": [
+      { "title": "Claude Code 国内用户真正卡在哪里", "body": "常见问题集中在无法稳定连接、API Key 获取和支付门槛、Base URL 不知道怎么填、模型名称不匹配，以及长任务失败后无法判断成本。落地配置页应该先解决这些问题，而不是只介绍 Claude Code 是什么。" },
+      { "title": "推荐的接入前检查", "body": "先确认 3API 控制台中对应分组是否有可用模型，再为 Claude Code 创建独立 API Key；配置后用一个小型代码任务验证流式输出、工具调用、超时和请求记录。" },
+      { "title": "生产或团队使用建议", "body": "不要多人共享一个密钥。为项目、成员或环境拆分 API Key，设置额度上限，并定期检查失败请求、异常 Token 消耗和高频调用。" }
+    ],
+    "faqs": [
+      { "question": "3API 是 Anthropic 或 Claude 官方官网吗？", "answer": "不是。3API 是独立第三方 API 接入平台，不代表 Anthropic 或 Claude 官方。" },
+      { "question": "使用 Claude Code 一定需要国外信用卡吗？", "answer": "如果直接使用官方服务，支付和地区要求以官方规则为准；通过 3API 使用时，应以 3API 控制台展示的充值、分组和模型可用情况为准。" },
+      { "question": "Claude Code 和 Cursor 可以共用一个 API Key 吗？", "answer": "技术上取决于客户端配置，但不建议共用。为不同工具拆分密钥更利于限额、排障和成本归因。" }
+    ]
+  },
+  "cursor-api-key": {
+    "path": "/cursor-api-key",
+    "title": "Cursor API Key 国内配置 - 接入 Claude 与 OpenAI 兼容模型 | 3API",
+    "description": "Cursor API Key 国内配置指南：了解如何选择 OpenAI 兼容接口、填写 Base URL、管理密钥、查看 Token 用量并降低 AI 编程成本。",
+    "eyebrow": "CURSOR API KEY",
+    "heading": "让 Cursor 接入可控的 AI API",
+    "summary": "很多开发者在 Cursor 中尝试接入 Claude、OpenAI 兼容模型或第三方网关时，真正需要的是稳定的 API Key、清楚的接口地址和可追踪的费用记录。",
+    "primaryCta": "创建 Cursor 专用 Key",
+    "secondaryCta": "理解 Token 成本",
+    "secondaryPath": "/token-guide",
+    "highlights": [
+      { "title": "OpenAI 兼容", "text": "支持自定义 OpenAI 兼容地址的工具通常可以通过替换接口地址接入。" },
+      { "title": "模型分组", "text": "按项目或团队分配模型权限，避免测试环境和生产环境混用。" },
+      { "title": "用量归因", "text": "将 Cursor 单独设为一个 API Key，后续能清楚看见消耗来自哪里。" }
+    ],
+    "sections": [
+      { "title": "Cursor 用户的典型搜索需求", "body": "用户通常会搜索 Cursor API Key、Cursor Claude API、Cursor 国内配置、Cursor OpenAI Base URL 等词。背后的需求是让 AI 编程工具能稳定调用模型，并且不要把成本混进其他项目。" },
+      { "title": "配置时要核对什么", "body": "核对 Base URL 是否包含正确路径、API Key 是否属于当前分组、model 参数是否在控制台可用，并确认客户端是否支持流式输出和工具调用。" },
+      { "title": "降低成本的做法", "body": "给 Cursor 设置独立额度，日常任务使用合适模型，长上下文任务前先清理无关文件和历史，并定期查看高消耗请求。" }
+    ],
+    "faqs": [
+      { "question": "Cursor 可以使用第三方 API 网关吗？", "answer": "只要当前 Cursor 版本支持自定义 OpenAI 兼容接口，并且目标模型与端点兼容，通常可以接入。具体以客户端实际能力为准。" },
+      { "question": "为什么 Cursor 里模型名称填了还是不可用？", "answer": "常见原因包括模型不在当前分组、名称拼写不一致、接口端点不匹配、密钥额度不足或客户端缓存未刷新。" },
+      { "question": "Cursor 消耗怎么单独统计？", "answer": "建议为 Cursor 创建独立 API Key，在 3API 控制台按密钥和模型查看请求与 Token 明细。" }
+    ]
+  },
+  "api-base-url": {
+    "path": "/api-base-url",
+    "title": "API Base URL 怎么填？OpenAI 兼容接口配置说明 | 3API",
+    "description": "解释 API Base URL、API Key、模型名称和 OpenAI 兼容接口的关系，帮助开发者配置 Claude Code、Codex、Cursor、OpenCode 等 AI 工具。",
+    "eyebrow": "BASE URL GUIDE",
+    "heading": "Base URL 填错，API Key 再对也跑不通",
+    "summary": "国内开发者配置 AI 编程工具时，经常把 API Key、Base URL、模型名称和端点路径混在一起。理解这几个字段的区别，能减少大部分接入失败。",
+    "primaryCta": "查看我的接口地址",
+    "secondaryCta": "返回 API 中转站",
+    "secondaryPath": "/api-relay",
+    "highlights": [
+      { "title": "Base URL", "text": "表示客户端请求发往哪个 API 服务入口，通常不是 API Key 本身。" },
+      { "title": "API Key", "text": "表示调用凭证，应只放在服务端、本地配置或可信客户端中。" },
+      { "title": "模型名称", "text": "决定本次请求调用哪个模型，必须与平台可用模型保持一致。" }
+    ],
+    "sections": [
+      { "title": "Base URL 和 API Key 的区别", "body": "Base URL 是接口地址，API Key 是身份凭证。一个告诉客户端往哪里发请求，另一个告诉平台这次请求属于谁。两者都正确，模型名称和端点也匹配，调用才会成功。" },
+      { "title": "哪些工具会用到 Base URL", "body": "Claude Code、Codex、Cursor、OpenCode、Chatbox、各类 Agent 框架和 OpenAI SDK 都可能需要配置接口地址。不同工具字段名可能写作 base_url、api_base、baseURL 或 endpoint。" },
+      { "title": "排查顺序", "body": "先看 3API 控制台的可用端点和模型，再检查客户端配置文件、环境变量、model 参数、网络代理和错误码。不要把 API Key 写到前端网页或公开仓库。" }
+    ],
+    "faqs": [
+      { "question": "Base URL 是不是填 API Key？", "answer": "不是。Base URL 是接口地址，API Key 是密钥。两者是不同字段。" },
+      { "question": "为什么同一个 Key 在不同工具里表现不同？", "answer": "不同工具对端点路径、流式输出、工具调用和模型列表的支持不同，需要按工具分别验证。" },
+      { "question": "Base URL 能公开发给别人吗？", "answer": "接口地址本身通常不是密钥，但仍应结合平台说明谨慎分享。API Key 绝不能公开。" }
+    ]
+  },
+  "openai-api-domestic-payment": {
+    "path": "/openai-api-domestic-payment",
+    "title": "OpenAI API 国内接入与充值方式对比 - 开发者避坑指南 | 3API",
+    "description": "面向国内开发者说明 OpenAI API 直连、第三方 API 网关、团队统一计费和 ChatGPT Plus 的区别，避免把充值、订阅和 API 调用混为一谈。",
+    "eyebrow": "OPENAI API CHINA",
+    "heading": "国内用 OpenAI API，先分清接入和充值",
+    "summary": "很多用户搜索 OpenAI API 国内充值，其实是在找一个能稳定调用、能支付、能看明细、能接入项目的方案。3API 提供的是第三方 API 接入和用量管理服务，不销售 ChatGPT Plus。",
+    "primaryCta": "使用 API 接入",
+    "secondaryCta": "Plus 和 API 区别",
+    "secondaryPath": "/chatgpt-plus-vs-api",
+    "highlights": [
+      { "title": "不是 Plus 代购", "text": "ChatGPT Plus 是订阅产品，API 是程序化调用服务，两者权益通常不互通。" },
+      { "title": "按量计费", "text": "API 成本取决于模型、输入输出 Token、缓存和实际调用次数。" },
+      { "title": "团队管理", "text": "统一创建密钥、设置额度并查看用量，避免多人共用官方账号造成成本混乱。" }
+    ],
+    "sections": [
+      { "title": "用户为什么搜国内充值", "body": "常见动机包括没有可用支付方式、官方账号注册门槛高、项目急需稳定接口、团队需要统一报销和用量记录。落地页应先讲清这些问题，而不是泛泛介绍 OpenAI。" },
+      { "title": "三种接入路径的区别", "body": "官方 API 直连适合具备官方账号、支付和网络条件的用户；第三方 API 网关适合希望快速接入和统一管理的开发者；ChatGPT Plus 适合在 ChatGPT 产品内使用，不等于 API 余额。" },
+      { "title": "选择服务时的避坑点", "body": "检查是否明确第三方身份、是否有用量明细、是否能创建独立密钥、是否说明模型可用范围、是否提供退款或余额规则，以及是否避免夸大官方授权。" }
+    ],
+    "faqs": [
+      { "question": "3API 能给 OpenAI 官方账户充值吗？", "answer": "3API 提供第三方 API 接入和用量管理服务，不是 OpenAI 官方充值渠道。" },
+      { "question": "买了 ChatGPT Plus 就能调用 API 吗？", "answer": "通常不能。Plus 订阅和 API 计费是不同体系，具体以 OpenAI 官方规则为准。" },
+      { "question": "国内开发应用更适合 Plus 还是 API？", "answer": "如果要把模型接入网站、工具、机器人、IDE 或自动化流程，应使用 API；如果只在 ChatGPT 产品里对话，则关注 Plus 或其他订阅方案。" }
+    ]
+  },
   "codex-api": {
     "path": "/codex-api",
-    "title": "Codex API 接入与配置 - AI 编程统一接口 | 3API",
-    "description": "3API Codex API 接入指南：配置 API 地址与密钥，在 Codex 客户端和 AI 编程工作流中使用后台已开通的模型能力。",
+    "title": "Codex 国内配置教程 - API Key 与 AI 编程统一接口 | 3API",
+    "description": "3API Codex 国内配置指南：填写 API 地址与密钥，在 Codex 客户端、AI 编程工作流和 OpenAI 兼容工具中使用后台已开通的模型能力。",
     "eyebrow": "CODEX FOR DEVELOPERS",
-    "heading": "让 Codex 接入更清晰、更可控",
-    "summary": "创建独立 API Key，配置接口地址，在控制台持续查看调用量与费用。适合个人开发者、Agent 工程师和研发团队。",
+    "heading": "Codex 国内配置，重点是 Key、地址和模型",
+    "summary": "创建独立 API Key，配置接口地址和模型名称，在控制台持续查看调用量与费用。适合个人开发者、Agent 工程师和研发团队。",
     "primaryCta": "开始配置",
-    "secondaryCta": "了解配置要点",
-    "secondaryPath": "/codex-api",
+    "secondaryCta": "查看 Base URL 配置",
+    "secondaryPath": "/api-base-url",
     "highlights": [
-      { "title": "快速配置", "text": "通过 API 地址和密钥完成客户端接入。" },
+      { "title": "快速配置", "text": "通过 API 地址、密钥和模型名称完成客户端接入。" },
       { "title": "会话连续", "text": "路由系统支持会话保持，减少长任务中的上下文漂移。" },
       { "title": "成本可见", "text": "按任务所产生的请求和 Token 追踪实际使用情况。" }
     ],
     "sections": [
-      { "title": "接入前需要准备什么", "body": "注册 3API、确认可用分组并创建 API Key。密钥只应保存在可信的本地配置或服务端环境变量中。" },
-      { "title": "兼容性检查", "body": "接入后先验证模型名称、流式输出、工具调用和长任务行为。不同客户端版本的配置字段可能不同，应以对应客户端文档为准。" },
+      { "title": "接入前需要准备什么", "body": "注册 3API、确认可用分组并创建 API Key，同时准备客户端需要的 Base URL、模型名称和本地配置文件位置。密钥只应保存在可信的本地配置或服务端环境变量中。" },
+      { "title": "兼容性检查", "body": "接入后先验证模型名称、流式输出、工具调用和长任务行为。不同客户端版本的配置字段可能不同，遇到 config.toml、auth.json 或环境变量配置问题时，应以对应客户端文档为准。" },
       { "title": "团队使用", "body": "建议为成员或项目拆分密钥并设置额度，避免多人共享一个密钥造成权限和成本归属不清。" }
     ],
     "faqs": [
