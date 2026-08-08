@@ -1867,7 +1867,7 @@ WITH distribution_thawed AS (
     RETURNING amount_cny_minor
 )
 SELECT COALESCE((SELECT SUM(amount_cny_minor) FROM distribution_thawed), 0)
-     + COALESCE((SELECT SUM(amount_cny_minor) FROM shop_thawed), 0)`).Scan(&amount); err != nil {
+     + COALESCE((SELECT SUM(amount_cny_minor) FROM shop_thawed), 0)`, programID, userID).Scan(&amount); err != nil {
 		return err
 	}
 	if amount > 0 {
