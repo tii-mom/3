@@ -36,7 +36,10 @@ const openFaq = ref<number | null>(0)
 const TABS: { value: FulfillmentMode; label: string; blurb: string }[] = [
   { value: 'session_topup', label: '代充值', blurb: '给自己已有的 ChatGPT 账号续费升级' },
   { value: 'account_delivery', label: '成品号', blurb: '直接拿一个开通好的独享账号' },
-  { value: 'rental', label: '租号', blurb: '按周或按月短期使用，成本更低' }
+  { value: 'rental', label: '租号', blurb: '按周或按月短期使用，成本更低' },
+  // 兜底 tab：后台新建商品时 fulfillment_mode 默认是 manual，
+  // 若没有这一项，未配置交付模式的商品会在首页被整体过滤掉（页面显示"准备中"空白）。
+  { value: 'manual', label: '其他服务', blurb: '人工受理，下单后客服按订单信息跟进交付' }
 ]
 
 const availableTabs = computed(() => TABS.filter((tab) => products.value.some((item) => item.fulfillment_mode === tab.value)))
