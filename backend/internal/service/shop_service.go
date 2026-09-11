@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -30,10 +31,30 @@ const (
 	ShopFulfillmentRental          = "rental"           // 租号：按时长租赁，后台人工发账号
 )
 
+// 商品品类（迁移 207）。与交付模式正交：品类表达「卖什么」，交付模式表达「怎么交付」。
+const (
+	ShopCategoryGPTTopup   = "gpt_topup"   // GPT / ChatGPT 代充值
+	ShopCategoryGPTAccount = "gpt_account" // GPT / ChatGPT 成品号
+	ShopCategoryXPremium   = "x_premium"   // X（Twitter）蓝 V / Premium
+	ShopCategoryGemini     = "gemini"      // Gemini 会员
+	ShopCategoryCodex      = "codex"       // Codex 相关
+	ShopCategoryOther      = "other"       // 其他
+)
+
+func isKnownCategory(category string) bool {
+	switch category {
+	case ShopCategoryGPTTopup, ShopCategoryGPTAccount, ShopCategoryXPremium,
+		ShopCategoryGemini, ShopCategoryCodex, ShopCategoryOther:
+		return true
+	}
+	return false
+}
+
 // shopProductColumns 统一商品 SELECT 列，避免各处 SQL 与扫描顺序不一致。
 const shopProductColumns = `id, name, description, image_url, product_type, price_cny_minor, original_price_cny_minor,
        grant_usd_amount::text, stock_quantity, sold_count, commission_bps, status, sort_order,
        fulfillment_mode, delivery_form_hint, badge_text, spec_label, highlight,
+       category, gallery_json,
        created_at, updated_at`
 
 // 系统游客账号邮箱（迁移 206 插入），用于承载免登录订单。
@@ -69,26 +90,28 @@ func (s *ShopService) SetSecretEncryptor(encryptor SecretEncryptor) {
 }
 
 type ShopProduct struct {
-	ID                    int64  `json:"id"`
-	Name                  string `json:"name"`
-	Description           string `json:"description"`
-	ImageURL              string `json:"image_url"`
-	ProductType           string `json:"product_type"`
-	PriceCNYMinor         int64  `json:"price_cny_minor"`
-	OriginalPriceCNYMinor int64  `json:"original_price_cny_minor"`
-	GrantUSDAmount        string `json:"grant_usd_amount"`
-	StockQuantity         *int64 `json:"stock_quantity,omitempty"`
-	SoldCount             int64  `json:"sold_count"`
-	CommissionBPS         int    `json:"commission_bps"`
-	Status                string `json:"status"`
-	SortOrder             int    `json:"sort_order"`
-	FulfillmentMode       string `json:"fulfillment_mode"`
-	DeliveryFormHint      string `json:"delivery_form_hint"`
-	BadgeText             string `json:"badge_text"`
-	SpecLabel             string `json:"spec_label"`
-	Highlight             bool   `json:"highlight"`
-	CreatedAt             string `json:"created_at,omitempty"`
-	UpdatedAt             string `json:"updated_at,omitempty"`
+	ID                    int64    `json:"id"`
+	Name                  string   `json:"name"`
+	Description           string   `json:"description"`
+	ImageURL              string   `json:"image_url"`
+	ProductType           string   `json:"product_type"`
+	PriceCNYMinor         int64    `json:"price_cny_minor"`
+	OriginalPriceCNYMinor int64    `json:"original_price_cny_minor"`
+	GrantUSDAmount        string   `json:"grant_usd_amount"`
+	StockQuantity         *int64   `json:"stock_quantity,omitempty"`
+	SoldCount             int64    `json:"sold_count"`
+	CommissionBPS         int      `json:"commission_bps"`
+	Status                string   `json:"status"`
+	SortOrder             int      `json:"sort_order"`
+	FulfillmentMode       string   `json:"fulfillment_mode"`
+	DeliveryFormHint      string   `json:"delivery_form_hint"`
+	BadgeText             string   `json:"badge_text"`
+	SpecLabel             string   `json:"spec_label"`
+	Highlight             bool     `json:"highlight"`
+	Category              string   `json:"category"`
+	Gallery               []string `json:"gallery"`
+	CreatedAt             string   `json:"created_at,omitempty"`
+	UpdatedAt             string   `json:"updated_at,omitempty"`
 }
 
 type ShopBanner struct {
@@ -155,6 +178,8 @@ type UpsertShopProductInput struct {
 	BadgeText             string
 	SpecLabel             string
 	Highlight             bool
+	Category              string
+	Gallery               []string
 }
 
 type UpsertShopBannerInput struct {
@@ -249,12 +274,13 @@ func (s *ShopService) CreateProduct(ctx context.Context, in UpsertShopProductInp
 	row := s.db.QueryRowContext(ctx, `
 INSERT INTO shop_products (tenant_id, name, description, image_url, product_type, price_cny_minor,
     original_price_cny_minor, grant_usd_amount, stock_quantity, commission_bps, status, sort_order,
-    fulfillment_mode, delivery_form_hint, badge_text, spec_label, highlight)
-VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+    fulfillment_mode, delivery_form_hint, badge_text, spec_label, highlight, category, gallery_json)
+VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 RETURNING `+shopProductColumns,
 		in.Name, in.Description, in.ImageURL, in.ProductType, in.PriceCNYMinor, in.OriginalPriceCNYMinor,
 		normalizeDecimalString(in.GrantUSDAmount), in.StockQuantity, in.CommissionBPS, in.Status, in.SortOrder,
-		in.FulfillmentMode, in.DeliveryFormHint, in.BadgeText, in.SpecLabel, in.Highlight)
+		in.FulfillmentMode, in.DeliveryFormHint, in.BadgeText, in.SpecLabel, in.Highlight,
+		in.Category, encodeGalleryJSON(in.Gallery))
 	item, err := scanShopProduct(row)
 	if err != nil {
 		return nil, err
@@ -276,12 +302,13 @@ UPDATE shop_products
 SET name = $2, description = $3, image_url = $4, product_type = $5, price_cny_minor = $6,
     original_price_cny_minor = $7, grant_usd_amount = $8, stock_quantity = $9, commission_bps = $10,
     status = $11, sort_order = $12, fulfillment_mode = $13, delivery_form_hint = $14, badge_text = $15,
-    spec_label = $16, highlight = $17, updated_at = NOW()
+    spec_label = $16, highlight = $17, category = $18, gallery_json = $19, updated_at = NOW()
 WHERE tenant_id = 1 AND id = $1 AND deleted_at IS NULL
 RETURNING `+shopProductColumns,
 		id, in.Name, in.Description, in.ImageURL, in.ProductType, in.PriceCNYMinor, in.OriginalPriceCNYMinor,
 		normalizeDecimalString(in.GrantUSDAmount), in.StockQuantity, in.CommissionBPS, in.Status, in.SortOrder,
-		in.FulfillmentMode, in.DeliveryFormHint, in.BadgeText, in.SpecLabel, in.Highlight)
+		in.FulfillmentMode, in.DeliveryFormHint, in.BadgeText, in.SpecLabel, in.Highlight,
+		in.Category, encodeGalleryJSON(in.Gallery))
 	item, err := scanShopProduct(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, infraerrors.NotFound("SHOP_PRODUCT_NOT_FOUND", "product not found")
@@ -771,8 +798,35 @@ func normalizeShopProductInput(in UpsertShopProductInput) UpsertShopProductInput
 	in.DeliveryFormHint = strings.TrimSpace(in.DeliveryFormHint)
 	in.BadgeText = strings.TrimSpace(in.BadgeText)
 	in.SpecLabel = strings.TrimSpace(in.SpecLabel)
+	in.Category = strings.TrimSpace(in.Category)
+	if !isKnownCategory(in.Category) {
+		in.Category = ShopCategoryOther
+	}
+	in.Gallery = normalizeGallery(in.Gallery)
 	in.GrantUSDAmount = normalizeDecimalString(in.GrantUSDAmount)
 	return in
+}
+
+// normalizeGallery 去掉空串与重复项，并限制图廊长度，避免后台误填导致前端渲染失控。
+func normalizeGallery(items []string) []string {
+	const maxGalleryItems = 6
+	clean := make([]string, 0, len(items))
+	seen := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		trimmed := strings.TrimSpace(item)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		clean = append(clean, trimmed)
+	}
+	if len(clean) > maxGalleryItems {
+		clean = clean[:maxGalleryItems]
+	}
+	return clean
 }
 
 func normalizeDecimalString(value string) string {
@@ -794,16 +848,50 @@ func scanShopProduct(rows productScanner) (ShopProduct, error) {
 	var item ShopProduct
 	var stock sql.NullInt64
 	var created, updated time.Time
+	var galleryRaw string
 	err := rows.Scan(&item.ID, &item.Name, &item.Description, &item.ImageURL, &item.ProductType, &item.PriceCNYMinor,
 		&item.OriginalPriceCNYMinor, &item.GrantUSDAmount, &stock, &item.SoldCount, &item.CommissionBPS,
 		&item.Status, &item.SortOrder, &item.FulfillmentMode, &item.DeliveryFormHint, &item.BadgeText,
-		&item.SpecLabel, &item.Highlight, &created, &updated)
+		&item.SpecLabel, &item.Highlight, &item.Category, &galleryRaw, &created, &updated)
 	if stock.Valid {
 		item.StockQuantity = &stock.Int64
+	}
+	item.Gallery = decodeGalleryJSON(galleryRaw)
+	if item.Category == "" {
+		item.Category = ShopCategoryOther
 	}
 	item.CreatedAt = created.Format(time.RFC3339)
 	item.UpdatedAt = updated.Format(time.RFC3339)
 	return item, err
+}
+
+// decodeGalleryJSON 把 gallery_json 列解析为图片 URL 数组。
+// 空值或脏数据一律退化为空数组，避免把无效 JSON 透传给前端。
+func decodeGalleryJSON(raw string) []string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return []string{}
+	}
+	var out []string
+	if err := json.Unmarshal([]byte(trimmed), &out); err != nil || out == nil {
+		return []string{}
+	}
+	return out
+}
+
+// encodeGalleryJSON 把图片 URL 数组序列化为 gallery_json 列值。
+func encodeGalleryJSON(items []string) string {
+	clean := make([]string, 0, len(items))
+	for _, item := range items {
+		if trimmed := strings.TrimSpace(item); trimmed != "" {
+			clean = append(clean, trimmed)
+		}
+	}
+	encoded, err := json.Marshal(clean)
+	if err != nil {
+		return "[]"
+	}
+	return string(encoded)
 }
 
 func scanShopOrder(rows productScanner) (ShopOrder, error) {

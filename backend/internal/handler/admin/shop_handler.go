@@ -17,17 +17,24 @@ func NewShopHandler(shopService *service.ShopService) *ShopHandler {
 }
 
 type shopProductRequest struct {
-	Name                  string `json:"name"`
-	Description           string `json:"description"`
-	ImageURL              string `json:"image_url"`
-	ProductType           string `json:"product_type"`
-	PriceCNYMinor         int64  `json:"price_cny_minor"`
-	OriginalPriceCNYMinor int64  `json:"original_price_cny_minor"`
-	GrantUSDAmount        string `json:"grant_usd_amount"`
-	StockQuantity         *int64 `json:"stock_quantity"`
-	CommissionBPS         int    `json:"commission_bps"`
-	Status                string `json:"status"`
-	SortOrder             int    `json:"sort_order"`
+	Name                  string   `json:"name"`
+	Description           string   `json:"description"`
+	ImageURL              string   `json:"image_url"`
+	ProductType           string   `json:"product_type"`
+	PriceCNYMinor         int64    `json:"price_cny_minor"`
+	OriginalPriceCNYMinor int64    `json:"original_price_cny_minor"`
+	GrantUSDAmount        string   `json:"grant_usd_amount"`
+	StockQuantity         *int64   `json:"stock_quantity"`
+	CommissionBPS         int      `json:"commission_bps"`
+	Status                string   `json:"status"`
+	SortOrder             int      `json:"sort_order"`
+	FulfillmentMode       string   `json:"fulfillment_mode"`
+	DeliveryFormHint      string   `json:"delivery_form_hint"`
+	BadgeText             string   `json:"badge_text"`
+	SpecLabel             string   `json:"spec_label"`
+	Highlight             bool     `json:"highlight"`
+	Category              string   `json:"category"`
+	Gallery               []string `json:"gallery"`
 }
 
 type shopBannerRequest struct {
@@ -199,6 +206,13 @@ func (r shopProductRequest) toServiceInput() service.UpsertShopProductInput {
 		CommissionBPS:         r.CommissionBPS,
 		Status:                r.Status,
 		SortOrder:             r.SortOrder,
+		FulfillmentMode:       r.FulfillmentMode,
+		DeliveryFormHint:      r.DeliveryFormHint,
+		BadgeText:             r.BadgeText,
+		SpecLabel:             r.SpecLabel,
+		Highlight:             r.Highlight,
+		Category:              r.Category,
+		Gallery:               r.Gallery,
 	}
 }
 
