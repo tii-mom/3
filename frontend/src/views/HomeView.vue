@@ -6,7 +6,7 @@ import { formatCNY, publicShopAPI, type PublicBanner, type PublicProduct } from 
 import { SHOP_CATEGORIES, normalizeShopCategory, type ShopCategory } from '@/constants/shop'
 import userAPI from '@/api/user'
 import { resolveShopAssetUrl } from '@/api/shop'
-import { pickBestDeal } from '@/utils/shopDeal'
+import { planHeroPromo } from '@/utils/heroPromo'
 import { useGuestCheckout } from '@/composables/useGuestCheckout'
 import { useRevealOnScroll } from '@/composables/useRevealOnScroll'
 import PlanCard from '@/components/home/PlanCard.vue'
@@ -66,41 +66,47 @@ const categoryGroups = computed(() => {
   }))
 })
 
+/** 按展示顺序（推荐位 → sort_order → id）排好的商品，首屏所有选品都从这里取 */
+const orderedProducts = computed(() => products.value.slice().sort(compareProducts))
+
 /**
- * 首屏右侧悬浮卡取前三个商品：先推荐位、再按后台排序。
+ * 首屏右侧悬浮卡取前三个商品。
  * 用真实商品而不是装饰卡——悬浮元素本身就是购买入口，点一下直接开下单抽屉。
+ * 想让某个商品出现在这里，在后台把它勾上「推荐位」或把排序值调小。
  */
-const heroProducts = computed(() => products.value.slice().sort(compareProducts).slice(0, 3))
+const heroProducts = computed(() => orderedProducts.value.slice(0, 3))
+
+const heroPromoPlan = computed(() => planHeroPromo(orderedProducts.value))
 
 /**
- * 首屏促销条的文案全部由真实商品数据推导，不写死折扣数字。
- * 理由：后台目前没有任何「新客立减 / 优惠券」规则，如果促销条上写一个凭空的优惠金额，
- * 用户下单时对不上，属于虚假宣传。这里只在商品确实配了划线原价（original_price > price）时
- * 才显示「省 ¥X」，否则退化成一句不含数字的服务承诺。
+ * 首屏促销条的文案全部由真实商品数据推导。选品规则见 @/utils/heroPromo：
+ * 只主推后台勾了「推荐」的商品，没有任何推荐位时退化成不含商品名的服务承诺——
+ * 避免自动挑中「XX（无质保）」这类名字，把首屏最响的位置浪费掉。
  */
-const heroDeal = computed(() => pickBestDeal(products.value))
-
 const heroPromo = computed(() => {
-  const deal = heroDeal.value
-  if (deal) {
+  const { product, savingMinor, minPriceMinor } = heroPromoPlan.value
+  if (product) {
     return {
-      title: deal.product.name,
-      subtitle: '官方渠道代充值 · 下单立减',
-      badge: `省 ¥${formatCNY(deal.savingMinor)}`,
+      title: product.name,
+      subtitle: savingMinor > 0 ? '官方渠道代充值 · 下单立减' : '官方渠道直供 · 1-3 分钟到账',
+      badge:
+        savingMinor > 0
+          ? `省 ¥${formatCNY(savingMinor)}`
+          : `¥${formatCNY(product.price_cny_minor)}`,
       actionText: '立即下单'
     }
   }
   return {
     title: 'ChatGPT Plus / Pro 会员代充',
-    subtitle: '1-3 分钟到账 · 30 天质保 · 全程不需要账号密码',
-    badge: '查看套餐',
-    actionText: '立即充值'
+    subtitle: '1-3 分钟到账 · 30 天质保 · 不需要账号密码',
+    badge: minPriceMinor !== null ? `最低 ¥${formatCNY(minPriceMinor)} 起` : '查看套餐',
+    actionText: '查看套餐'
   }
 })
 
 /** 首屏促销条：点击直接进入购买环节 */
 function onPromoAction() {
-  const target = heroDeal.value?.product || heroProducts.value[0]
+  const target = heroPromoPlan.value.product || heroProducts.value[0]
   if (target) {
     openSheet(target)
     return
