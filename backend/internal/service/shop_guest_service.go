@@ -520,14 +520,15 @@ func generateGuestOrderNo(ctx context.Context, tx *sql.Tx) (string, error) {
 	const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 	for attempt := 0; attempt < 8; attempt++ {
 		var sb strings.Builder
-		sb.WriteString(guestOrderNoPrefix)
-		sb.WriteString(time.Now().Format("20060102"))
+		// strings.Builder 的 Write* 永远返回 nil error，显式忽略以满足 errcheck。
+		_, _ = sb.WriteString(guestOrderNoPrefix)
+		_, _ = sb.WriteString(time.Now().Format("20060102"))
 		for i := 0; i < guestOrderNoRandomLen; i++ {
 			idx, err := rand.Int(rand.Reader, big.NewInt(int64(len(alphabet))))
 			if err != nil {
 				return "", err
 			}
-			sb.WriteByte(alphabet[idx.Int64()])
+			_ = sb.WriteByte(alphabet[idx.Int64()])
 		}
 		candidate := sb.String()
 		var exists int
