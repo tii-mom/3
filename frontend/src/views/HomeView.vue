@@ -2,7 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import FAQ_ITEMS from '@/content/home-faq.json'
 import { useAppStore } from '@/stores/app'
-import { publicShopAPI, type FulfillmentMode, type PublicBanner, type PublicProduct } from '@/api/publicShop'
+import { publicShopAPI, type PublicBanner, type PublicProduct } from '@/api/publicShop'
+import { SHOP_CATEGORIES, normalizeShopCategory, type ShopCategory } from '@/constants/shop'
 import userAPI from '@/api/user'
 import { resolveShopAssetUrl } from '@/api/shop'
 import { useGuestCheckout } from '@/composables/useGuestCheckout'
@@ -28,37 +29,43 @@ const products = ref<PublicProduct[]>([])
 const banners = ref<PublicBanner[]>([])
 const affCode = ref('')
 const loading = ref(true)
-const activeTab = ref<FulfillmentMode>('session_topup')
 const sheetOpen = ref(false)
 const selectedProduct = ref<PublicProduct | null>(null)
 const openFaq = ref<number | null>(0)
 
-const TABS: { value: FulfillmentMode; label: string; blurb: string }[] = [
-  { value: 'session_topup', label: '代充值', blurb: '给自己已有的 ChatGPT 账号续费升级' },
-  { value: 'account_delivery', label: '成品号', blurb: '直接拿一个开通好的独享账号' },
-  { value: 'rental', label: '租号', blurb: '按周或按月短期使用，成本更低' },
-  // 兜底 tab：后台新建商品时 fulfillment_mode 默认是 manual，
-  // 若没有这一项，未配置交付模式的商品会在首页被整体过滤掉（页面显示"准备中"空白）。
-  { value: 'manual', label: '其他服务', blurb: '人工受理，下单后客服按订单信息跟进交付' }
-]
+/**
+ * 商品按品类分组（而不是按交付模式 tab）。
+ * 品类回答「卖什么」（GPT 代充 / 成品号 / X 蓝V / Gemini ...），所有分组都直接渲染到 DOM，
+ * 不像 tab 那样只渲染当前激活的一组——既方便横向比价，也让爬虫能抓到全部商品。
+ */
+function compareProducts(a: PublicProduct, b: PublicProduct) {
+  if (a.highlight !== b.highlight) return a.highlight ? -1 : 1
+  if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order
+  return a.id - b.id
+}
 
-const availableTabs = computed(() => TABS.filter((tab) => products.value.some((item) => item.fulfillment_mode === tab.value)))
-const visibleProducts = computed(() => products.value.filter((item) => item.fulfillment_mode === activeTab.value))
-const activeTabBlurb = computed(() => availableTabs.value.find((tab) => tab.value === activeTab.value)?.blurb || '')
+const categoryGroups = computed(() => {
+  const buckets = new Map<ShopCategory, PublicProduct[]>()
+  for (const product of products.value) {
+    const key = normalizeShopCategory(product.category)
+    const bucket = buckets.get(key)
+    if (bucket) bucket.push(product)
+    else buckets.set(key, [product])
+  }
+  // 按 SHOP_CATEGORIES 的固定顺序输出，空品类不渲染
+  return SHOP_CATEGORIES.filter((meta) => (buckets.get(meta.value)?.length ?? 0) > 0).map((meta) => ({
+    value: meta.value,
+    label: meta.label,
+    blurb: meta.blurb,
+    items: (buckets.get(meta.value) || []).slice().sort(compareProducts)
+  }))
+})
+
 const contactInfo = computed(() => appStore.contactInfo?.trim() || '')
 // 下单抽屉里的支付方式：后台配置 ∩ 当前商品金额在单笔限额内
 const sheetPaymentMethods = computed(() =>
   selectedProduct.value ? methodsForAmount(selectedProduct.value.price_cny_minor) : []
 )
-
-const ASSURANCE = [
-  { title: '官方渠道充值', desc: '按官方订阅流程开通，不开后门、不刷额度' },
-  { title: '1-3 分钟到账', desc: '凭证提交后自动进入处理队列' },
-  { title: '30 天质保', desc: '非用户原因中断，按条款处理' },
-  { title: '订单可查', desc: '凭订单号 + 联系方式随时看进度' },
-  { title: '正规发票', desc: '按实际金额开票，报销无忧' },
-  { title: '边界透明', desc: '第三方独立服务，非 OpenAI 官方' }
-]
 
 const METRICS = [
   { value: '1-3', unit: '分钟', label: '平均到账时间' },
@@ -67,12 +74,38 @@ const METRICS = [
   { value: '24', unit: '小时', label: '售后响应窗口' }
 ]
 
-const COMPARISON = [
-  { label: '适合谁', topup: '已有账号要续费', account: '想换个新号', rental: '短期试用' },
-  { label: '需要提供', topup: '登录凭证', account: '接收邮箱', rental: '接收邮箱' },
-  { label: '账号归属', topup: '你自己的号', account: '交付给你', rental: '租期内使用' },
-  { label: '交付时效', topup: '1-3 分钟', account: '人工发货', rental: '人工发货' },
-  { label: '成本', topup: '低', account: '中', rental: '最低' }
+/** 三种交付方式对比：按「方式」分组而不是按维度分行，移动端更好读 */
+const COMPARISON: { name: string; for: string; rows: [string, string][] }[] = [
+  {
+    name: '代充值',
+    for: '已有账号要续费',
+    rows: [
+      ['需要提供', '登录凭证'],
+      ['账号归属', '你自己的号'],
+      ['交付时效', '1-3 分钟'],
+      ['成本', '低']
+    ]
+  },
+  {
+    name: '成品号',
+    for: '想换个新号',
+    rows: [
+      ['需要提供', '接收邮箱'],
+      ['账号归属', '交付给你'],
+      ['交付时效', '人工发货'],
+      ['成本', '中']
+    ]
+  },
+  {
+    name: '租号',
+    for: '短期试用',
+    rows: [
+      ['需要提供', '接收邮箱'],
+      ['账号归属', '租期内使用'],
+      ['交付时效', '人工发货'],
+      ['成本', '最低']
+    ]
+  }
 ]
 
 onMounted(async () => {
@@ -90,10 +123,6 @@ onMounted(async () => {
     products.value = []
   } finally {
     loading.value = false
-    const first = availableTabs.value[0]
-    if (first && !products.value.some((item) => item.fulfillment_mode === activeTab.value)) {
-      activeTab.value = first.value
-    }
   }
   // 推广奖励只在登录后展示
   if (isLoggedIn.value) {
@@ -114,7 +143,6 @@ function openSheet(product: PublicProduct) {
 function openBannerProduct(productID: number) {
   const product = products.value.find((item) => item.id === productID)
   if (!product) return
-  activeTab.value = product.fulfillment_mode
   openSheet(product)
 }
 
@@ -155,13 +183,16 @@ function handlePaymentSuccess() {
     <main>
       <section class="hero">
         <div class="hero__grid" aria-hidden="true" />
+        <div class="hero__aura" aria-hidden="true">
+          <span class="hero__orb hero__orb--a" />
+          <span class="hero__orb hero__orb--b" />
+        </div>
         <div class="hero__inner">
           <div class="hero__copy">
             <p class="eyebrow">ChatGPT Plus / Pro 充值 · 成品号直供</p>
             <h1 class="hero__title">给你的 ChatGPT 续上<br>官方会员与独享账号</h1>
             <p class="hero__desc">
-              官方渠道代充值，1-3 分钟到账，30 天质保，可开发票。
-              不想动自己的账号？成品号与租号即买即用，全程不需要账号密码。
+              官方渠道代充值，1-3 分钟到账，30 天质保。成品号与租号即买即用，全程不需要账号密码。
             </p>
             <div class="hero__actions">
               <a class="sh-btn sh-btn--primary" href="#plans">选择套餐</a>
@@ -258,42 +289,38 @@ function handlePaymentSuccess() {
             <p class="section__desc">价格以支付前页面显示为准，支持支付宝与微信支付</p>
           </header>
 
-          <div v-if="availableTabs.length" class="sh-tabs">
-            <div class="sh-tabs__track" role="tablist">
-              <button
-                v-for="tab in availableTabs"
-                :key="tab.value"
-                type="button"
-                role="tab"
-                class="sh-tabs__item"
-                :class="{ 'sh-tabs__item--active': activeTab === tab.value }"
-                :aria-selected="activeTab === tab.value"
-                @click="activeTab = tab.value"
-              >
-                {{ tab.label }}
-              </button>
-            </div>
-            <p v-if="activeTabBlurb" class="sh-tabs__blurb">{{ activeTabBlurb }}</p>
-          </div>
-
           <div v-if="loading" class="plans__grid">
             <div v-for="i in 3" :key="i" class="sh-skeleton" />
           </div>
 
-          <div v-else-if="visibleProducts.length" class="plans__grid">
-            <PlanCard
-              v-for="product in visibleProducts"
-              :key="product.id"
-              :product="product"
-              :show-commission="isLoggedIn"
-              :aff-code="affCode"
-              @select="openSheet"
-            />
-          </div>
+          <template v-else-if="categoryGroups.length">
+            <nav v-if="categoryGroups.length > 1" class="plans__nav" aria-label="商品分类">
+              <a v-for="group in categoryGroups" :key="group.value" class="plans__nav-item" :href="`#cat-${group.value}`">
+                {{ group.label }}
+              </a>
+            </nav>
+
+            <section v-for="group in categoryGroups" :id="`cat-${group.value}`" :key="group.value" class="plans__group">
+              <header class="plans__group-head">
+                <h3 class="plans__group-title">{{ group.label }}</h3>
+                <p v-if="group.blurb" class="plans__group-blurb">{{ group.blurb }}</p>
+              </header>
+              <div class="plans__grid">
+                <PlanCard
+                  v-for="product in group.items"
+                  :key="product.id"
+                  :product="product"
+                  :show-commission="isLoggedIn"
+                  :aff-code="affCode"
+                  @select="openSheet"
+                />
+              </div>
+            </section>
+          </template>
 
           <div v-else class="empty">
-            <p class="empty__title">这个分类的套餐正在准备中</p>
-            <p class="empty__desc">可以先看看其他分类，或联系客服咨询</p>
+            <p class="empty__title">套餐正在准备中</p>
+            <p class="empty__desc">可以先联系客服咨询，或稍后再来看看</p>
           </div>
         </div>
       </section>
@@ -337,41 +364,20 @@ function handlePaymentSuccess() {
         <div class="section__inner">
           <header class="section__head">
             <h2 class="section__title">三种方式怎么选</h2>
-            <p class="section__desc">一张表看懂差异</p>
+            <p class="section__desc">按你现在的情况对号入座</p>
           </header>
-          <div class="sh-table-wrap">
-            <table class="sh-table">
-              <thead>
-                <tr>
-                  <th />
-                  <th>代充值</th>
-                  <th>成品号</th>
-                  <th>租号</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="row in COMPARISON" :key="row.label">
-                  <th scope="row">{{ row.label }}</th>
-                  <td>{{ row.topup }}</td>
-                  <td>{{ row.account }}</td>
-                  <td>{{ row.rental }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <section class="assurance">
-        <div class="section__inner">
-          <header class="section__head">
-            <h2 class="section__title">服务保障</h2>
-            <p class="section__desc">流程写清楚，售后才有据可依</p>
-          </header>
-          <div class="assurance__grid">
-            <article v-for="item in ASSURANCE" :key="item.title" class="assurance__card">
-              <h3>{{ item.title }}</h3>
-              <p>{{ item.desc }}</p>
+          <div class="compare__grid">
+            <article v-for="col in COMPARISON" :key="col.name" class="compare__card">
+              <header class="compare__head">
+                <h3 class="compare__name">{{ col.name }}</h3>
+                <p class="compare__for">{{ col.for }}</p>
+              </header>
+              <dl class="compare__rows">
+                <div v-for="row in col.rows" :key="row[0]" class="compare__row">
+                  <dt>{{ row[0] }}</dt>
+                  <dd>{{ row[1] }}</dd>
+                </div>
+              </dl>
             </article>
           </div>
         </div>
@@ -403,13 +409,9 @@ function handlePaymentSuccess() {
       </section>
 
       <section class="closing">
-        <div class="section__inner section__inner--narrow closing__inner">
-          <h2>准备好开始了吗</h2>
-          <p>选择套餐后支付，1-3 分钟内完成。需要帮助随时联系客服。</p>
-          <div class="closing__actions">
-            <a class="sh-btn sh-btn--primary" href="#plans">选择套餐</a>
-            <RouterLink class="sh-btn sh-btn--ghost" to="/order">查询订单</RouterLink>
-          </div>
+        <div class="section__inner closing__inner">
+          <h2 class="closing__title">准备好开始了吗</h2>
+          <a class="sh-btn sh-btn--primary" href="#plans">选择套餐</a>
         </div>
       </section>
     </main>
@@ -502,6 +504,9 @@ function handlePaymentSuccess() {
   --sh-accent-text: #b34b1f;
   --sh-grid: rgba(9, 9, 11, 0.05);
   --sh-scrim: rgba(9, 9, 11, 0.55);
+  /* 首屏光斑：品牌橙 + 少量冷色，饱和度压到最低，只做氛围不抢内容 */
+  --sh-aura-1: rgba(216, 90, 40, 0.15);
+  --sh-aura-2: rgba(58, 118, 240, 0.11);
   --sh-shadow: 0 1px 2px rgba(9, 9, 11, 0.04), 0 1px 3px rgba(9, 9, 11, 0.04);
 
   min-height: 100vh;
@@ -659,6 +664,71 @@ function handlePaymentSuccess() {
   -webkit-mask-image: radial-gradient(ellipse 90% 62% at 50% 0%, #000 0%, transparent 72%);
   mask-image: radial-gradient(ellipse 90% 62% at 50% 0%, #000 0%, transparent 72%);
   pointer-events: none;
+}
+
+/* 动态背景：两团渐变光斑做极缓呼吸（34s / 44s 交替）。
+   只动 opacity 与 transform —— 两者都走 GPU 合成，不触发重排重绘；
+   没有 JS、没有 canvas、没有视频，常驻内存开销约等于 0。
+   光斑本身用 radial-gradient 自带柔边，不需要 filter: blur（那才真的吃性能）。 */
+.hero__aura {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.hero__orb {
+  position: absolute;
+  border-radius: 50%;
+  will-change: opacity, transform;
+}
+
+.hero__orb--a {
+  top: -22%;
+  left: -8%;
+  width: 52vw;
+  height: 52vw;
+  background: radial-gradient(circle at 50% 50%, var(--sh-aura-1) 0%, transparent 66%);
+  animation: sh-orb-a 34s ease-in-out infinite alternate;
+}
+
+.hero__orb--b {
+  top: -12%;
+  right: -12%;
+  width: 44vw;
+  height: 44vw;
+  background: radial-gradient(circle at 50% 50%, var(--sh-aura-2) 0%, transparent 66%);
+  animation: sh-orb-b 44s ease-in-out infinite alternate;
+}
+
+@keyframes sh-orb-a {
+  from {
+    opacity: 0.5;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    opacity: 0.85;
+    transform: translate3d(2%, -2%, 0) scale(1.07);
+  }
+}
+
+@keyframes sh-orb-b {
+  from {
+    opacity: 0.38;
+    transform: translate3d(0, 0, 0) scale(1.04);
+  }
+  to {
+    opacity: 0.68;
+    transform: translate3d(-2%, 2%, 0) scale(1);
+  }
+}
+
+/* 系统开启「减弱动态效果」时退化为静态光斑 */
+@media (prefers-reduced-motion: reduce) {
+  .hero__orb {
+    animation: none;
+    opacity: 0.6;
+  }
 }
 
 .hero__inner {
@@ -954,44 +1024,53 @@ function handlePaymentSuccess() {
   padding: 96px 0;
 }
 
-/* 分段控件：不是卡片，是一个整体 */
-.sh-tabs {
-  margin-bottom: 32px;
+/* 品类锚点导航：胶囊 chip，点击滚到对应分组 */
+.plans__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 40px;
 }
 
-.sh-tabs__track {
-  display: inline-flex;
-  padding: 4px;
-  gap: 2px;
-  border-radius: 11px;
+.plans__nav-item {
+  padding: 7px 16px;
+  border-radius: 999px;
   border: 1px solid var(--sh-border);
   background: var(--sh-surface-2);
-}
-
-.sh-tabs__item {
-  padding: 8px 20px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
   color: var(--sh-text-2);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
-  cursor: pointer;
-  transition: background 160ms ease-out, color 160ms ease-out;
+  text-decoration: none;
+  transition: color 160ms ease-out, border-color 160ms ease-out;
 }
 
-.sh-tabs__item:hover {
+.plans__nav-item:hover {
+  color: var(--sh-text);
+  border-color: var(--sh-border-strong);
+}
+
+/* 分组之间留出比卡片间距更大的呼吸，避免所有商品糊成一片 */
+.plans__group {
+  scroll-margin-top: 88px;
+}
+
+.plans__group + .plans__group {
+  margin-top: 56px;
+}
+
+.plans__group-head {
+  margin-bottom: 20px;
+}
+
+.plans__group-title {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--sh-text);
 }
 
-.sh-tabs__item--active {
-  background: var(--sh-surface);
-  color: var(--sh-text);
-  box-shadow: var(--sh-shadow);
-}
-
-.sh-tabs__blurb {
-  margin-top: 12px;
+.plans__group-blurb {
+  margin-top: 6px;
   font-size: 13px;
   color: var(--sh-text-3);
 }
@@ -1099,78 +1178,54 @@ function handlePaymentSuccess() {
   border-top: 1px solid var(--sh-border);
 }
 
-.sh-table-wrap {
-  overflow-x: auto;
-  border-radius: 14px;
-  border: 1px solid var(--sh-border);
-}
-
-.sh-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-}
-
-.sh-table th,
-.sh-table td {
-  padding: 16px 20px;
-  text-align: left;
-  border-bottom: 1px solid var(--sh-border);
-}
-
-.sh-table thead th {
-  font-weight: 500;
-  color: var(--sh-text);
-  background: var(--sh-surface-2);
-}
-
-.sh-table tbody th {
-  font-weight: 400;
-  color: var(--sh-text-3);
-  white-space: nowrap;
-}
-
-.sh-table td {
-  color: var(--sh-text);
-}
-
-.sh-table tbody tr:last-child th,
-.sh-table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-/* ---------- assurance ---------- */
-.assurance {
-  padding: 96px 0;
-  border-top: 1px solid var(--sh-border);
-}
-
-.assurance__grid {
+/* 三列对比卡：比表格少一半文字，移动端也不用横向滚动 */
+.compare__grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
-  background: var(--sh-border);
-  border: 1px solid var(--sh-border);
-  border-radius: 14px;
-  overflow: hidden;
+  gap: 20px;
 }
 
-.assurance__card {
-  padding: 24px;
+.compare__card {
+  padding: 24px 22px;
+  border: 1px solid var(--sh-border);
+  border-radius: 14px;
   background: var(--sh-surface);
 }
 
-.assurance__card h3 {
-  font-size: 15px;
+.compare__name {
+  font-size: 17px;
   font-weight: 600;
   color: var(--sh-text);
 }
 
-.assurance__card p {
-  margin-top: 8px;
-  font-size: 14px;
-  line-height: 1.7;
-  color: var(--sh-text-2);
+.compare__for {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--sh-text-3);
+}
+
+.compare__rows {
+  margin: 20px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.compare__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.compare__row dt {
+  color: var(--sh-text-3);
+}
+
+.compare__row dd {
+  color: var(--sh-text);
+  text-align: right;
 }
 
 /* ---------- faq ---------- */
@@ -1222,33 +1277,24 @@ function handlePaymentSuccess() {
 
 /* ---------- closing ---------- */
 .closing {
-  padding: 96px 0;
+  padding: 72px 0;
   border-top: 1px solid var(--sh-border);
 }
 
+/* 一句话 + 一个按钮，横向排布；不再重复 hero 里已经说过的说明文字 */
 .closing__inner {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
 }
 
-.closing h2 {
-  font-size: 30px;
+.closing__title {
+  font-size: 26px;
   font-weight: 600;
   letter-spacing: -0.025em;
   color: var(--sh-text);
-}
-
-.closing p {
-  margin-top: 12px;
-  font-size: 15px;
-  color: var(--sh-text-2);
-}
-
-.closing__actions {
-  margin-top: 32px;
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  flex-wrap: wrap;
 }
 
 /* ---------- footer ---------- */
@@ -1333,7 +1379,7 @@ function handlePaymentSuccess() {
   }
 
   .workflow__grid,
-  .assurance__grid {
+  .compare__grid {
     grid-template-columns: 1fr;
   }
 
@@ -1389,7 +1435,6 @@ function handlePaymentSuccess() {
   .plans,
   .workflow,
   .compare,
-  .assurance,
   .faq,
   .closing {
     padding: 64px 0;
@@ -1403,32 +1448,34 @@ function handlePaymentSuccess() {
     font-size: 24px;
   }
 
-  /* 分段控件横向滚动，避免竖排堆叠 */
-  .sh-tabs__track {
-    display: flex;
-    width: 100%;
+  /* 品类导航横向滚动，避免竖排堆叠占满首屏 */
+  .plans__nav {
+    flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: none;
+    margin-bottom: 28px;
   }
 
-  .sh-tabs__track::-webkit-scrollbar {
+  .plans__nav::-webkit-scrollbar {
     display: none;
   }
 
-  .sh-tabs__item {
-    flex: 1 0 auto;
-    text-align: center;
-    padding: 8px 16px;
+  .plans__nav-item {
+    flex: 0 0 auto;
+  }
+
+  .plans__group + .plans__group {
+    margin-top: 44px;
   }
 
   .plans__grid {
     grid-template-columns: 1fr;
   }
 
-  .sh-table th,
-  .sh-table td {
-    padding: 13px 14px;
-    font-size: 13px;
+  .closing__inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
   }
 
   .footer__cols {
@@ -1495,5 +1542,8 @@ function handlePaymentSuccess() {
   --sh-grid: rgba(255, 255, 255, 0.045);
   --sh-scrim: rgba(0, 0, 0, 0.6);
   --sh-shadow: none;
+  /* 深色下光斑更亮一点，否则近黑背景上看不见 */
+  --sh-aura-1: rgba(255, 122, 69, 0.2);
+  --sh-aura-2: rgba(88, 132, 255, 0.15);
 }
 </style>

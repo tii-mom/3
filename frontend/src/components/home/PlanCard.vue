@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { formatCNY, type PublicProduct } from '@/api/publicShop'
+import { resolveShopAssetUrl } from '@/api/shop'
 
 const props = defineProps<{
   product: PublicProduct
@@ -11,6 +12,15 @@ const props = defineProps<{
 }>()
 
 defineEmits<{ select: [product: PublicProduct] }>()
+
+/** 主图 + 图廊合成一组；hover 时切到第二张，移开回到主图（不做自动轮播） */
+const images = computed(() =>
+  [props.product.image_url, ...(props.product.gallery || [])]
+    .map((url) => resolveShopAssetUrl(url))
+    .filter(Boolean)
+)
+const hovered = ref(false)
+const displayImage = computed(() => (hovered.value ? images.value[1] || images.value[0] : images.value[0]) || '')
 
 const soldOut = computed(() => props.product.stock_quantity !== null && props.product.stock_quantity !== undefined && props.product.stock_quantity <= 0)
 const lowStock = computed(() => !soldOut.value && props.product.stock_quantity !== null && props.product.stock_quantity !== undefined && props.product.stock_quantity <= 5)
@@ -42,14 +52,22 @@ async function copyPromotionLink() {
     class="plan-card"
     :class="{ 'plan-card--featured': product.highlight, 'plan-card--soldout': soldOut }"
   >
-    <div v-if="product.badge_text" class="plan-card__badge">{{ product.badge_text }}</div>
-
-    <div v-if="product.image_url" class="plan-card__media">
-      <img :src="product.image_url" :alt="product.name" loading="lazy">
+    <div
+      v-if="images.length"
+      class="plan-card__media"
+      @mouseenter="hovered = true"
+      @mouseleave="hovered = false"
+    >
+      <img :src="displayImage" :alt="product.name" loading="lazy">
+      <span v-if="images.length > 1" class="plan-card__media-count">{{ images.length }} 图</span>
     </div>
 
     <header class="plan-card__head">
-      <h3 class="plan-card__title">{{ product.name }}</h3>
+      <!-- 角标放在标题行内：绝对定位到右上角会和商品图重叠，导致文字压在图上读不清 -->
+      <div class="plan-card__title-line">
+        <h3 class="plan-card__title">{{ product.name }}</h3>
+        <span v-if="product.badge_text" class="plan-card__badge">{{ product.badge_text }}</span>
+      </div>
       <p v-if="product.description" class="plan-card__desc">{{ product.description }}</p>
     </header>
 
@@ -111,10 +129,16 @@ async function copyPromotionLink() {
   opacity: 0.6;
 }
 
+.plan-card__title-line {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .plan-card__badge {
-  position: absolute;
-  top: 14px;
-  right: 16px;
+  flex: 0 0 auto;
+  margin-top: 2px;
   padding: 3px 9px;
   border-radius: 6px;
   background: var(--sh-accent-soft, rgba(216, 90, 40, 0.08));
@@ -122,14 +146,16 @@ async function copyPromotionLink() {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .plan-card__title {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.015em;
   color: var(--sh-text, #09090b);
-  padding-right: 56px;
 }
 
 .plan-card__desc {
@@ -138,6 +164,13 @@ async function copyPromotionLink() {
   line-height: 1.7;
   color: var(--sh-text-2, #56565f);
   min-height: 44px;
+  /* 后台介绍支持换行，这里保留换行与多余空格的语义 */
+  white-space: pre-line;
+  /* 统一截到两行：同组卡片的图片/价格才能横向对齐，完整介绍在下单抽屉里看 */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .plan-card__price {
@@ -198,6 +231,7 @@ async function copyPromotionLink() {
 }
 
 .plan-card__media {
+  position: relative;
   height: 128px;
   margin: -2px 0 2px;
   overflow: hidden;
@@ -210,6 +244,20 @@ async function copyPromotionLink() {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* 图廊角标：告诉用户还有更多图，hover 可切换 */
+.plan-card__media-count {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(9, 9, 11, 0.62);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
 .plan-card__meta--warn {

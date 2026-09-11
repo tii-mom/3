@@ -1,5 +1,6 @@
 import { apiClient } from './client'
 import type { CreateOrderResult } from '@/types/payment'
+import type { ShopCategory } from '@/constants/shop'
 
 /**
  * 官网首页「免登录直充」链路的数据层。
@@ -7,6 +8,14 @@ import type { CreateOrderResult } from '@/types/payment'
  */
 
 export type FulfillmentMode = 'manual' | 'session_topup' | 'account_delivery' | 'rental'
+
+export type { ShopCategory as ProductCategory } from '@/constants/shop'
+export {
+  SHOP_CATEGORIES,
+  normalizeShopCategory,
+  shopCategoryBlurb,
+  shopCategoryLabel,
+} from '@/constants/shop'
 
 export interface PublicProduct {
   id: number
@@ -24,6 +33,8 @@ export interface PublicProduct {
   badge_text: string
   spec_label: string
   highlight: boolean
+  category: ShopCategory
+  gallery: string[]
   sort_order: number
 }
 

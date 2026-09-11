@@ -2,10 +2,14 @@ import { apiClient } from './client'
 import { buildApiUrl } from './url'
 import type { BasePaginationResponse } from '@/types'
 import type { CreateOrderResult } from '@/types/payment'
+import { SHOP_CATEGORIES, type ShopCategory } from '@/constants/shop'
 
 export type ShopProductType = 'virtual' | 'platform_usd_balance'
 export type ShopProductStatus = 'draft' | 'published' | 'archived'
 export type ShopFulfillmentMode = 'manual' | 'session_topup' | 'account_delivery' | 'rental'
+
+export type { ShopCategory }
+export { SHOP_CATEGORIES }
 
 export interface ShopProduct {
   id: number
@@ -26,6 +30,8 @@ export interface ShopProduct {
   badge_text: string
   spec_label: string
   highlight: boolean
+  category: ShopCategory
+  gallery: string[]
   created_at?: string
   updated_at?: string
 }
@@ -94,6 +100,8 @@ export interface ShopProductPayload {
   badge_text?: string
   spec_label?: string
   highlight?: boolean
+  category?: ShopCategory
+  gallery?: string[]
 }
 
 export interface ShopBannerPayload {

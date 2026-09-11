@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores'
 import { formatCNY, FULFILLMENT_LABELS, deliveryRequirement, type PublicProduct } from '@/api/publicShop'
+import { resolveShopAssetUrl } from '@/api/shop'
 import type { GuestPaymentOption } from '@/composables/useGuestCheckout'
 
 const props = defineProps<{
@@ -25,6 +26,17 @@ const contact = ref('')
 const paymentType = ref('')
 const agreed = ref(false)
 const touched = ref(false)
+
+/** 主图 + 图廊；切换商品时回到第一张 */
+const images = computed(() =>
+  [props.product?.image_url, ...(props.product?.gallery || [])]
+    .map((url) => resolveShopAssetUrl(url))
+    .filter(Boolean)
+)
+const activeImage = ref(0)
+watch(() => props.product?.id, () => {
+  activeImage.value = 0
+})
 
 const methods = computed(() => props.paymentMethods || [])
 const noMethodAvailable = computed(() => methods.value.length === 0)
@@ -96,6 +108,25 @@ function submit() {
             </svg>
           </button>
         </header>
+
+        <div v-if="images.length" class="sheet__gallery">
+          <img class="sheet__gallery-main" :src="images[activeImage]" :alt="product.name">
+          <div v-if="images.length > 1" class="sheet__thumbs">
+            <button
+              v-for="(url, index) in images"
+              :key="`${index}-${url}`"
+              type="button"
+              class="sheet__thumb"
+              :class="{ 'sheet__thumb--active': activeImage === index }"
+              :aria-label="`查看第 ${index + 1} 张图`"
+              @click="activeImage = index"
+            >
+              <img :src="url" alt="">
+            </button>
+          </div>
+        </div>
+
+        <p v-if="product.description" class="sheet__desc">{{ product.description }}</p>
 
         <div class="sheet__summary">
           <span class="sheet__summary-label">应付金额</span>
@@ -229,6 +260,64 @@ function submit() {
 }
 
 /* 金额条：中性表面 + hairline，不再用橙色块 */
+/* 图廊：主图 + 缩略图，点击切换，不做自动轮播 */
+.sheet__gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sheet__gallery-main {
+  width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+  border-radius: 11px;
+  border: 1px solid var(--sh-border, rgba(9, 9, 11, 0.08));
+  background: var(--sh-surface-2, #f6f6f7);
+}
+
+.sheet__thumbs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.sheet__thumbs::-webkit-scrollbar {
+  display: none;
+}
+
+.sheet__thumb {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid var(--sh-border, rgba(9, 9, 11, 0.08));
+  background: var(--sh-surface-2, #f6f6f7);
+  cursor: pointer;
+  transition: border-color 160ms ease-out;
+}
+
+.sheet__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sheet__thumb--active {
+  border-color: var(--sh-accent, #d85a28);
+}
+
+.sheet__desc {
+  margin-top: -4px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--sh-text-2, #56565f);
+  white-space: pre-line;
+}
+
 .sheet__summary {
   display: flex;
   align-items: baseline;

@@ -250,6 +250,14 @@
 
             <div class="mt-4 grid gap-4 md:grid-cols-2">
               <label class="shop-field">
+                <span>商品品类</span>
+                <select v-model="productForm.category" class="input-field w-full">
+                  <option v-for="option in SHOP_CATEGORIES" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
+              </label>
+              <label class="shop-field">
                 <span>交付模式</span>
                 <select v-model="productForm.fulfillment_mode" class="input-field w-full">
                   <option value="manual">人工处理</option>
@@ -292,6 +300,25 @@
               <input v-model="productForm.image_url" class="input-field w-full" placeholder="https://...">
             </label>
             <p class="mt-3 text-xs leading-5 text-gray-500 dark:text-gray-400">建议使用 16:9 或 4:3 图片，支持 JPG、PNG、WebP、GIF，最大 5MB。本地上传会自动保存到商城素材库。</p>
+
+            <div class="mt-5 border-t border-gray-200 pt-4 dark:border-dark-700">
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-sm font-semibold text-gray-900 dark:text-white">商品图廊</p>
+                <span class="text-xs text-gray-500 dark:text-gray-400">{{ productForm.gallery?.length || 0 }}/6</span>
+              </div>
+              <p class="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">下单抽屉里展示的多张细节图，最多 6 张。</p>
+              <div v-if="(productForm.gallery?.length || 0) > 0" class="mt-3 space-y-2">
+                <div v-for="(url, index) in productForm.gallery" :key="`gallery-${index}`" class="flex items-center gap-2">
+                  <img v-if="shopImage(url)" :src="shopImage(url)" alt="图廊预览" class="h-9 w-9 shrink-0 rounded-lg object-cover">
+                  <div v-else class="shop-thumb h-9 w-9 shrink-0 rounded-lg text-xs" aria-hidden="true">图</div>
+                  <input v-model="productForm.gallery[index]" class="input-field min-w-0 flex-1" placeholder="https://...">
+                  <button type="button" class="shrink-0 rounded-lg px-2 py-1 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10" aria-label="移除该图" @click="removeGalleryItem(index)">移除</button>
+                </div>
+              </div>
+              <button type="button" class="btn-secondary mt-3 w-full justify-center rounded-2xl px-4 py-2" :disabled="(productForm.gallery?.length || 0) >= 6" @click="addGalleryItem">
+                添加图片地址
+              </button>
+            </div>
           </aside>
         </div>
         <div class="mt-6 flex justify-end gap-3">
@@ -381,6 +408,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { adminShopAPI, resolveShopAssetUrl, type ShopBanner, type ShopOrder, type ShopProduct, type ShopProductPayload } from '@/api/shop'
+import { SHOP_CATEGORIES } from '@/constants/shop'
 import { useAppStore } from '@/stores'
 import AppLayout from '@/components/layout/AppLayout.vue'
 
@@ -404,7 +432,8 @@ const uploadingBannerImage = ref(false)
 
 const productDialog = reactive({ open: false, id: 0 })
 const bannerDialog = reactive({ open: false, id: 0 })
-const productForm = reactive<ShopProductPayload>({
+// gallery 显式声明为非可选，模板里可以直接按下标读写，无需到处判空
+const productForm = reactive<ShopProductPayload & { gallery: string[] }>({
   name: '',
   description: '',
   image_url: '',
@@ -421,6 +450,8 @@ const productForm = reactive<ShopProductPayload>({
   badge_text: '',
   spec_label: '',
   highlight: false,
+  category: 'other',
+  gallery: [],
 })
 const bannerForm = reactive({
   title: '',
@@ -569,6 +600,20 @@ async function confirmFulfillOrder() {
   }
 }
 
+function addGalleryItem() {
+  if (!productForm.gallery) {
+    productForm.gallery = []
+  }
+  if (productForm.gallery.length >= 6) {
+    return
+  }
+  productForm.gallery.push('')
+}
+
+function removeGalleryItem(index: number) {
+  productForm.gallery?.splice(index, 1)
+}
+
 function openProductDialog(product?: ShopProduct) {
   productDialog.open = true
   productDialog.id = product?.id || 0
@@ -589,6 +634,8 @@ function openProductDialog(product?: ShopProduct) {
     badge_text: product.badge_text || '',
     spec_label: product.spec_label || '',
     highlight: product.highlight || false,
+    category: product.category || 'other',
+    gallery: [...(product.gallery || [])],
   } : {
     name: '',
     description: '',
@@ -606,6 +653,8 @@ function openProductDialog(product?: ShopProduct) {
     badge_text: '',
     spec_label: '',
     highlight: false,
+    category: 'other',
+    gallery: [],
   })
 }
 
@@ -615,6 +664,8 @@ async function saveProduct() {
       ...productForm,
       product_type: 'virtual',
       grant_usd_amount: '0',
+      // 去掉用户没填完的空输入框，避免把空串存进图廊
+      gallery: (productForm.gallery || []).map((url) => url.trim()).filter(Boolean),
     }
     if (productDialog.id) await adminShopAPI.updateProduct(productDialog.id, payload)
     else await adminShopAPI.createProduct(payload)
