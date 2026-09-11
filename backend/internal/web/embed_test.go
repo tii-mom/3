@@ -30,7 +30,7 @@ func TestInjectSiteTitle(t *testing.T) {
 
 		result := injectSiteTitle(html, settingsJSON)
 
-		assert.Contains(t, string(result), "<title>MyCustomSite - AI API Gateway</title>")
+		assert.Contains(t, string(result), "<title>MyCustomSite - ChatGPT 代充值与成品号</title>")
 		assert.NotContains(t, string(result), "Sub2API")
 	})
 
@@ -98,7 +98,25 @@ func TestInjectSiteTitle(t *testing.T) {
 
 		result := injectSiteTitle(html, settingsJSON)
 
-		assert.Contains(t, string(result), "<title>A&amp;B - AI API Gateway</title>")
+		assert.Contains(t, string(result), "<title>A&amp;B - ChatGPT 代充值与成品号</title>")
+	})
+
+	t.Run("uses_site_tagline_when_configured", func(t *testing.T) {
+		html := []byte(`<html><head><title>Sub2API</title></head><body></body></html>`)
+		settingsJSON := []byte(`{"site_name":"MyCustomSite","site_tagline":"AI API Gateway"}`)
+
+		result := injectSiteTitle(html, settingsJSON)
+
+		assert.Contains(t, string(result), "<title>MyCustomSite - ChatGPT 代充值与成品号</title>")
+	})
+
+	t.Run("falls_back_to_sales_tagline_when_empty", func(t *testing.T) {
+		html := []byte(`<html><head><title>Sub2API</title></head><body></body></html>`)
+		settingsJSON := []byte(`{"site_name":"MyCustomSite","site_tagline":"   "}`)
+
+		result := injectSiteTitle(html, settingsJSON)
+
+		assert.Contains(t, string(result), "<title>MyCustomSite - ChatGPT 代充值与成品号</title>")
 	})
 
 	t.Run("preserves_rest_of_html", func(t *testing.T) {
@@ -110,7 +128,7 @@ func TestInjectSiteTitle(t *testing.T) {
 		assert.Contains(t, string(result), `<meta charset="UTF-8">`)
 		assert.Contains(t, string(result), `<script src="app.js"></script>`)
 		assert.Contains(t, string(result), `<div id="app"></div>`)
-		assert.Contains(t, string(result), "<title>TestSite - AI API Gateway</title>")
+		assert.Contains(t, string(result), "<title>TestSite - ChatGPT 代充值与成品号</title>")
 	})
 }
 
@@ -287,7 +305,7 @@ func TestFrontendServer_InjectSettings(t *testing.T) {
 		require.NoError(t, err)
 
 		result := server.injectSettings([]byte(`{"site_name":"CustomSite"}`))
-		assert.NotContains(t, string(result), "CustomSite - AI API Gateway")
+		assert.NotContains(t, string(result), "CustomSite - ChatGPT 代充值与成品号")
 	})
 }
 

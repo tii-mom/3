@@ -21,5 +21,7 @@ func RegisterShopRoutes(
 		shop.GET("/products", shopHandler.ListProducts)
 		shop.POST("/orders", shopHandler.CreateOrder)
 		shop.GET("/orders/my", shopHandler.MyOrders)
+		shop.POST("/orders/claim", shopHandler.ClaimOrder)
+		shop.POST("/orders/:id/delivery", shopHandler.SubmitDelivery)
 	}
 }

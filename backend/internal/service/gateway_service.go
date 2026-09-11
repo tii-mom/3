@@ -1181,7 +1181,9 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 	if platform != "" {
 		filtered := make([]Account, 0)
 		for _, acc := range accounts {
-			if acc.Platform == platform {
+			if acc.Platform == platform ||
+				((platform == PlatformAnthropic || platform == PlatformGemini) &&
+					acc.Platform == PlatformAntigravity && acc.IsMixedSchedulingEnabled()) {
 				filtered = append(filtered, acc)
 			}
 		}
@@ -1195,8 +1197,12 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 	for _, acc := range accounts {
 		mapping := acc.GetModelMapping()
 		if len(mapping) > 0 {
-			hasAnyMapping = true
 			for model := range mapping {
+				model = strings.TrimSpace(model)
+				if !isConcreteModelID(model) {
+					continue
+				}
+				hasAnyMapping = true
 				modelSet[model] = struct{}{}
 			}
 		}
@@ -1223,6 +1229,11 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 		modelsListCacheStoreTotal.Add(1)
 	}
 	return cloneStringSlice(models)
+}
+
+func isConcreteModelID(modelID string) bool {
+	modelID = strings.TrimSpace(modelID)
+	return modelID != "" && !strings.ContainsAny(modelID, "*?")
 }
 
 func (s *GatewayService) InvalidateAvailableModelsCache(groupID *int64, platform string) {

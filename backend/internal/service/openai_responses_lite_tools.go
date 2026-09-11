@@ -214,3 +214,30 @@ func normalizeOpenAIResponsesLiteToolsPayload(body []byte) ([]byte, bool, error)
 	}
 	return rebuilt, true, nil
 }
+
+// promoteOpenAIResponsesLiteImageGenerationPayload moves a Codex image request
+// back to the standard Responses contract so Hosted image_generation can be
+// injected. Responses Lite intentionally rejects the hosted tool type, while
+// the local image_gen namespace is only useful when the client can execute it.
+func promoteOpenAIResponsesLiteImageGenerationPayload(body []byte) ([]byte, bool, error) {
+	var requestBody map[string]any
+	if err := json.Unmarshal(body, &requestBody); err != nil {
+		return body, false, fmt.Errorf("decode Responses Lite image request: %w", err)
+	}
+	metadata, ok := requestBody["client_metadata"].(map[string]any)
+	if !ok {
+		return body, true, nil
+	}
+	if _, exists := metadata[responsesLiteWSMetadataKey]; !exists {
+		return body, true, nil
+	}
+	delete(metadata, responsesLiteWSMetadataKey)
+	if len(metadata) == 0 {
+		delete(requestBody, "client_metadata")
+	}
+	rebuilt, err := marshalOpenAIUpstreamJSON(requestBody)
+	if err != nil {
+		return body, false, fmt.Errorf("encode standard Responses image request: %w", err)
+	}
+	return rebuilt, true, nil
+}

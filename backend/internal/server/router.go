@@ -127,8 +127,10 @@ func registerRoutes(
 	routes.RegisterGatewayRoutes(r, h, apiKeyAuth, apiKeyService, subscriptionService, opsService, settingService, cfg)
 	routes.RegisterPaymentRoutes(v1, h.Payment, h.PaymentWebhook, h.Admin.Payment, jwtAuth, adminAuth, auditLog, settingService)
 	routes.RegisterShopRoutes(v1, h.Shop, jwtAuth, settingService)
+	routes.RegisterPublicShopRoutes(v1, h.PublicShop)
 	routes.RegisterAIToolRoutes(v1, h.AITool, jwtAuth, settingService)
 	routes.RegisterAdminShopRoutes(v1, h.Admin.Shop, adminAuth, auditLog, settingService, cfg.Pricing.DataDir)
+	routes.RegisterAdminShopDeliveryRoutes(v1, h.AdminShopDelivery, adminAuth, auditLog, settingService)
 
 	handler.RegisterPageRoutes(v1, cfg.Pricing.DataDir, gin.HandlerFunc(jwtAuth), gin.HandlerFunc(adminAuth), settingService)
 }

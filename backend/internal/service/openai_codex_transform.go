@@ -623,6 +623,136 @@ func hasCodexImageGenerationFunctionTool(reqBody map[string]any) bool {
 		codexToolsContainFunctionName(reqBody["tools"], codexImageGenerationFunctionToolName)
 }
 
+func isCodexImageGenerationFunctionName(name string) bool {
+	switch strings.TrimSpace(name) {
+	case codexImageGenerationFunctionToolName, "image_gen__imagegen":
+		return true
+	default:
+		return false
+	}
+}
+
+func isCodexImageGenerationClientTool(tool map[string]any) bool {
+	if tool == nil {
+		return false
+	}
+	toolType := strings.TrimSpace(firstNonEmptyString(tool["type"]))
+	if toolType == "namespace" && isOpenAIImageGenNamespaceName(firstNonEmptyString(tool["name"])) {
+		return true
+	}
+	if toolType != "function" {
+		return false
+	}
+	name := strings.TrimSpace(firstNonEmptyString(tool["name"]))
+	if name == "" {
+		if function, ok := tool["function"].(map[string]any); ok {
+			name = strings.TrimSpace(firstNonEmptyString(function["name"]))
+		}
+	}
+	return isCodexImageGenerationFunctionName(name)
+}
+
+// replaceCodexImageGenerationClientToolsWithHosted makes the account-level
+// Hosted policy authoritative for standard Responses requests. Codex commonly
+// advertises its local image_gen namespace even when the client cannot execute
+// it; leaving that declaration in place makes the model call the unavailable
+// local tool instead of the hosted image_generation tool.
+func replaceCodexImageGenerationClientToolsWithHosted(reqBody map[string]any) bool {
+	if len(reqBody) == 0 {
+		return false
+	}
+	modified := stripCodexImageGenerationClientToolList(reqBody, "tools")
+	if stripCodexImageGenerationClientToolsFromInput(reqBody) {
+		modified = true
+	}
+	if codexImageGenerationToolChoiceSelected(reqBody["tool_choice"]) {
+		delete(reqBody, "tool_choice")
+		modified = true
+	}
+	return modified
+}
+
+func stripCodexImageGenerationClientToolList(container map[string]any, key string) bool {
+	rawTools, ok := container[key]
+	if !ok || rawTools == nil {
+		return false
+	}
+	tools, ok := rawTools.([]any)
+	if !ok {
+		return false
+	}
+	filtered := make([]any, 0, len(tools))
+	removed := false
+	for _, rawTool := range tools {
+		tool, ok := rawTool.(map[string]any)
+		if ok && isCodexImageGenerationClientTool(tool) {
+			removed = true
+			continue
+		}
+		filtered = append(filtered, rawTool)
+	}
+	if !removed {
+		return false
+	}
+	if len(filtered) == 0 {
+		delete(container, key)
+	} else {
+		container[key] = filtered
+	}
+	return true
+}
+
+func stripCodexImageGenerationClientToolsFromInput(reqBody map[string]any) bool {
+	input, ok := reqBody["input"].([]any)
+	if !ok {
+		return false
+	}
+	filteredInput := make([]any, 0, len(input))
+	modified := false
+	for _, rawItem := range input {
+		item, ok := rawItem.(map[string]any)
+		if !ok || strings.TrimSpace(firstNonEmptyString(item["type"])) != "additional_tools" {
+			filteredInput = append(filteredInput, rawItem)
+			continue
+		}
+		if !stripCodexImageGenerationClientToolList(item, "tools") {
+			filteredInput = append(filteredInput, rawItem)
+			continue
+		}
+		modified = true
+		if _, hasTools := item["tools"]; hasTools {
+			filteredInput = append(filteredInput, rawItem)
+		}
+	}
+	if modified {
+		reqBody["input"] = filteredInput
+	}
+	return modified
+}
+
+func codexImageGenerationToolChoiceSelected(choice any) bool {
+	switch value := choice.(type) {
+	case string:
+		return isCodexImageGenerationFunctionName(value)
+	case map[string]any:
+		choiceType := strings.TrimSpace(firstNonEmptyString(value["type"]))
+		if choiceType == "namespace" &&
+			isOpenAIImageGenNamespaceName(firstNonEmptyString(value["name"], value["namespace"])) {
+			return true
+		}
+		if choiceType == "function" && isCodexImageGenerationFunctionName(firstNonEmptyString(value["name"])) {
+			return true
+		}
+		if function, ok := value["function"].(map[string]any); ok && isCodexImageGenerationFunctionName(firstNonEmptyString(function["name"])) {
+			return true
+		}
+		if tool, ok := value["tool"].(map[string]any); ok {
+			return codexImageGenerationToolChoiceSelected(tool)
+		}
+	}
+	return false
+}
+
 func toolsContainImageGeneration(rawTools any) bool {
 	if rawTools == nil {
 		return false

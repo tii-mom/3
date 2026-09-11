@@ -535,6 +535,48 @@ func TestGetAvailableModels_UsesShortCacheAndSupportsInvalidation(t *testing.T) 
 	require.Equal(t, int64(2), store)
 }
 
+func TestGetAvailableModels_IncludesMixedAntigravityForGeminiGroup(t *testing.T) {
+	groupID := int64(91)
+	repo := &modelsListAccountRepoStub{
+		byGroup: map[int64][]Account{
+			groupID: {
+				{
+					ID:       1,
+					Platform: PlatformAntigravity,
+					Extra:    map[string]any{"mixed_scheduling": true},
+					Credentials: map[string]any{
+						"model_mapping": map[string]any{
+							"gemini-3.6-flash-high": "gemini-3.6-flash-high",
+							"gemini-*":              "gemini-3.6-flash-high",
+						},
+					},
+				},
+				{
+					ID:       2,
+					Platform: PlatformAntigravity,
+					Extra:    map[string]any{"mixed_scheduling": false},
+					Credentials: map[string]any{
+						"model_mapping": map[string]any{
+							"gemini-3.6-flash-low": "gemini-3.6-flash-low",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	svc := &GatewayService{
+		accountRepo:        repo,
+		modelsListCache:    gocache.New(time.Minute, time.Minute),
+		modelsListCacheTTL: time.Minute,
+	}
+
+	models := svc.GetAvailableModels(context.Background(), &groupID, PlatformGemini)
+	require.Contains(t, models, "gemini-3.6-flash-high")
+	require.NotContains(t, models, "gemini-3.6-flash-low")
+	require.NotContains(t, models, "gemini-*")
+}
+
 func TestGetAvailableModels_ErrorAndGlobalListBranches(t *testing.T) {
 	resetGatewayHotpathStatsForTest()
 

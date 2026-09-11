@@ -114,6 +114,19 @@ func IsExplicitImageGenerationIntent(endpoint string, requestedModel string, bod
 	return imageIntent
 }
 
+// IsCodexImageGenerationBridgeIntent detects the client-side image_gen
+// declarations that require a Responses-capable account when Hosted bridging
+// is enabled. This is intentionally separate from explicit image intent:
+// Codex advertises the local namespace on ordinary turns, but a Chat
+// Completions-only account cannot serve it through the Hosted bridge.
+func IsCodexImageGenerationBridgeIntent(body []byte) bool {
+	if len(body) == 0 || !gjson.ValidBytes(body) {
+		return false
+	}
+	return openAIJSONToolsContainCodexImageGenerationClientTool(gjson.GetBytes(body, "tools")) ||
+		openAIJSONInputContainsCodexImageGenerationClientTool(gjson.GetBytes(body, "input"))
+}
+
 // IsImageGenerationIntentForPlatform applies platform-specific intent rules.
 //
 // Codex advertises the image_gen namespace on ordinary Responses requests so
@@ -232,6 +245,44 @@ func openAIJSONToolsContainNativeImageGeneration(tools gjson.Result) bool {
 	found := false
 	tools.ForEach(func(_, item gjson.Result) bool {
 		found = isOpenAIImageGenerationType(openAIJSONString(item.Get("type")))
+		return !found
+	})
+	return found
+}
+
+func openAIJSONToolsContainCodexImageGenerationClientTool(tools gjson.Result) bool {
+	if !tools.IsArray() {
+		return false
+	}
+	found := false
+	tools.ForEach(func(_, item gjson.Result) bool {
+		if isImageGenNamespaceTool(item) {
+			found = true
+			return false
+		}
+		if openAIJSONString(item.Get("type")) != "function" {
+			return true
+		}
+		name := openAIJSONString(item.Get("name"))
+		if name == "" {
+			name = openAIJSONString(item.Get("function.name"))
+		}
+		found = isOpenAIImageGenFunctionReference("", name)
+		return !found
+	})
+	return found
+}
+
+func openAIJSONInputContainsCodexImageGenerationClientTool(input gjson.Result) bool {
+	if !input.IsArray() {
+		return false
+	}
+	found := false
+	input.ForEach(func(_, item gjson.Result) bool {
+		if openAIJSONString(item.Get("type")) != "additional_tools" {
+			return true
+		}
+		found = openAIJSONToolsContainCodexImageGenerationClientTool(item.Get("tools"))
 		return !found
 	})
 	return found

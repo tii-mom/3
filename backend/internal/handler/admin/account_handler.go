@@ -2422,8 +2422,7 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 
 	// Handle Antigravity accounts: return Claude + Gemini models
 	if account.Platform == service.PlatformAntigravity {
-		// 直接复用 antigravity.DefaultModels()，与 /v1/models 端点保持同步
-		response.Success(c, antigravity.DefaultModels())
+		response.Success(c, antigravityAccountModels(account))
 		return
 	}
 
@@ -2516,6 +2515,72 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 	}
 
 	response.Success(c, models)
+}
+
+// antigravityAccountModels returns the models that can be selected in the
+// account test dialog. A populated model_mapping is the account's explicit
+// upstream capability list; falling back to the static list keeps legacy
+// accounts usable when no live mapping has been synchronized yet.
+func antigravityAccountModels(account *service.Account) []antigravity.ClaudeModel {
+	defaultModels := antigravity.DefaultModels()
+	if account == nil || account.Credentials == nil {
+		return defaultModels
+	}
+
+	modelIDs := make([]string, 0)
+	seen := make(map[string]struct{})
+	addModelID := func(modelID, mappedModel string) {
+		modelID = strings.TrimSpace(modelID)
+		if strings.TrimSpace(mappedModel) == "" || !isConcreteAntigravityModelID(modelID) {
+			return
+		}
+		if _, exists := seen[modelID]; exists {
+			return
+		}
+		seen[modelID] = struct{}{}
+		modelIDs = append(modelIDs, modelID)
+	}
+	switch rawMapping := account.Credentials["model_mapping"].(type) {
+	case map[string]any:
+		for modelID, value := range rawMapping {
+			if mappedModel, ok := value.(string); ok {
+				addModelID(modelID, mappedModel)
+			}
+		}
+	case map[string]string:
+		for modelID, value := range rawMapping {
+			addModelID(modelID, value)
+		}
+	}
+	if len(modelIDs) == 0 {
+		return defaultModels
+	}
+
+	sort.Strings(modelIDs)
+	defaultByID := make(map[string]antigravity.ClaudeModel, len(defaultModels))
+	for _, model := range defaultModels {
+		defaultByID[model.ID] = model
+	}
+
+	models := make([]antigravity.ClaudeModel, 0, len(modelIDs))
+	for _, modelID := range modelIDs {
+		if model, ok := defaultByID[modelID]; ok {
+			models = append(models, model)
+			continue
+		}
+		models = append(models, antigravity.ClaudeModel{
+			ID:          modelID,
+			Type:        "model",
+			DisplayName: modelID,
+			CreatedAt:   "",
+		})
+	}
+	return models
+}
+
+func isConcreteAntigravityModelID(modelID string) bool {
+	modelID = strings.TrimSpace(modelID)
+	return modelID != "" && !strings.ContainsAny(modelID, "*?")
 }
 
 // SyncUpstreamModels handles syncing live supported models from an account's upstream.

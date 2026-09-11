@@ -22,17 +22,50 @@ const (
 	ShopProductTypePlatformUSDBalance = "platform_usd_balance"
 )
 
+// 商品交付模式（迁移 206）
+const (
+	ShopFulfillmentManual          = "manual"           // 人工处理，仅需备注
+	ShopFulfillmentSessionTopup    = "session_topup"    // 代充值：用户提交 ChatGPT Session
+	ShopFulfillmentAccountDelivery = "account_delivery" // 成品号：后台人工发账号
+	ShopFulfillmentRental          = "rental"           // 租号：按时长租赁，后台人工发账号
+)
+
+// shopProductColumns 统一商品 SELECT 列，避免各处 SQL 与扫描顺序不一致。
+const shopProductColumns = `id, name, description, image_url, product_type, price_cny_minor, original_price_cny_minor,
+       grant_usd_amount::text, stock_quantity, sold_count, commission_bps, status, sort_order,
+       fulfillment_mode, delivery_form_hint, badge_text, spec_label, highlight,
+       created_at, updated_at`
+
+// 系统游客账号邮箱（迁移 206 插入），用于承载免登录订单。
+const shopGuestUserEmail = "guest@internal.3api.invalid"
+
+func isKnownFulfillmentMode(mode string) bool {
+	switch mode {
+	case ShopFulfillmentManual, ShopFulfillmentSessionTopup, ShopFulfillmentAccountDelivery, ShopFulfillmentRental:
+		return true
+	}
+	return false
+}
+
 type ShopService struct {
 	db             *sql.DB
 	paymentService *PaymentService
+	encryptor      SecretEncryptor
+	guestLimiter   *guestOrderLimiter
 }
 
 func NewShopService(db *sql.DB) *ShopService {
-	return &ShopService{db: db}
+	return &ShopService{db: db, guestLimiter: newGuestOrderLimiter()}
 }
 
 func (s *ShopService) SetPaymentService(paymentService *PaymentService) {
 	s.paymentService = paymentService
+}
+
+// SetSecretEncryptor 注入用于加密存储交付资料（Session 凭证等）的加密器。
+// 未注入时公开下单接口会拒绝创建订单，避免敏感信息明文落库。
+func (s *ShopService) SetSecretEncryptor(encryptor SecretEncryptor) {
+	s.encryptor = encryptor
 }
 
 type ShopProduct struct {
@@ -49,6 +82,11 @@ type ShopProduct struct {
 	CommissionBPS         int    `json:"commission_bps"`
 	Status                string `json:"status"`
 	SortOrder             int    `json:"sort_order"`
+	FulfillmentMode       string `json:"fulfillment_mode"`
+	DeliveryFormHint      string `json:"delivery_form_hint"`
+	BadgeText             string `json:"badge_text"`
+	SpecLabel             string `json:"spec_label"`
+	Highlight             bool   `json:"highlight"`
 	CreatedAt             string `json:"created_at,omitempty"`
 	UpdatedAt             string `json:"updated_at,omitempty"`
 }
@@ -67,25 +105,32 @@ type ShopBanner struct {
 }
 
 type ShopOrder struct {
-	ID                    int64   `json:"id"`
-	UserID                int64   `json:"user_id"`
-	ProductID             int64   `json:"product_id"`
-	PaymentOrderID        *int64  `json:"payment_order_id,omitempty"`
-	Status                string  `json:"status"`
-	FulfillmentStatus     string  `json:"fulfillment_status"`
-	CommissionStatus      string  `json:"commission_status"`
-	SnapshotName          string  `json:"snapshot_name"`
-	SnapshotDescription   string  `json:"snapshot_description"`
-	SnapshotImageURL      string  `json:"snapshot_image_url"`
-	SnapshotProductType   string  `json:"snapshot_product_type"`
-	SnapshotPriceCNYMinor int64   `json:"snapshot_price_cny_minor"`
-	SnapshotGrantUSD      string  `json:"snapshot_grant_usd_amount"`
-	SnapshotCommissionBPS int     `json:"snapshot_commission_bps"`
-	FulfillmentNote       string  `json:"fulfillment_note"`
-	UserEmail             string  `json:"user_email,omitempty"`
-	CreatedAt             string  `json:"created_at"`
-	PaidAt                *string `json:"paid_at,omitempty"`
-	FulfilledAt           *string `json:"fulfilled_at,omitempty"`
+	ID                      int64   `json:"id"`
+	UserID                  int64   `json:"user_id"`
+	ProductID               int64   `json:"product_id"`
+	PaymentOrderID          *int64  `json:"payment_order_id,omitempty"`
+	Status                  string  `json:"status"`
+	FulfillmentStatus       string  `json:"fulfillment_status"`
+	CommissionStatus        string  `json:"commission_status"`
+	SnapshotName            string  `json:"snapshot_name"`
+	SnapshotDescription     string  `json:"snapshot_description"`
+	SnapshotImageURL        string  `json:"snapshot_image_url"`
+	SnapshotProductType     string  `json:"snapshot_product_type"`
+	SnapshotPriceCNYMinor   int64   `json:"snapshot_price_cny_minor"`
+	SnapshotGrantUSD        string  `json:"snapshot_grant_usd_amount"`
+	SnapshotCommissionBPS   int     `json:"snapshot_commission_bps"`
+	FulfillmentNote         string  `json:"fulfillment_note"`
+	UserEmail               string  `json:"user_email,omitempty"`
+	OrderNo                 string  `json:"order_no,omitempty"`
+	GuestToken              string  `json:"guest_token,omitempty"`
+	GuestContact            string  `json:"guest_contact,omitempty"`
+	SnapshotFulfillmentMode string  `json:"snapshot_fulfillment_mode,omitempty"`
+	DeliveryHint            string  `json:"delivery_hint,omitempty"`
+	DeliverySubmittedAt     *string `json:"delivery_submitted_at,omitempty"`
+	RentalDuration          string  `json:"rental_duration,omitempty"`
+	CreatedAt               string  `json:"created_at"`
+	PaidAt                  *string `json:"paid_at,omitempty"`
+	FulfilledAt             *string `json:"fulfilled_at,omitempty"`
 }
 
 type CreateShopOrderResult struct {
@@ -105,6 +150,11 @@ type UpsertShopProductInput struct {
 	CommissionBPS         int
 	Status                string
 	SortOrder             int
+	FulfillmentMode       string
+	DeliveryFormHint      string
+	BadgeText             string
+	SpecLabel             string
+	Highlight             bool
 }
 
 type UpsertShopBannerInput struct {
@@ -131,9 +181,7 @@ func (s *ShopService) listProducts(ctx context.Context, admin bool) ([]ShopProdu
 		where += ` AND status = 'published'`
 	}
 	rows, err := s.db.QueryContext(ctx, `
-SELECT id, name, description, image_url, product_type, price_cny_minor, original_price_cny_minor,
-       grant_usd_amount::text, stock_quantity, sold_count, commission_bps, status, sort_order,
-       created_at, updated_at
+SELECT `+shopProductColumns+`
 FROM shop_products
 WHERE `+where+`
 ORDER BY sort_order ASC, id DESC`)
@@ -200,12 +248,13 @@ func (s *ShopService) CreateProduct(ctx context.Context, in UpsertShopProductInp
 	var item ShopProduct
 	row := s.db.QueryRowContext(ctx, `
 INSERT INTO shop_products (tenant_id, name, description, image_url, product_type, price_cny_minor,
-    original_price_cny_minor, grant_usd_amount, stock_quantity, commission_bps, status, sort_order)
-VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-RETURNING id, name, description, image_url, product_type, price_cny_minor, original_price_cny_minor,
-       grant_usd_amount::text, stock_quantity, sold_count, commission_bps, status, sort_order, created_at, updated_at`,
+    original_price_cny_minor, grant_usd_amount, stock_quantity, commission_bps, status, sort_order,
+    fulfillment_mode, delivery_form_hint, badge_text, spec_label, highlight)
+VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+RETURNING `+shopProductColumns,
 		in.Name, in.Description, in.ImageURL, in.ProductType, in.PriceCNYMinor, in.OriginalPriceCNYMinor,
-		normalizeDecimalString(in.GrantUSDAmount), in.StockQuantity, in.CommissionBPS, in.Status, in.SortOrder)
+		normalizeDecimalString(in.GrantUSDAmount), in.StockQuantity, in.CommissionBPS, in.Status, in.SortOrder,
+		in.FulfillmentMode, in.DeliveryFormHint, in.BadgeText, in.SpecLabel, in.Highlight)
 	item, err := scanShopProduct(row)
 	if err != nil {
 		return nil, err
@@ -226,12 +275,13 @@ func (s *ShopService) UpdateProduct(ctx context.Context, id int64, in UpsertShop
 UPDATE shop_products
 SET name = $2, description = $3, image_url = $4, product_type = $5, price_cny_minor = $6,
     original_price_cny_minor = $7, grant_usd_amount = $8, stock_quantity = $9, commission_bps = $10,
-    status = $11, sort_order = $12, updated_at = NOW()
+    status = $11, sort_order = $12, fulfillment_mode = $13, delivery_form_hint = $14, badge_text = $15,
+    spec_label = $16, highlight = $17, updated_at = NOW()
 WHERE tenant_id = 1 AND id = $1 AND deleted_at IS NULL
-RETURNING id, name, description, image_url, product_type, price_cny_minor, original_price_cny_minor,
-       grant_usd_amount::text, stock_quantity, sold_count, commission_bps, status, sort_order, created_at, updated_at`,
+RETURNING `+shopProductColumns,
 		id, in.Name, in.Description, in.ImageURL, in.ProductType, in.PriceCNYMinor, in.OriginalPriceCNYMinor,
-		normalizeDecimalString(in.GrantUSDAmount), in.StockQuantity, in.CommissionBPS, in.Status, in.SortOrder)
+		normalizeDecimalString(in.GrantUSDAmount), in.StockQuantity, in.CommissionBPS, in.Status, in.SortOrder,
+		in.FulfillmentMode, in.DeliveryFormHint, in.BadgeText, in.SpecLabel, in.Highlight)
 	item, err := scanShopProduct(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, infraerrors.NotFound("SHOP_PRODUCT_NOT_FOUND", "product not found")
@@ -654,7 +704,9 @@ func (s *ShopService) listOrders(ctx context.Context, userID int64, page, pageSi
 SELECT o.id, o.user_id, o.product_id, o.payment_order_id, o.status, o.fulfillment_status, o.commission_status,
        o.snapshot_name, o.snapshot_description, o.snapshot_image_url, o.snapshot_product_type,
        o.snapshot_price_cny_minor, o.snapshot_grant_usd_amount::text, o.snapshot_commission_bps,
-       o.fulfillment_note, COALESCE(u.email, ''), o.created_at, o.paid_at, o.fulfilled_at
+       o.fulfillment_note, COALESCE(u.email, ''), COALESCE(o.order_no, ''), COALESCE(o.guest_token, ''),
+       COALESCE(o.guest_contact, ''), COALESCE(o.snapshot_fulfillment_mode, 'manual'), COALESCE(o.delivery_hint, ''),
+       o.delivery_submitted_at, COALESCE(o.rental_duration, ''), o.created_at, o.paid_at, o.fulfilled_at
 FROM shop_orders o
 LEFT JOIN users u ON u.id = o.user_id
 WHERE `+where+`
@@ -712,6 +764,13 @@ func normalizeShopProductInput(in UpsertShopProductInput) UpsertShopProductInput
 	if in.Status == "" {
 		in.Status = "draft"
 	}
+	in.FulfillmentMode = strings.TrimSpace(in.FulfillmentMode)
+	if !isKnownFulfillmentMode(in.FulfillmentMode) {
+		in.FulfillmentMode = ShopFulfillmentManual
+	}
+	in.DeliveryFormHint = strings.TrimSpace(in.DeliveryFormHint)
+	in.BadgeText = strings.TrimSpace(in.BadgeText)
+	in.SpecLabel = strings.TrimSpace(in.SpecLabel)
 	in.GrantUSDAmount = normalizeDecimalString(in.GrantUSDAmount)
 	return in
 }
@@ -737,7 +796,8 @@ func scanShopProduct(rows productScanner) (ShopProduct, error) {
 	var created, updated time.Time
 	err := rows.Scan(&item.ID, &item.Name, &item.Description, &item.ImageURL, &item.ProductType, &item.PriceCNYMinor,
 		&item.OriginalPriceCNYMinor, &item.GrantUSDAmount, &stock, &item.SoldCount, &item.CommissionBPS,
-		&item.Status, &item.SortOrder, &created, &updated)
+		&item.Status, &item.SortOrder, &item.FulfillmentMode, &item.DeliveryFormHint, &item.BadgeText,
+		&item.SpecLabel, &item.Highlight, &created, &updated)
 	if stock.Valid {
 		item.StockQuantity = &stock.Int64
 	}
@@ -750,11 +810,13 @@ func scanShopOrder(rows productScanner) (ShopOrder, error) {
 	var item ShopOrder
 	var paymentOrderID sql.NullInt64
 	var created time.Time
-	var paidAt, fulfilledAt sql.NullTime
+	var paidAt, fulfilledAt, deliverySubmittedAt sql.NullTime
 	err := rows.Scan(&item.ID, &item.UserID, &item.ProductID, &paymentOrderID, &item.Status, &item.FulfillmentStatus,
 		&item.CommissionStatus, &item.SnapshotName, &item.SnapshotDescription, &item.SnapshotImageURL,
 		&item.SnapshotProductType, &item.SnapshotPriceCNYMinor, &item.SnapshotGrantUSD,
-		&item.SnapshotCommissionBPS, &item.FulfillmentNote, &item.UserEmail, &created, &paidAt, &fulfilledAt)
+		&item.SnapshotCommissionBPS, &item.FulfillmentNote, &item.UserEmail, &item.OrderNo, &item.GuestToken,
+		&item.GuestContact, &item.SnapshotFulfillmentMode, &item.DeliveryHint, &deliverySubmittedAt,
+		&item.RentalDuration, &created, &paidAt, &fulfilledAt)
 	if err != nil {
 		return item, err
 	}
@@ -762,6 +824,10 @@ func scanShopOrder(rows productScanner) (ShopOrder, error) {
 		item.PaymentOrderID = &paymentOrderID.Int64
 	}
 	item.CreatedAt = created.Format(time.RFC3339)
+	if deliverySubmittedAt.Valid {
+		v := deliverySubmittedAt.Time.Format(time.RFC3339)
+		item.DeliverySubmittedAt = &v
+	}
 	if paidAt.Valid {
 		v := paidAt.Time.Format(time.RFC3339)
 		item.PaidAt = &v

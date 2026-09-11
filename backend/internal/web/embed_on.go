@@ -348,7 +348,8 @@ func shouldServeStaticSEOSnapshot(userAgent string) bool {
 // This ensures the browser tab shows the correct title before JS executes.
 func injectSiteTitle(html, settingsJSON []byte) []byte {
 	var cfg struct {
-		SiteName string `json:"site_name"`
+		SiteName    string `json:"site_name"`
+		SiteTagline string `json:"site_tagline"`
 	}
 	if err := json.Unmarshal(settingsJSON, &cfg); err != nil || cfg.SiteName == "" {
 		return html
@@ -361,7 +362,12 @@ func injectSiteTitle(html, settingsJSON []byte) []byte {
 		return html
 	}
 
-	newTitle := []byte("<title>" + htmlpkg.EscapeString(cfg.SiteName) + " - AI API Gateway</title>")
+	// 后缀跟随站点业务定位（默认销售文案）；后台可通过 site_tagline 配置覆盖
+	suffix := strings.TrimSpace(cfg.SiteTagline)
+	if suffix == "" {
+		suffix = "ChatGPT 代充值与成品号"
+	}
+	newTitle := []byte("<title>" + htmlpkg.EscapeString(cfg.SiteName) + " - " + htmlpkg.EscapeString(suffix) + "</title>")
 	var buf bytes.Buffer
 	buf.Write(html[:titleStart])
 	buf.Write(newTitle)

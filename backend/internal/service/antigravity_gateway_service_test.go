@@ -131,9 +131,52 @@ func TestIsPromptTooLongError(t *testing.T) {
 	require.False(t, isPromptTooLongError([]byte(`{"error":{"message":"other"}}`)))
 }
 
+func TestDetectAntigravityUnavailableModel(t *testing.T) {
+	response := []byte("data: {\"response\":{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Gemini 3 Pro is no longer available.\"}]}}]}}\n\n")
+	text := extractTextFromSSEResponse(response)
+	err := detectAntigravityUnavailableModel(response, text, "gemini-3-pro-preview")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "gemini-3-pro-preview")
+	require.Contains(t, err.Error(), "no longer available")
+}
+
+func TestDetectAntigravityUnavailableModel_AllowsSuccessfulResponse(t *testing.T) {
+	response := []byte("data: {\"response\":{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"ok\"}]}}]}}\n\n")
+	text := extractTextFromSSEResponse(response)
+	require.NoError(t, detectAntigravityUnavailableModel(response, text, "gemini-3.6-flash-high"))
+}
+
 type httpUpstreamStub struct {
 	resp *http.Response
 	err  error
+}
+
+func TestAntigravityGatewayService_TestConnectionRejectsHTTP200ModelError(t *testing.T) {
+	upstream := &httpUpstreamStub{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader("data: {\"response\":{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Gemini 3 Pro is no longer available.\"}]}}]}}\n\n")),
+	}}
+	svc := &AntigravityGatewayService{
+		tokenProvider: &AntigravityTokenProvider{},
+		httpUpstream:  upstream,
+	}
+	account := &Account{
+		ID:       301,
+		Platform: PlatformAntigravity,
+		Type:     AccountTypeOAuth,
+		Credentials: map[string]any{
+			"access_token": "test-access-token",
+			"project_id":   "test-project",
+			"model_mapping": map[string]any{
+				"gemini-3-pro-preview": "gemini-3-pro-preview",
+			},
+		},
+	}
+
+	result, err := svc.TestConnection(context.Background(), account, "gemini-3-pro-preview")
+	require.Nil(t, result)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no longer available")
 }
 
 func (s *httpUpstreamStub) Do(_ *http.Request, _ string, _ int64, _ int) (*http.Response, error) {

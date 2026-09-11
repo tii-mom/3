@@ -71,6 +71,19 @@ var antigravityPassthroughErrorMessages = []string{
 	"prompt is too long",
 }
 
+// These errors can be returned inside a successful v1internal response when
+// Antigravity has removed a model. They must not be treated as a successful
+// account test merely because the HTTP status is 200.
+var antigravityUnavailableModelMarkers = []string{
+	"no longer available",
+	"is not available",
+	"model not found",
+	"model_not_found",
+	"unsupported model",
+	"model is unavailable",
+	"not supported",
+}
+
 // MODEL_CAPACITY_EXHAUSTED 全局去重：避免多个并发请求同时对同一模型进行容量耗尽重试
 var (
 	modelCapacityExhaustedMu    sync.RWMutex
@@ -423,7 +436,30 @@ func (s *AntigravityGatewayService) TestConnection(ctx context.Context, account 
 	}
 
 	text := extractTextFromSSEResponse(respBody)
+	if err := detectAntigravityUnavailableModel(respBody, text, modelID); err != nil {
+		return nil, err
+	}
 	return &TestConnectionResult{Text: text, MappedModel: mappedModel}, nil
+}
+
+func detectAntigravityUnavailableModel(respBody []byte, responseText, modelID string) error {
+	bodyText := strings.TrimSpace(string(respBody))
+	combined := strings.ToLower(bodyText + "\n" + responseText)
+	for _, marker := range antigravityUnavailableModelMarkers {
+		if !strings.Contains(combined, marker) {
+			continue
+		}
+
+		detail := strings.TrimSpace(responseText)
+		if detail == "" {
+			detail = bodyText
+		}
+		if detail == "" {
+			detail = "upstream reported that this model is unavailable"
+		}
+		return fmt.Errorf("模型 %q 不可用: %s", modelID, truncateForLog([]byte(detail), 512))
+	}
+	return nil
 }
 
 // testConnectionHandleError 是 TestConnection 使用的轻量 handleError 回调。

@@ -33,7 +33,15 @@ func (h *VoucherHandler) Create(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
-	voucher, err := h.service.Create(c.Request.Context(), subject.UserID, service.CreateVoucherInput{Amount: request.Amount, TOTPCode: request.TOTPCode})
+	idempotencyKey, err := service.NormalizeIdempotencyKey(c.GetHeader("Idempotency-Key"))
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	// Keep the header optional for older clients. The current frontend sends it
+	// on every create request, while legacy clients still retain the old API
+	// contract without retry protection.
+	voucher, err := h.service.Create(c.Request.Context(), subject.UserID, service.CreateVoucherInput{Amount: request.Amount, TOTPCode: request.TOTPCode, IdempotencyKey: idempotencyKey})
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

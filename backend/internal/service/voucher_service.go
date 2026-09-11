@@ -33,9 +33,10 @@ var (
 const voucherTenantID int64 = 1
 
 type VoucherService struct {
-	db          *sql.DB
-	settings    SettingRepository
-	totpService *TotpService
+	db            *sql.DB
+	settings      SettingRepository
+	totpService   *TotpService
+	codeEncryptor SecretEncryptor
 }
 
 type Voucher struct {
@@ -55,8 +56,15 @@ type Voucher struct {
 }
 
 type CreateVoucherInput struct {
-	Amount   string
-	TOTPCode string
+	Amount         string
+	TOTPCode       string
+	IdempotencyKey string
+}
+
+type VoucherRedeemResult struct {
+	Voucher    *Voucher
+	FaceValue  string
+	NewBalance string
 }
 
 type VoucherAvailability struct {
@@ -91,8 +99,12 @@ type voucherConfig struct {
 	stepUpMinimum   decimal.Decimal
 }
 
-func NewVoucherService(db *sql.DB, settings SettingRepository, totpService *TotpService) *VoucherService {
-	return &VoucherService{db: db, settings: settings, totpService: totpService}
+func NewVoucherService(db *sql.DB, settings SettingRepository, totpService *TotpService, encryptors ...SecretEncryptor) *VoucherService {
+	var codeEncryptor SecretEncryptor
+	if len(encryptors) > 0 {
+		codeEncryptor = encryptors[0]
+	}
+	return &VoucherService{db: db, settings: settings, totpService: totpService, codeEncryptor: codeEncryptor}
 }
 
 func (s *VoucherService) AdminConfig(ctx context.Context) (map[string]any, error) {
@@ -207,19 +219,19 @@ func (s *VoucherService) Create(ctx context.Context, userID int64, input CreateV
 	if err != nil || amount.LessThan(config.minimum) || amount.GreaterThan(config.maximum) || amount.Exponent() < -8 {
 		return nil, ErrVoucherAmountOutOfRange
 	}
-	if amount.GreaterThanOrEqual(config.stepUpMinimum) {
-		if strings.TrimSpace(input.TOTPCode) == "" || s.totpService == nil {
-			return nil, ErrVoucherStepUpRequired
-		}
-		if err := s.totpService.VerifyCode(ctx, userID, input.TOTPCode); err != nil {
-			return nil, err
-		}
-	}
 	fee := calculateVoucherFee(amount, config.feeBPS)
 	total := amount.Add(fee)
-	code, hash, last4, err := generateVoucherCode()
+	idempotencyKey, err := NormalizeIdempotencyKey(input.IdempotencyKey)
 	if err != nil {
 		return nil, err
+	}
+	var idempotencyKeyHash, requestFingerprint string
+	if idempotencyKey != "" {
+		if s.codeEncryptor == nil {
+			return nil, infraerrors.ServiceUnavailable("VOUCHER_IDEMPOTENCY_UNAVAILABLE", "voucher idempotency is not configured")
+		}
+		idempotencyKeyHash = hashVoucherIdempotencyKey(idempotencyKey)
+		requestFingerprint = voucherRequestFingerprint(amount, config.feeBPS, config.expiryDays)
 	}
 
 	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
@@ -229,6 +241,63 @@ func (s *VoucherService) Create(ctx context.Context, userID int64, input CreateV
 	defer func() { _ = tx.Rollback() }()
 	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1)`, userID); err != nil {
 		return nil, err
+	}
+	if idempotencyKeyHash != "" {
+		var existingID int64
+		var existingFingerprint, encryptedCode sql.NullString
+		lookupErr := tx.QueryRowContext(ctx, `
+SELECT id, idempotency_request_hash, code_encrypted
+FROM balance_vouchers
+WHERE tenant_id = $1 AND issuer_user_id = $2 AND idempotency_key_hash = $3
+FOR UPDATE`, voucherTenantID, userID, idempotencyKeyHash).Scan(&existingID, &existingFingerprint, &encryptedCode)
+		if lookupErr == nil {
+			if !existingFingerprint.Valid || existingFingerprint.String != requestFingerprint {
+				return nil, infraerrors.Conflict("VOUCHER_IDEMPOTENCY_CONFLICT", "idempotency key was already used with a different voucher request")
+			}
+			if !encryptedCode.Valid || encryptedCode.String == "" {
+				return nil, infraerrors.ServiceUnavailable("VOUCHER_IDEMPOTENCY_REPLAY_UNAVAILABLE", "the original voucher response cannot be replayed")
+			}
+			code, decryptErr := s.codeEncryptor.Decrypt(encryptedCode.String)
+			if decryptErr != nil {
+				return nil, infraerrors.ServiceUnavailable("VOUCHER_IDEMPOTENCY_REPLAY_UNAVAILABLE", "the original voucher response cannot be replayed").WithCause(decryptErr)
+			}
+			existing, getErr := getVoucherForUpdate(ctx, tx, `id = $1 AND tenant_id = $2`, existingID, voucherTenantID)
+			if getErr != nil {
+				return nil, getErr
+			}
+			if err := tx.Commit(); err != nil {
+				return nil, err
+			}
+			existing.Code = code
+			return existing, nil
+		}
+		if !errors.Is(lookupErr, sql.ErrNoRows) {
+			return nil, lookupErr
+		}
+	}
+	if amount.GreaterThanOrEqual(config.stepUpMinimum) {
+		if strings.TrimSpace(input.TOTPCode) == "" || s.totpService == nil {
+			return nil, ErrVoucherStepUpRequired
+		}
+		if err := s.totpService.VerifyCode(ctx, userID, input.TOTPCode); err != nil {
+			return nil, err
+		}
+	}
+
+	code, hash, last4, err := generateVoucherCode()
+	if err != nil {
+		return nil, err
+	}
+	var encryptedCode any
+	var nullableKeyHash, nullableRequestFingerprint any
+	if idempotencyKeyHash != "" {
+		encrypted, encryptErr := s.codeEncryptor.Encrypt(code)
+		if encryptErr != nil {
+			return nil, encryptErr
+		}
+		encryptedCode = encrypted
+		nullableKeyHash = idempotencyKeyHash
+		nullableRequestFingerprint = requestFingerprint
 	}
 	var count int64
 	var daily string
@@ -262,10 +331,10 @@ WHERE tenant_id = $1 AND issuer_user_id = $2 AND created_at >= date_trunc('day',
 	var voucherID int64
 	if err := tx.QueryRowContext(ctx, `
 INSERT INTO balance_vouchers (
-    tenant_id, issuer_user_id, code_hash, code_last4, face_value, fee_amount,
-    fee_rate_bps, status, expires_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, 'ISSUED', $8)
-RETURNING id`, voucherTenantID, userID, hash, last4, amount.String(), fee.String(), config.feeBPS, expiresAt).Scan(&voucherID); err != nil {
+	    tenant_id, issuer_user_id, code_hash, code_last4, face_value, fee_amount,
+	    fee_rate_bps, status, expires_at, idempotency_key_hash, idempotency_request_hash, code_encrypted
+) VALUES ($1, $2, $3, $4, $5, $6, $7, 'ISSUED', $8, $9, $10, $11)
+RETURNING id`, voucherTenantID, userID, hash, last4, amount.String(), fee.String(), config.feeBPS, expiresAt, nullableKeyHash, nullableRequestFingerprint, encryptedCode).Scan(&voucherID); err != nil {
 		return nil, err
 	}
 	if _, err := tx.ExecContext(ctx, `
@@ -315,6 +384,28 @@ ORDER BY created_at DESC, id DESC LIMIT $3 OFFSET $4`, voucherTenantID, userID, 
 		items = append(items, voucher)
 	}
 	return items, total, rows.Err()
+}
+
+func (s *VoucherService) ListRedeemedHistory(ctx context.Context, userID, limit int64) ([]Voucher, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 25
+	}
+	rows, err := s.db.QueryContext(ctx, voucherSelectSQL+`
+WHERE tenant_id = $1 AND redeemer_user_id = $2 AND status = 'REDEEMED'
+ORDER BY redeemed_at DESC NULLS LAST, id DESC LIMIT $3`, voucherTenantID, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	items := make([]Voucher, 0, limit)
+	for rows.Next() {
+		item, scanErr := scanVoucher(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
 }
 
 func (s *VoucherService) AdminList(ctx context.Context, status string, page, pageSize int) ([]Voucher, int64, error) {
@@ -409,7 +500,7 @@ func (s *VoucherService) Cancel(ctx context.Context, userID, voucherID int64) (*
 	return s.transitionToRefund(ctx, userID, voucherID, "CANCELLED")
 }
 
-func (s *VoucherService) Redeem(ctx context.Context, userID int64, code string) (*Voucher, error) {
+func (s *VoucherService) Redeem(ctx context.Context, userID int64, code string) (*VoucherRedeemResult, error) {
 	config, err := s.loadConfig(ctx)
 	if err != nil {
 		return nil, err
@@ -434,9 +525,6 @@ func (s *VoucherService) Redeem(ctx context.Context, userID int64, code string) 
 	voucher, err := getVoucherForUpdate(ctx, tx, `code_hash = $1 AND tenant_id = $2`, hash, voucherTenantID)
 	if err != nil {
 		return nil, err
-	}
-	if voucher.IssuerUserID == userID {
-		return nil, ErrVoucherSelfRedeem
 	}
 	if voucher.Status != "ISSUED" {
 		return nil, ErrVoucherUnavailable
@@ -467,6 +555,9 @@ func (s *VoucherService) Redeem(ctx context.Context, userID int64, code string) 
 		}
 		return nil, ErrVoucherUnavailable
 	}
+	if voucher.IssuerUserID == userID {
+		return nil, ErrVoucherSelfRedeem
+	}
 	face, _ := decimal.NewFromString(voucher.FaceValue)
 	account, err := lockCreditAccount(ctx, tx, userID)
 	if err != nil {
@@ -491,7 +582,11 @@ func (s *VoucherService) Redeem(ctx context.Context, userID int64, code string) 
 		return nil, err
 	}
 	voucher.Status, voucher.RedeemerUserID, voucher.RedeemedAt = "REDEEMED", &userID, &now
-	return voucher, nil
+	return &VoucherRedeemResult{
+		Voucher:    voucher,
+		FaceValue:  face.StringFixed(8),
+		NewBalance: account.balance().StringFixed(8),
+	}, nil
 }
 
 func (s *VoucherService) ExpireDue(ctx context.Context, limit int) error {
@@ -538,6 +633,9 @@ func (s *VoucherService) transitionToRefund(ctx context.Context, userID, voucher
 	}
 	if voucher.Status != "ISSUED" {
 		return nil, ErrVoucherUnavailable
+	}
+	if target == "CANCELLED" && !voucher.ExpiresAt.After(time.Now()) {
+		target = "EXPIRED"
 	}
 	face, _ := decimal.NewFromString(voucher.FaceValue)
 	fee, _ := decimal.NewFromString(voucher.FeeAmount)
@@ -678,6 +776,16 @@ func generateVoucherCode() (code, hash, last4 string, err error) {
 	last4 = strings.ReplaceAll(code, "-", "")
 	last4 = last4[len(last4)-4:]
 	return code, hash, last4, nil
+}
+
+func hashVoucherIdempotencyKey(key string) string {
+	digest := sha256.Sum256([]byte(key))
+	return hex.EncodeToString(digest[:])
+}
+
+func voucherRequestFingerprint(amount decimal.Decimal, feeBPS int64, expiryDays int) string {
+	digest := sha256.Sum256([]byte(fmt.Sprintf("%s|%d|%d", amount.StringFixed(8), feeBPS, expiryDays)))
+	return hex.EncodeToString(digest[:])
 }
 
 func (s *VoucherService) loadConfig(ctx context.Context) (voucherConfig, error) {

@@ -61,3 +61,31 @@ func TestIsExplicitImageGenerationIntent_PlainTextRequest(t *testing.T) {
 	assert.False(t, IsExplicitImageGenerationIntent("/v1/responses", "gpt-5.5", body),
 		"plain text request should NOT be explicit image intent")
 }
+
+func TestIsCodexImageGenerationBridgeIntentDetectsClientImageTools(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "top-level namespace",
+			body: `{"tools":[{"type":"namespace","name":"image_gen"}]}`,
+		},
+		{
+			name: "lite additional tools namespace",
+			body: `{"input":[{"type":"additional_tools","tools":[{"type":"namespace","name":"image_gen"}]}]}`,
+		},
+		{
+			name: "function tool",
+			body: `{"tools":[{"type":"function","name":"image_gen.imagegen"}]}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.True(t, IsCodexImageGenerationBridgeIntent([]byte(tt.body)))
+		})
+	}
+
+	assert.False(t, IsCodexImageGenerationBridgeIntent([]byte(`{"tools":[{"type":"function","name":"shell"}]}`)))
+}
