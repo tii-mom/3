@@ -2,18 +2,23 @@
 import { computed, onMounted, ref } from 'vue'
 import FAQ_ITEMS from '@/content/home-faq.json'
 import { useAppStore } from '@/stores/app'
-import { publicShopAPI, type PublicBanner, type PublicProduct } from '@/api/publicShop'
+import { formatCNY, publicShopAPI, type PublicBanner, type PublicProduct } from '@/api/publicShop'
 import { SHOP_CATEGORIES, normalizeShopCategory, type ShopCategory } from '@/constants/shop'
 import userAPI from '@/api/user'
 import { resolveShopAssetUrl } from '@/api/shop'
+import { pickBestDeal } from '@/utils/shopDeal'
 import { useGuestCheckout } from '@/composables/useGuestCheckout'
+import { useRevealOnScroll } from '@/composables/useRevealOnScroll'
 import PlanCard from '@/components/home/PlanCard.vue'
 import OrderSheet from '@/components/home/OrderSheet.vue'
 import SessionGuide from '@/components/home/SessionGuide.vue'
+import HeroPromo from '@/components/home/HeroPromo.vue'
+import HeroFloatCards from '@/components/home/HeroFloatCards.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
 
 const appStore = useAppStore()
+const { vReveal } = useRevealOnScroll()
 const {
   isLoggedIn,
   submitting,
@@ -60,6 +65,75 @@ const categoryGroups = computed(() => {
     items: (buckets.get(meta.value) || []).slice().sort(compareProducts)
   }))
 })
+
+/**
+ * 首屏右侧悬浮卡取前三个商品：先推荐位、再按后台排序。
+ * 用真实商品而不是装饰卡——悬浮元素本身就是购买入口，点一下直接开下单抽屉。
+ */
+const heroProducts = computed(() => products.value.slice().sort(compareProducts).slice(0, 3))
+
+/**
+ * 首屏促销条的文案全部由真实商品数据推导，不写死折扣数字。
+ * 理由：后台目前没有任何「新客立减 / 优惠券」规则，如果促销条上写一个凭空的优惠金额，
+ * 用户下单时对不上，属于虚假宣传。这里只在商品确实配了划线原价（original_price > price）时
+ * 才显示「省 ¥X」，否则退化成一句不含数字的服务承诺。
+ */
+const heroDeal = computed(() => pickBestDeal(products.value))
+
+const heroPromo = computed(() => {
+  const deal = heroDeal.value
+  if (deal) {
+    return {
+      title: deal.product.name,
+      subtitle: '官方渠道代充值 · 下单立减',
+      badge: `省 ¥${formatCNY(deal.savingMinor)}`,
+      actionText: '立即下单'
+    }
+  }
+  return {
+    title: 'ChatGPT Plus / Pro 会员代充',
+    subtitle: '1-3 分钟到账 · 30 天质保 · 全程不需要账号密码',
+    badge: '查看套餐',
+    actionText: '立即充值'
+  }
+})
+
+/** 首屏促销条：点击直接进入购买环节 */
+function onPromoAction() {
+  const target = heroDeal.value?.product || heroProducts.value[0]
+  if (target) {
+    openSheet(target)
+    return
+  }
+  document.getElementById('plans')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+const HERO_FEATURES = [
+  {
+    label: '不需要账号密码',
+    path: 'M12 3l7 3v6c0 4.2-2.9 7.4-7 9-4.1-1.6-7-4.8-7-9V6z'
+  },
+  {
+    label: '1-3 分钟到账',
+    path: 'M12 7v5l3.2 1.9M12 3a9 9 0 100 18 9 9 0 000-18z'
+  },
+  {
+    label: '30 天质保',
+    path: 'M4.5 12.5l4.5 4.5L19.5 6.5'
+  }
+]
+
+/** 跑马灯：深色段与浅色段之间的过渡带，一列服务承诺横向滚动 */
+const MARQUEE: string[] = [
+  'ChatGPT Plus / Pro 官方渠道代充',
+  '成品号独享交付',
+  'X 蓝V 认证',
+  'Gemini Advanced 会员',
+  '支付宝 / 微信支付',
+  '支付后凭订单号查进度',
+  '非人为中断 30 天质保',
+  '全程不需要账号密码'
+]
 
 const contactInfo = computed(() => appStore.contactInfo?.trim() || '')
 // 下单抽屉里的支付方式：后台配置 ∩ 当前商品金额在单笔限额内
@@ -182,70 +256,69 @@ function handlePaymentSuccess() {
 
     <main>
       <section class="hero">
-        <div class="hero__grid" aria-hidden="true" />
-        <div class="hero__aura" aria-hidden="true">
-          <span class="hero__orb hero__orb--a" />
-          <span class="hero__orb hero__orb--b" />
-        </div>
+        <!-- 五层叠加：极光 → 透镜 → 内容 → 颗粒。纯 CSS，无 JS / canvas / 视频 -->
+        <span class="hero__glow hero__glow--a" aria-hidden="true" />
+        <span class="hero__glow hero__glow--b" aria-hidden="true" />
+        <span class="hero__glow hero__glow--c" aria-hidden="true" />
+        <span class="hero__glow hero__glow--d" aria-hidden="true" />
+        <span class="hero__lens" aria-hidden="true" />
+        <span class="hero__grain" aria-hidden="true" />
+
         <div class="hero__inner">
           <div class="hero__copy">
-            <p class="eyebrow">ChatGPT Plus / Pro 充值 · 成品号直供</p>
-            <h1 class="hero__title">给你的 ChatGPT 续上<br>官方会员与独享账号</h1>
+            <p class="hero__eyebrow">
+              <span class="hero__eyebrow-dot" aria-hidden="true" />
+              ChatGPT Plus / Pro 充值 · 成品号直供
+            </p>
+            <h1 class="hero__title">
+              <span class="hero__title-line hero__title-line--lead">把 ChatGPT 会员这件小事</span>
+              <span class="hero__title-line hero__title-line--emphasis">一分钟交给我们</span>
+            </h1>
             <p class="hero__desc">
               官方渠道代充值，1-3 分钟到账，30 天质保。成品号与租号即买即用，全程不需要账号密码。
             </p>
             <div class="hero__actions">
               <a class="sh-btn sh-btn--primary" href="#plans">选择套餐</a>
-              <a class="sh-btn sh-btn--ghost" href="#workflow">查看充值流程</a>
+              <a class="sh-btn sh-btn--dark-ghost" href="#workflow">查看充值流程</a>
             </div>
-            <ul class="hero__trust">
-              <li>不需要账号密码</li>
-              <li>支付后凭订单号查进度</li>
-              <li>独立第三方服务</li>
+            <ul class="hero__features">
+              <li v-for="feature in HERO_FEATURES" :key="feature.label" class="hero__feature">
+                <span class="hero__feature-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                    <path :d="feature.path" />
+                  </svg>
+                </span>
+                <span>{{ feature.label }}</span>
+              </li>
             </ul>
           </div>
 
-          <aside class="hero__panel" aria-hidden="true">
-            <div class="panel">
-              <div class="panel__head">
-                <span class="panel__pulse" />
-                <span>充值进度</span>
-                <span class="panel__tag">实时</span>
-              </div>
-              <ol class="panel__steps">
-                <li class="panel__step is-done">
-                  <span class="panel__node" />
-                  <div>
-                    <p>选择套餐</p>
-                    <small>确认价格与服务说明</small>
-                  </div>
-                </li>
-                <li class="panel__step is-done">
-                  <span class="panel__node" />
-                  <div>
-                    <p>填写联系方式</p>
-                    <small>仅用于查单与售后</small>
-                  </div>
-                </li>
-                <li class="panel__step is-active">
-                  <span class="panel__node" />
-                  <div>
-                    <p>提交登录凭证</p>
-                    <small>支付后随时可补交</small>
-                  </div>
-                </li>
-                <li class="panel__step">
-                  <span class="panel__node" />
-                  <div>
-                    <p>到账完成</p>
-                    <small>平均 1-3 分钟</small>
-                  </div>
-                </li>
-              </ol>
-            </div>
-          </aside>
+          <div class="hero__float">
+            <HeroFloatCards v-if="heroProducts.length" :products="heroProducts" @select="openSheet" />
+          </div>
+        </div>
+
+        <div class="hero__wide">
+          <HeroPromo
+            :title="heroPromo.title"
+            :subtitle="heroPromo.subtitle"
+            :badge="heroPromo.badge"
+            :action-text="heroPromo.actionText"
+            @action="onPromoAction"
+          />
         </div>
       </section>
+
+      <div class="marquee" aria-hidden="true">
+        <div class="marquee__track">
+          <div v-for="pass in 2" :key="pass" class="marquee__item">
+            <template v-for="(item, index) in MARQUEE" :key="`${pass}-${index}`">
+              <span>{{ item }}</span>
+              <span class="marquee__dot" />
+            </template>
+          </div>
+        </div>
+      </div>
 
       <section class="metrics">
         <div class="metrics__inner">
@@ -284,8 +357,9 @@ function handlePaymentSuccess() {
 
       <section id="plans" class="plans">
         <div class="section__inner">
-          <header class="section__head">
-            <h2 class="section__title">选择套餐</h2>
+          <header class="section__head" v-reveal>
+            <span class="section__no">01 — 选择套餐</span>
+            <h2 class="section__title">按你要的服务挑一个</h2>
             <p class="section__desc">价格以支付前页面显示为准，支持支付宝与微信支付</p>
           </header>
 
@@ -327,30 +401,31 @@ function handlePaymentSuccess() {
 
       <section id="workflow" class="workflow">
         <div class="section__inner">
-          <header class="section__head">
+          <header class="section__head" v-reveal>
+            <span class="section__no">02 — 下单流程</span>
             <h2 class="section__title">三步完成充值</h2>
             <p class="section__desc">先选套餐付款，再补交凭证，全程不需要账号密码</p>
           </header>
 
           <div class="workflow__grid">
-            <article class="step">
+            <article class="step" v-reveal="0">
               <span class="step__num">01</span>
               <h3>选择套餐</h3>
               <p>在上方选择代充值、成品号或租号，确认价格与服务说明</p>
             </article>
-            <article class="step">
+            <article class="step" v-reveal="90">
               <span class="step__num">02</span>
               <h3>留联系方式并支付</h3>
               <p>填写手机号或邮箱用于查单与售后，选择支付宝或微信完成支付</p>
             </article>
-            <article class="step">
+            <article class="step" v-reveal="180">
               <span class="step__num">03</span>
               <h3>提交信息等待到账</h3>
               <p>代充值粘贴登录凭证，成品号与租号留接收邮箱，随后等待交付</p>
             </article>
           </div>
 
-          <div class="guide-wrap">
+          <div class="guide-wrap" v-reveal>
             <div class="guide-wrap__head">
               <h3>怎么拿到登录凭证</h3>
               <p>四步搞定，复制粘贴即可，不需要懂技术</p>
@@ -362,12 +437,13 @@ function handlePaymentSuccess() {
 
       <section class="compare">
         <div class="section__inner">
-          <header class="section__head">
+          <header class="section__head" v-reveal>
+            <span class="section__no">03 — 怎么选</span>
             <h2 class="section__title">三种方式怎么选</h2>
             <p class="section__desc">按你现在的情况对号入座</p>
           </header>
           <div class="compare__grid">
-            <article v-for="col in COMPARISON" :key="col.name" class="compare__card">
+            <article v-for="(col, i) in COMPARISON" :key="col.name" class="compare__card" v-reveal="i * 90">
               <header class="compare__head">
                 <h3 class="compare__name">{{ col.name }}</h3>
                 <p class="compare__for">{{ col.for }}</p>
@@ -385,7 +461,8 @@ function handlePaymentSuccess() {
 
       <section id="faq" class="faq">
         <div class="section__inner section__inner--narrow">
-          <header class="section__head">
+          <header class="section__head" v-reveal>
+            <span class="section__no">04 — 常见问题</span>
             <h2 class="section__title">常见问题</h2>
             <p class="section__desc">下单前最常被问到的几件事</p>
           </header>
@@ -408,7 +485,7 @@ function handlePaymentSuccess() {
         </div>
       </section>
 
-      <section class="closing">
+      <section class="closing" v-reveal>
         <div class="section__inner closing__inner">
           <h2 class="closing__title">准备好开始了吗</h2>
           <a class="sh-btn sh-btn--primary" href="#plans">选择套餐</a>
@@ -504,10 +581,25 @@ function handlePaymentSuccess() {
   --sh-accent-text: #b34b1f;
   --sh-grid: rgba(9, 9, 11, 0.05);
   --sh-scrim: rgba(9, 9, 11, 0.55);
-  /* 首屏光斑：品牌橙 + 少量冷色，饱和度压到最低，只做氛围不抢内容 */
-  --sh-aura-1: rgba(216, 90, 40, 0.15);
-  --sh-aura-2: rgba(58, 118, 240, 0.11);
   --sh-shadow: 0 1px 2px rgba(9, 9, 11, 0.04), 0 1px 3px rgba(9, 9, 11, 0.04);
+
+  /* ---------- 深色段令牌 ----------
+     导航 / 首屏 / 跑马灯这一段永远是深色（不跟随明暗主题），
+     与下方浅色转化段靠 --sh-* 各管各的，两套互不干扰。 */
+  --dk-bg: #0b0d12;
+  --dk-fg: #f6f7fb;
+  --dk-fg-2: rgba(246, 247, 251, 0.64);
+  --dk-fg-3: rgba(246, 247, 251, 0.4);
+  --dk-border: rgba(255, 255, 255, 0.1);
+  --dk-border-strong: rgba(255, 255, 255, 0.22);
+  /* 极光三色：暖橙（品牌）＋蓝紫＋青，比纯冷色更有温度。
+     取值刻意偏高——光斑本身是极低饱和的宽渐变，叠两层遮罩后实际观感会再降一档。 */
+  --dk-glow-1: rgba(255, 122, 69, 0.52);
+  --dk-glow-2: rgba(124, 92, 255, 0.48);
+  --dk-glow-3: rgba(34, 211, 238, 0.4);
+  --dk-glow-4: rgba(255, 77, 109, 0.34);
+  --dk-accent: #ff6b35;
+  --dk-accent-2: #ff4d6d;
 
   min-height: 100vh;
   background: var(--sh-bg);
@@ -516,6 +608,12 @@ function handlePaymentSuccess() {
   -webkit-font-smoothing: antialiased;
 }
 
+
+/* 吸顶导航高 60px：锚点跳转时留出余量，否则标题会被导航盖住 */
+section[id],
+.plans__group[id] {
+  scroll-margin-top: 76px;
+}
 
 .section__inner {
   max-width: 1120px;
@@ -546,19 +644,46 @@ function handlePaymentSuccess() {
   color: var(--sh-text-2);
 }
 
-.eyebrow {
-  font-size: 13px;
-  letter-spacing: 0.02em;
-  color: var(--sh-text-3);
+/* ---------- 滚动入场 ----------
+   .reveal 是初始态（透明 + 下移 14px），.is-revealed 由 v-reveal 指令在进入视口时加上。
+   只动 opacity / transform，不动 margin / height，避免触发 layout。 */
+.reveal {
+  opacity: 0;
+  transform: translate3d(0, 14px, 0);
+  transition: opacity 620ms cubic-bezier(0.22, 0.61, 0.36, 1), transform 620ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
-/* ---------- nav ---------- */
+.reveal.is-revealed {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+/* 分段编号：01 / 02 / 03 —— 极细的排版锚点，给浅色段一点 editorial 感 */
+.section__no {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--sh-text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* ---------- nav（深色常驻，与首屏共用一套令牌） ---------- */
 .nav {
   position: sticky;
   top: 0;
   z-index: 40;
-  border-bottom: 1px solid var(--sh-border);
-  background: color-mix(in srgb, var(--sh-bg) 82%, transparent);
+  border-bottom: 1px solid var(--dk-border);
+  background: color-mix(in srgb, var(--dk-bg) 76%, transparent);
   backdrop-filter: saturate(180%) blur(14px);
 }
 
@@ -586,8 +711,8 @@ function handlePaymentSuccess() {
   display: grid;
   place-items: center;
   border-radius: 7px;
-  background: var(--sh-text);
-  color: var(--sh-bg);
+  background: linear-gradient(140deg, var(--dk-accent), var(--dk-accent-2));
+  color: #fff;
   font-size: 14px;
   font-weight: 600;
 }
@@ -595,7 +720,7 @@ function handlePaymentSuccess() {
 .nav__name {
   font-size: 15px;
   font-weight: 600;
-  color: var(--sh-text);
+  color: var(--dk-fg);
   letter-spacing: -0.01em;
 }
 
@@ -606,13 +731,13 @@ function handlePaymentSuccess() {
 }
 
 .nav__links a {
-  color: var(--sh-text-2);
+  color: var(--dk-fg-2);
   text-decoration: none;
   transition: color 160ms ease-out;
 }
 
 .nav__links a:hover {
-  color: var(--sh-text);
+  color: var(--dk-fg);
 }
 
 .nav__actions {
@@ -623,147 +748,273 @@ function handlePaymentSuccess() {
 
 .nav__ghost {
   font-size: 14px;
-  color: var(--sh-text-2);
+  color: var(--dk-fg-2);
   text-decoration: none;
   transition: color 160ms ease-out;
 }
 
 .nav__ghost:hover {
-  color: var(--sh-text);
+  color: var(--dk-fg);
 }
 
 .nav__cta {
   padding: 8px 15px;
   border-radius: 8px;
-  background: var(--sh-accent);
-  color: var(--sh-accent-fg);
+  background: linear-gradient(100deg, var(--dk-accent), var(--dk-accent-2));
+  color: #fff;
   font-size: 14px;
   font-weight: 500;
   text-decoration: none;
-  transition: background 160ms ease-out;
+  transition: filter 160ms ease-out;
 }
 
 .nav__cta:hover {
-  background: var(--sh-accent-hover);
+  filter: brightness(1.08);
 }
 
-/* ---------- hero ---------- */
+/* ---------- hero：深色沉浸首屏 ----------
+   五层叠加：极光（唯一色彩来源）→ 透镜（景深）→ 内容 → 颗粒（质感）→ 悬浮商品卡。
+   全部纯 CSS —— 无 JS、无 canvas、无视频；动画只动 opacity / transform（GPU 合成）。 */
 .hero {
   position: relative;
-  padding: 104px 0 80px;
   overflow: hidden;
+  isolation: isolate;
+  background: var(--dk-bg);
+  color: var(--dk-fg);
+  padding: 88px 0 96px;
 }
 
-.hero__grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(var(--sh-grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--sh-grid) 1px, transparent 1px);
-  background-size: 68px 68px;
-  -webkit-mask-image: radial-gradient(ellipse 90% 62% at 50% 0%, #000 0%, transparent 72%);
-  mask-image: radial-gradient(ellipse 90% 62% at 50% 0%, #000 0%, transparent 72%);
-  pointer-events: none;
-}
-
-/* 动态背景：两团渐变光斑做极缓呼吸（34s / 44s 交替）。
-   只动 opacity 与 transform —— 两者都走 GPU 合成，不触发重排重绘；
-   没有 JS、没有 canvas、没有视频，常驻内存开销约等于 0。
-   光斑本身用 radial-gradient 自带柔边，不需要 filter: blur（那才真的吃性能）。 */
-.hero__aura {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.hero__orb {
+/* 1) 极光层：三团光斑极缓呼吸。这是整段唯一的「彩色」来源，其余一律中性灰阶。 */
+.hero__glow {
   position: absolute;
   border-radius: 50%;
+  pointer-events: none;
   will-change: opacity, transform;
 }
 
-.hero__orb--a {
+.hero__glow--a {
   top: -22%;
-  left: -8%;
-  width: 52vw;
-  height: 52vw;
-  background: radial-gradient(circle at 50% 50%, var(--sh-aura-1) 0%, transparent 66%);
-  animation: sh-orb-a 34s ease-in-out infinite alternate;
+  left: -12%;
+  width: 58vw;
+  height: 58vw;
+  background: radial-gradient(circle at 50% 50%, var(--dk-glow-1) 0%, transparent 66%);
+  animation: dk-glow-a 34s ease-in-out infinite alternate;
 }
 
-.hero__orb--b {
-  top: -12%;
-  right: -12%;
-  width: 44vw;
-  height: 44vw;
-  background: radial-gradient(circle at 50% 50%, var(--sh-aura-2) 0%, transparent 66%);
-  animation: sh-orb-b 44s ease-in-out infinite alternate;
+.hero__glow--b {
+  top: -14%;
+  right: -14%;
+  width: 54vw;
+  height: 54vw;
+  background: radial-gradient(circle at 50% 50%, var(--dk-glow-2) 0%, transparent 66%);
+  animation: dk-glow-b 44s ease-in-out infinite alternate;
 }
 
-@keyframes sh-orb-a {
+.hero__glow--c {
+  bottom: -30%;
+  left: 24%;
+  width: 48vw;
+  height: 48vw;
+  background: radial-gradient(circle at 50% 50%, var(--dk-glow-3) 0%, transparent 68%);
+  animation: dk-glow-c 38s ease-in-out infinite alternate;
+}
+
+/* 第四团暖粉：补在右侧中段，把「冷→暖」的过渡补齐，避免整屏只剩蓝紫 */
+.hero__glow--d {
+  top: 22%;
+  right: 2%;
+  width: 34vw;
+  height: 34vw;
+  background: radial-gradient(circle at 50% 50%, var(--dk-glow-4) 0%, transparent 70%);
+  animation: dk-glow-d 41s ease-in-out infinite alternate;
+}
+
+@keyframes dk-glow-a {
   from {
-    opacity: 0.5;
+    opacity: 0.6;
     transform: translate3d(0, 0, 0) scale(1);
   }
   to {
-    opacity: 0.85;
-    transform: translate3d(2%, -2%, 0) scale(1.07);
+    opacity: 1;
+    transform: translate3d(3%, -2%, 0) scale(1.08);
   }
 }
 
-@keyframes sh-orb-b {
+@keyframes dk-glow-b {
   from {
-    opacity: 0.38;
+    opacity: 0.5;
+    transform: translate3d(0, 0, 0) scale(1.05);
+  }
+  to {
+    opacity: 0.92;
+    transform: translate3d(-3%, 3%, 0) scale(1);
+  }
+}
+
+@keyframes dk-glow-c {
+  from {
+    opacity: 0.36;
+    transform: translate3d(0, 2%, 0) scale(1.02);
+  }
+  to {
+    opacity: 0.72;
+    transform: translate3d(2%, -3%, 0) scale(1.1);
+  }
+}
+
+@keyframes dk-glow-d {
+  from {
+    opacity: 0.42;
     transform: translate3d(0, 0, 0) scale(1.04);
   }
   to {
-    opacity: 0.68;
-    transform: translate3d(-2%, 2%, 0) scale(1);
+    opacity: 0.86;
+    transform: translate3d(-4%, 4%, 0) scale(0.98);
   }
+}
+
+/* 2) 透镜层：一圈椭圆描边 + 三重 inset 阴影 + 上下渐隐，制造「往里看」的景深 */
+.hero__lens {
+  position: absolute;
+  inset: -14% -6% 8%;
+  border-radius: 48% / 42%;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow:
+    inset 7rem 0 12rem -9rem rgba(255, 255, 255, 0.18),
+    inset -7rem 0 12rem -9rem rgba(255, 255, 255, 0.18),
+    inset 0 -5rem 10rem -8rem rgba(255, 255, 255, 0.12);
+  /* 上下都要完全淡出：椭圆下弧如果只淡到一半，会在促销条上方留一道突兀的白线 */
+  -webkit-mask-image: linear-gradient(transparent 4%, #000 22% 68%, transparent 86%);
+  mask-image: linear-gradient(transparent 4%, #000 22% 68%, transparent 86%);
+  pointer-events: none;
+}
+
+/* 3) 颗粒层：一张 180×180 的静态 SVG 噪声平铺，去掉数字塑料感。
+   它是静态图片，没有运行时开销——整套视觉里性价比最高的一层。 */
+.hero__grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.16;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  background-repeat: repeat;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
 }
 
 /* 系统开启「减弱动态效果」时退化为静态光斑 */
 @media (prefers-reduced-motion: reduce) {
-  .hero__orb {
+  .hero__glow {
     animation: none;
-    opacity: 0.6;
+    opacity: 0.7;
   }
 }
 
 .hero__inner {
   position: relative;
+  z-index: 2;
   max-width: 1120px;
   margin: 0 auto;
   padding: 0 24px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 372px;
-  gap: 64px;
+  grid-template-columns: minmax(0, 1fr) 384px;
+  gap: 56px;
   align-items: center;
 }
 
+/* 右侧悬浮卡容器：桌面端给足 3D 位移的呼吸空间，窄屏由媒体查询收窄 */
+.hero__float {
+  position: relative;
+  min-width: 0;
+}
+
+.hero__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--dk-border);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 13px;
+  color: var(--dk-fg-2);
+}
+
+.hero__eyebrow-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.16);
+}
+
 .hero__title {
-  margin-top: 18px;
-  font-size: 48px;
-  line-height: 1.12;
+  margin-top: 24px;
+  font-size: clamp(2.5rem, 4.4vw, 3.6rem);
+  line-height: 1.06;
   font-weight: 600;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+  color: var(--dk-fg);
+}
+
+.hero__title-line {
+  display: block;
+}
+
+.hero__title-line--lead {
+  font-size: 0.78em;
+  font-weight: 500;
   letter-spacing: -0.035em;
-  color: var(--sh-text);
+  color: var(--dk-fg-2);
+}
+
+/* 第二行做渐变文字：纯白 → 暖橙 → 纯白，把视觉重心压在这一句上 */
+.hero__title-line--emphasis {
+  margin-top: 0.08em;
+  font-size: 1.04em;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  background: linear-gradient(104deg, #ffffff 6%, #ffb08a 54%, #ffffff 96%);
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  -webkit-background-clip: text;
 }
 
 .hero__desc {
   margin-top: 20px;
-  max-width: 560px;
-  font-size: 16px;
+  max-width: 520px;
+  font-size: 15px;
   line-height: 1.75;
-  color: var(--sh-text-2);
+  color: var(--dk-fg-2);
 }
 
 .hero__actions {
-  margin-top: 32px;
+  margin-top: 30px;
   display: flex;
-  gap: 12px;
+  align-items: center;
+  gap: 14px;
   flex-wrap: wrap;
+}
+
+.sh-btn--dark-ghost {
+  border: 1px solid var(--dk-border-strong);
+  color: var(--dk-fg);
+  background: transparent;
+}
+
+.sh-btn--dark-ghost:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+/* 促销条容器：跟在两栏内容下方，整幅居中，抢到最大视觉宽度 */
+.hero__wide {
+  position: relative;
+  z-index: 2;
+  max-width: 1120px;
+  margin: 52px auto 0;
+  padding: 0 24px;
+  display: flex;
+  justify-content: center;
 }
 
 .sh-btn {
@@ -797,120 +1048,93 @@ function handlePaymentSuccess() {
   background: var(--sh-surface-2);
 }
 
-.hero__trust {
-  margin-top: 28px;
+/* 特性胶囊：小圆图标 + 短语，替掉原来那串带圆点的文字列表 */
+.hero__features {
+  margin: 26px 0 0;
   padding: 0;
   list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 20px;
-  font-size: 13px;
-  color: var(--sh-text-3);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  max-width: 520px;
 }
 
-.hero__trust li {
+.hero__feature {
   display: flex;
   align-items: center;
   gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.3;
+  color: var(--dk-fg-2);
 }
 
-.hero__trust li::before {
-  content: '';
+.hero__feature-icon {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--dk-border);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  color: var(--dk-fg);
+}
+
+.hero__feature-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* ---------- 跑马灯：深色段与浅色段之间的过渡带 ---------- */
+.marquee {
+  background: var(--dk-bg);
+  border-top: 1px solid var(--dk-border);
+  overflow: hidden;
+  padding: 20px 0;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8% 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 8% 92%, transparent);
+}
+
+/* 轨道里放两份同样的列表，位移 50% 即可无缝衔接。
+   注意：轨道本身不能有 gap（否则 -50% 会差半个间距，循环时出现跳动），
+   间距一律放在 .marquee__item 内部 + padding-right，这样两份列表宽度严格相等。 */
+.marquee__track {
+  display: flex;
+  width: max-content;
+  animation: dk-marquee 36s linear infinite;
+}
+
+.marquee__item {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  padding-right: 40px;
+  font-size: 14px;
+  color: rgba(246, 247, 251, 0.52);
+  white-space: nowrap;
+}
+
+.marquee__dot {
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: var(--sh-border-strong);
+  background: var(--dk-border-strong);
 }
 
-/* ---------- hero panel ---------- */
-.panel {
-  padding: 20px;
-  border-radius: 14px;
-  border: 1px solid var(--sh-border);
-  background: var(--sh-surface);
-  box-shadow: var(--sh-shadow);
+@keyframes dk-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
 }
 
-.panel__head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--sh-text-2);
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--sh-border);
-}
-
-.panel__pulse {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #1a9e6f;
-  box-shadow: 0 0 0 3px rgba(26, 158, 111, 0.14);
-}
-
-.panel__tag {
-  margin-left: auto;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--sh-border);
-  font-size: 11px;
-  color: var(--sh-text-3);
-}
-
-.panel__steps {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.panel__step {
-  display: flex;
-  gap: 12px;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--sh-border);
-}
-
-.panel__step:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.panel__node {
-  flex-shrink: 0;
-  width: 9px;
-  height: 9px;
-  margin-top: 6px;
-  border-radius: 50%;
-  border: 1.5px solid var(--sh-border-strong);
-}
-
-.panel__step.is-done .panel__node {
-  background: var(--sh-text-3);
-  border-color: var(--sh-text-3);
-}
-
-.panel__step.is-active .panel__node {
-  background: var(--sh-accent);
-  border-color: var(--sh-accent);
-  box-shadow: 0 0 0 4px var(--sh-accent-soft);
-}
-
-.panel__step p {
-  font-size: 14px;
-  color: var(--sh-text-3);
-}
-
-.panel__step.is-done p,
-.panel__step.is-active p {
-  color: var(--sh-text);
-}
-
-.panel__step small {
-  display: block;
-  margin-top: 3px;
-  font-size: 12px;
-  color: var(--sh-text-3);
+@media (prefers-reduced-motion: reduce) {
+  .marquee__track {
+    animation: none;
+  }
 }
 
 /* ---------- metrics ---------- */
@@ -1370,8 +1594,9 @@ function handlePaymentSuccess() {
     gap: 40px;
   }
 
-  .hero__panel {
-    max-width: 460px;
+  /* 悬浮卡在窄屏改为横向滑动条（组件内部已处理），这里只需让它占满栏宽 */
+  .hero__float {
+    max-width: 560px;
   }
 
   .metrics__inner {
@@ -1423,9 +1648,14 @@ function handlePaymentSuccess() {
     min-width: 0;
   }
 
-  .hero__trust {
+  .hero__features {
     margin-top: 22px;
-    gap: 6px 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 12px;
+  }
+
+  .hero__wide {
+    margin-top: 36px;
   }
 
   .banners {
@@ -1542,8 +1772,16 @@ function handlePaymentSuccess() {
   --sh-grid: rgba(255, 255, 255, 0.045);
   --sh-scrim: rgba(0, 0, 0, 0.6);
   --sh-shadow: none;
-  /* 深色下光斑更亮一点，否则近黑背景上看不见 */
-  --sh-aura-1: rgba(255, 122, 69, 0.2);
-  --sh-aura-2: rgba(88, 132, 255, 0.15);
+}
+
+/* 锚点平滑滚动（导航「套餐 / 流程 / 常见问题」）。放在非 scoped 块里才能作用到 html。 */
+html:has(.sales-home) {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:has(.sales-home) {
+    scroll-behavior: auto;
+  }
 }
 </style>
