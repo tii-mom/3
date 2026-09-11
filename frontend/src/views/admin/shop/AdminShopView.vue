@@ -1,27 +1,26 @@
 <template>
   <AppLayout>
-  <div class="space-y-6 p-4 sm:p-6 lg:p-8">
-    <section class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm dark:border-dark-700 dark:bg-dark-900">
+  <div class="space-y-6">
+    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-900">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p class="text-sm font-semibold text-primary-600 dark:text-primary-300">商城管理</p>
-          <h1 class="mt-1 text-2xl font-bold text-gray-950 dark:text-white">商品上架、轮播展示、订单发货</h1>
-          <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">适合售卖平台商品；用户付款后在订单里手动填写发货信息，推广佣金进入算力公司钱包。</p>
+          <h1 class="text-xl font-bold text-gray-950 dark:text-white">商城管理</h1>
+          <p class="mt-1.5 text-sm text-gray-500 dark:text-gray-400">商品上架、轮播展示与订单发货；用户付款后在订单里填写发货信息，推广佣金进入算力公司钱包。</p>
         </div>
         <div class="flex flex-wrap gap-2">
-          <button v-if="tab === 'products'" class="btn-primary rounded-2xl px-4 py-2.5" @click="openProductDialog()">新增商品</button>
-          <button v-else-if="tab === 'banners'" class="btn-primary rounded-2xl px-4 py-2.5" @click="openBannerDialog()">新增轮播</button>
+          <button v-if="tab === 'products'" class="btn-primary rounded-lg px-4 py-2" @click="openProductDialog()">新增商品</button>
+          <button v-else-if="tab === 'banners'" class="btn-primary rounded-lg px-4 py-2" @click="openBannerDialog()">新增轮播</button>
         </div>
       </div>
-      <div class="mt-6 flex gap-2 overflow-x-auto">
-        <button v-for="item in tabs" :key="item.key" class="rounded-2xl px-4 py-2 text-sm font-semibold transition" :class="tab === item.key ? 'bg-gray-950 text-white dark:bg-white dark:text-gray-950' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-800 dark:text-gray-300'" @click="tab = item.key">
+      <div class="mt-5 flex gap-1.5 overflow-x-auto rounded-lg bg-gray-100 p-1 dark:bg-dark-800">
+        <button v-for="item in tabs" :key="item.key" class="whitespace-nowrap rounded-md px-3.5 py-1.5 text-sm font-medium transition" :class="tab === item.key ? 'bg-white text-gray-950 shadow-sm dark:bg-dark-700 dark:text-white' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'" @click="tab = item.key">
           {{ item.label }}
         </button>
       </div>
     </section>
 
-    <section v-if="tab === 'products'" class="rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900">
-      <div class="overflow-x-auto">
+    <section v-if="tab === 'products'" class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900">
+      <div class="hidden overflow-x-auto lg:block">
         <table class="min-w-full divide-y divide-gray-100 text-sm dark:divide-dark-700">
           <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500 dark:bg-dark-800 dark:text-gray-400">
             <tr>
@@ -37,7 +36,8 @@
             <tr v-for="product in products" :key="product.id">
               <td class="px-5 py-4">
                 <div class="flex items-center gap-3">
-                  <img :src="shopImage(product.image_url) || defaultProductImage" class="h-12 w-12 rounded-2xl object-cover" alt="">
+                  <img v-if="shopImage(product.image_url)" :src="shopImage(product.image_url)" class="h-12 w-12 rounded-lg object-cover" alt="">
+                  <div v-else class="shop-thumb h-12 w-12 rounded-lg" aria-hidden="true">3</div>
                   <div>
                     <div class="font-semibold text-gray-950 dark:text-white">{{ product.name }}</div>
                     <div class="line-clamp-1 text-xs text-gray-500">{{ product.description }}</div>
@@ -49,18 +49,47 @@
               <td class="px-5 py-4">{{ (product.commission_bps / 100).toFixed(0) }}%</td>
               <td class="px-5 py-4"><span :class="statusClass(product.status)" class="rounded-full px-2.5 py-1 text-xs font-semibold">{{ statusLabel(product.status) }}</span></td>
               <td class="px-5 py-4 text-right">
-                <button class="btn-secondary mr-2 rounded-xl px-3 py-1.5 text-xs" @click="openProductDialog(product)">编辑</button>
-                <button class="rounded-xl px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10" @click="removeProduct(product)">删除</button>
+                <button class="btn-secondary mr-2 rounded-lg px-3 py-1.5 text-xs" @click="openProductDialog(product)">编辑</button>
+                <button class="rounded-lg px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10" @click="removeProduct(product)">删除</button>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
+
+      <!-- 移动端：表格列太密，改为卡片列表 -->
+      <div class="divide-y divide-gray-100 dark:divide-dark-700 lg:hidden">
+        <article v-for="product in products" :key="product.id" class="p-4">
+          <div class="flex gap-3">
+            <img v-if="shopImage(product.image_url)" :src="shopImage(product.image_url)" class="h-14 w-14 shrink-0 rounded-lg object-cover" alt="">
+            <div v-else class="shop-thumb h-14 w-14 shrink-0 rounded-lg" aria-hidden="true">3</div>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <div class="truncate font-semibold text-gray-950 dark:text-white">{{ product.name }}</div>
+                  <div class="mt-0.5 line-clamp-2 text-xs text-gray-500">{{ product.description }}</div>
+                </div>
+                <span :class="statusClass(product.status)" class="shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold">{{ statusLabel(product.status) }}</span>
+              </div>
+              <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+                <span class="text-sm font-semibold text-gray-950 tabular-nums dark:text-white">¥{{ money(product.price_cny_minor) }}</span>
+                <span>{{ typeLabel(product.product_type) }}</span>
+                <span>佣金 {{ (product.commission_bps / 100).toFixed(0) }}%</span>
+              </div>
+              <div class="mt-3 flex gap-2">
+                <button class="btn-secondary rounded-lg px-3 py-1.5 text-xs" @click="openProductDialog(product)">编辑</button>
+                <button class="rounded-lg px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10" @click="removeProduct(product)">删除</button>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
     </section>
 
     <section v-else-if="tab === 'banners'" class="grid gap-4 lg:grid-cols-2">
-      <article v-for="banner in banners" :key="banner.id" class="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900">
-        <img :src="shopImage(banner.image_url) || defaultBannerImage" class="h-40 w-full object-cover" alt="">
+      <article v-for="banner in banners" :key="banner.id" class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900">
+        <img v-if="shopImage(banner.image_url)" :src="shopImage(banner.image_url)" class="h-40 w-full object-cover" alt="">
+        <div v-else class="shop-thumb h-40 w-full" aria-hidden="true">3</div>
         <div class="p-5">
           <div class="flex items-start justify-between gap-3">
             <div>
@@ -72,14 +101,14 @@
             </span>
           </div>
           <div class="mt-4 flex justify-end gap-2">
-            <button class="btn-secondary rounded-xl px-3 py-1.5 text-xs" @click="openBannerDialog(banner)">编辑</button>
-            <button class="rounded-xl px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10" @click="removeBanner(banner)">删除</button>
+            <button class="btn-secondary rounded-lg px-3 py-1.5 text-xs" @click="openBannerDialog(banner)">编辑</button>
+            <button class="rounded-lg px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10" @click="removeBanner(banner)">删除</button>
           </div>
         </div>
       </article>
     </section>
 
-    <section v-else class="rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900">
+    <section v-else class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900">
       <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4 dark:border-dark-700">
         <div>
           <h2 class="text-lg font-bold text-gray-950 dark:text-white">商城订单</h2>
@@ -90,7 +119,7 @@
           <span class="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">已发货 {{ fulfilledOrdersCount }}</span>
         </div>
       </div>
-      <div class="overflow-x-auto">
+      <div class="hidden overflow-x-auto lg:block">
         <table class="min-w-full divide-y divide-gray-100 text-sm dark:divide-dark-700">
           <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500 dark:bg-dark-800 dark:text-gray-400">
             <tr>
@@ -109,7 +138,13 @@
                 <div class="font-semibold text-gray-950 dark:text-white">#{{ order.id }} {{ order.snapshot_name }}</div>
                 <div class="text-xs text-gray-500">支付订单：{{ order.payment_order_id || '-' }}</div>
               </td>
-              <td class="px-5 py-4">{{ order.user_email || order.user_id }}</td>
+              <td class="px-5 py-4">
+                <div>{{ order.user_email || `用户 #${order.user_id}` }}</div>
+                <div v-if="order.guest_contact" class="mt-1 text-xs font-medium text-emerald-600 dark:text-emerald-300">
+                  游客联系方式：{{ order.guest_contact }}
+                </div>
+                <div v-if="order.order_no" class="mt-0.5 text-xs text-gray-500">单号 {{ order.order_no }}</div>
+              </td>
               <td class="px-5 py-4 font-semibold">¥{{ money(order.snapshot_price_cny_minor) }}</td>
               <td class="px-5 py-4">
                 <div class="font-semibold text-gray-900 dark:text-white">{{ orderStatusLabel(order) }}</div>
@@ -121,7 +156,7 @@
                 <button
                   v-if="canFulfillOrder(order)"
                   type="button"
-                  class="btn-primary rounded-xl px-3 py-1.5 text-xs"
+                  class="btn-primary rounded-lg px-3 py-1.5 text-xs"
                   @click="openFulfillDialog(order)"
                 >
                   手动发货
@@ -132,10 +167,41 @@
           </tbody>
         </table>
       </div>
+
+      <!-- 移动端：订单卡片 -->
+      <div class="divide-y divide-gray-100 dark:divide-dark-700 lg:hidden">
+        <article v-for="order in orders" :key="order.id" class="p-4">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="truncate font-semibold text-gray-950 dark:text-white">#{{ order.id }} {{ order.snapshot_name }}</div>
+              <div class="mt-0.5 truncate text-xs text-gray-500">{{ order.user_email || `用户 #${order.user_id}` }}</div>
+              <div v-if="order.guest_contact" class="mt-0.5 truncate text-xs font-medium text-emerald-600 dark:text-emerald-300">游客联系：{{ order.guest_contact }}</div>
+            </div>
+            <div class="shrink-0 text-right">
+              <div class="text-sm font-semibold tabular-nums text-gray-950 dark:text-white">¥{{ money(order.snapshot_price_cny_minor) }}</div>
+              <div class="mt-1 text-xs text-gray-500">{{ orderStatusLabel(order) }}</div>
+            </div>
+          </div>
+          <div v-if="order.fulfillment_note" class="mt-2 line-clamp-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-500/10 dark:text-amber-200">
+            发货内容：{{ order.fulfillment_note }}
+          </div>
+          <div class="mt-3 flex items-center justify-between gap-2">
+            <span class="text-xs text-gray-500">{{ formatDate(order.created_at) }}</span>
+            <button
+              v-if="canFulfillOrder(order)"
+              type="button"
+              class="btn-primary rounded-lg px-3 py-1.5 text-xs"
+              @click="openFulfillDialog(order)"
+            >
+              手动发货
+            </button>
+          </div>
+        </article>
+      </div>
     </section>
 
     <div v-if="productDialog.open" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/55 p-4 backdrop-blur-sm">
-      <form class="shop-modal max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl dark:bg-dark-900" @submit.prevent="saveProduct">
+      <form class="shop-modal max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-xl bg-white p-5 shadow-2xl dark:bg-dark-900" @submit.prevent="saveProduct">
         <div class="flex items-start justify-between gap-4">
           <div>
             <p class="text-sm font-semibold text-primary-600 dark:text-primary-300">商品管理</p>
@@ -181,12 +247,41 @@
                 </select>
               </label>
             </div>
+
+            <div class="mt-4 grid gap-4 md:grid-cols-2">
+              <label class="shop-field">
+                <span>交付模式</span>
+                <select v-model="productForm.fulfillment_mode" class="input-field w-full">
+                  <option value="manual">人工处理</option>
+                  <option value="session_topup">代充值（需 Session）</option>
+                  <option value="account_delivery">成品号（发账号）</option>
+                  <option value="rental">租号（按时长）</option>
+                </select>
+              </label>
+              <label class="shop-field">
+                <span>角标文字</span>
+                <input v-model="productForm.badge_text" type="text" class="input-field w-full" placeholder="如：最热门，留空不显示">
+              </label>
+              <label class="shop-field">
+                <span>交付提示</span>
+                <input v-model="productForm.delivery_form_hint" type="text" class="input-field w-full" placeholder="如：提交 Session 后 1-3 分钟到账">
+              </label>
+              <label class="shop-field">
+                <span>规格说明</span>
+                <input v-model="productForm.spec_label" type="text" class="input-field w-full" placeholder="如：独享 · 30 天质保">
+              </label>
+              <label class="shop-field flex flex-row items-center gap-2 md:col-span-2">
+                <input v-model="productForm.highlight" type="checkbox" class="h-4 w-4 rounded border-gray-300">
+                <span>在官网首页高亮推荐</span>
+              </label>
+            </div>
           </div>
 
-          <aside class="rounded-3xl border border-gray-200 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-800/70">
+          <aside class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-800/70">
             <p class="text-sm font-semibold text-gray-900 dark:text-white">商品图片</p>
             <div class="mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-900">
-              <img :src="shopImage(productForm.image_url) || defaultProductImage" alt="商品预览图" class="h-44 w-full object-cover">
+              <img v-if="shopImage(productForm.image_url)" :src="shopImage(productForm.image_url)" alt="商品预览图" class="h-44 w-full object-cover">
+              <div v-else class="shop-thumb h-44 w-full" aria-hidden="true">3</div>
             </div>
             <input ref="productFileInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="hidden" @change="handleProductImageChange">
             <button type="button" class="btn-secondary mt-3 w-full justify-center rounded-2xl px-4 py-2.5" :disabled="uploadingProductImage" @click="productFileInput?.click()">
@@ -207,7 +302,7 @@
     </div>
 
     <div v-if="bannerDialog.open" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/55 p-4 backdrop-blur-sm">
-      <form class="shop-modal w-full max-w-3xl rounded-3xl bg-white p-6 shadow-2xl dark:bg-dark-900" @submit.prevent="saveBanner">
+      <form class="shop-modal w-full max-w-3xl rounded-xl bg-white p-5 shadow-2xl dark:bg-dark-900" @submit.prevent="saveBanner">
         <div class="flex items-start justify-between gap-4">
           <div>
             <p class="text-sm font-semibold text-primary-600 dark:text-primary-300">轮播管理</p>
@@ -224,10 +319,11 @@
             <label class="shop-field"><span>关联商品</span><select v-model.number="bannerForm.product_id" class="input-field w-full"><option :value="null">不关联</option><option v-for="product in products" :key="product.id" :value="product.id">{{ product.name }}</option></select></label>
             <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200"><input v-model="bannerForm.enabled" type="checkbox" class="rounded"> 展示轮播</label>
           </div>
-          <aside class="rounded-3xl border border-gray-200 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-800/70">
+          <aside class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-800/70">
             <p class="text-sm font-semibold text-gray-900 dark:text-white">轮播图片</p>
             <div class="mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-900">
-              <img :src="shopImage(bannerForm.image_url) || defaultBannerImage" alt="轮播预览图" class="h-36 w-full object-cover">
+              <img v-if="shopImage(bannerForm.image_url)" :src="shopImage(bannerForm.image_url)" alt="轮播预览图" class="h-36 w-full object-cover">
+              <div v-else class="shop-thumb h-36 w-full" aria-hidden="true">3</div>
             </div>
             <input ref="bannerFileInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="hidden" @change="handleBannerImageChange">
             <button type="button" class="btn-secondary mt-3 w-full justify-center rounded-2xl px-4 py-2.5" :disabled="uploadingBannerImage" @click="bannerFileInput?.click()">
@@ -244,7 +340,7 @@
     </div>
 
     <div v-if="fulfillDialog.open" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/55 p-4 backdrop-blur-sm">
-      <form class="shop-modal w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl dark:bg-dark-900" @submit.prevent="confirmFulfillOrder">
+      <form class="shop-modal w-full max-w-xl rounded-xl bg-white p-5 shadow-2xl dark:bg-dark-900" @submit.prevent="confirmFulfillOrder">
         <div class="flex items-start justify-between gap-4">
           <div>
             <p class="text-sm font-semibold text-primary-600 dark:text-primary-300">商城订单</p>
@@ -256,6 +352,17 @@
         <div class="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm dark:border-dark-700 dark:bg-dark-800/70">
           <div class="font-semibold text-gray-950 dark:text-white">#{{ fulfillDialog.orderId }} {{ fulfillDialog.orderName }}</div>
           <div class="mt-1 text-gray-500 dark:text-gray-400">请填写交付内容、领取方式、卡密、下载链接或后续联系方式，用户会在订单里直接看到。</div>
+        </div>
+        <div v-if="fulfillDialog.deliveryLoading" class="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-400 dark:border-dark-700 dark:bg-dark-800/70">
+          正在解密用户提交的交付资料...
+        </div>
+        <div v-else-if="fulfillDialog.deliveryPayload" class="mt-4 rounded-2xl border border-primary-200 bg-primary-50/60 p-4 text-sm dark:border-primary-500/30 dark:bg-primary-500/10">
+          <div class="flex items-center justify-between gap-3">
+            <span class="font-semibold text-primary-700 dark:text-primary-300">用户提交的交付资料（已解密）</span>
+            <button type="button" class="btn-secondary rounded-xl px-3 py-1 text-xs" @click="copyDeliveryPayload">复制</button>
+          </div>
+          <pre class="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-all font-mono text-xs text-gray-700 dark:text-gray-200">{{ fulfillDialog.deliveryPayload }}</pre>
+          <p class="mt-2 text-xs text-gray-400">仅用于本次交付，请勿外传；充值完成后建议提醒用户登出所有设备。</p>
         </div>
         <label class="shop-field mt-5">
           <span>发货内容</span>
@@ -294,8 +401,6 @@ const productFileInput = ref<HTMLInputElement | null>(null)
 const bannerFileInput = ref<HTMLInputElement | null>(null)
 const uploadingProductImage = ref(false)
 const uploadingBannerImage = ref(false)
-const defaultProductImage = 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=600&q=80'
-const defaultBannerImage = 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=900&q=80'
 
 const productDialog = reactive({ open: false, id: 0 })
 const bannerDialog = reactive({ open: false, id: 0 })
@@ -311,6 +416,11 @@ const productForm = reactive<ShopProductPayload>({
   commission_bps: 1000,
   status: 'draft',
   sort_order: 0,
+  fulfillment_mode: 'manual',
+  delivery_form_hint: '',
+  badge_text: '',
+  spec_label: '',
+  highlight: false,
 })
 const bannerForm = reactive({
   title: '',
@@ -326,7 +436,36 @@ const fulfillDialog = reactive({
   orderId: 0,
   orderName: '',
   note: '',
+  deliveryPayload: '',
+  deliveryLoading: false,
 })
+
+/** 解密并展示用户提交的交付资料（Session 或收货信息） */
+async function loadOrderDelivery(orderId: number) {
+  fulfillDialog.deliveryLoading = true
+  try {
+    const res = await adminShopAPI.getOrderDelivery(orderId)
+    if (fulfillDialog.orderId === orderId) {
+      fulfillDialog.deliveryPayload = (res.data as { payload?: string } | undefined)?.payload || ''
+    }
+  } catch {
+    // 解密失败不阻塞发货流程
+  } finally {
+    if (fulfillDialog.orderId === orderId) {
+      fulfillDialog.deliveryLoading = false
+    }
+  }
+}
+
+async function copyDeliveryPayload() {
+  if (!fulfillDialog.deliveryPayload) return
+  try {
+    await navigator.clipboard.writeText(fulfillDialog.deliveryPayload)
+    appStore.showToast('success', '已复制到剪贴板', 2000)
+  } catch {
+    appStore.showToast('error', '复制失败，请手动选择复制', 2000)
+  }
+}
 
 const productPrice = computed({
   get: () => productForm.price_cny_minor / 100,
@@ -405,6 +544,11 @@ function openFulfillDialog(order: ShopOrder) {
   fulfillDialog.orderId = order.id
   fulfillDialog.orderName = order.snapshot_name
   fulfillDialog.note = order.fulfillment_note || ''
+  fulfillDialog.deliveryPayload = ''
+  fulfillDialog.deliveryLoading = false
+  if (order.delivery_submitted_at) {
+    void loadOrderDelivery(order.id)
+  }
 }
 
 async function confirmFulfillOrder() {
@@ -440,6 +584,11 @@ function openProductDialog(product?: ShopProduct) {
     commission_bps: product.commission_bps,
     status: product.status,
     sort_order: product.sort_order,
+    fulfillment_mode: product.fulfillment_mode || 'manual',
+    delivery_form_hint: product.delivery_form_hint || '',
+    badge_text: product.badge_text || '',
+    spec_label: product.spec_label || '',
+    highlight: product.highlight || false,
   } : {
     name: '',
     description: '',
@@ -452,6 +601,11 @@ function openProductDialog(product?: ShopProduct) {
     commission_bps: 1000,
     status: 'draft',
     sort_order: 0,
+    fulfillment_mode: 'manual',
+    delivery_form_hint: '',
+    badge_text: '',
+    spec_label: '',
+    highlight: false,
   })
 }
 
@@ -565,12 +719,18 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.shop-modal {
-  color: rgb(17 24 39);
+/* 无图占位：跟随明暗主题，避免深色模式出现刺眼亮块（与控制台商城一致） */
+.shop-thumb {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #f4f4f5 0%, #e8e8ea 100%);
+  color: rgba(9, 9, 11, 0.34);
+  font-size: 0.875rem;
+  font-weight: 700;
 }
 
-:global(.dark) .shop-modal {
-  color: rgb(243 244 246);
+.shop-modal {
+  color: rgb(17 24 39);
 }
 
 .shop-field {
@@ -585,10 +745,6 @@ onMounted(async () => {
   color: rgb(55 65 81);
 }
 
-:global(.dark) .shop-field > span {
-  color: rgb(229 231 235);
-}
-
 .shop-modal :deep(.input-field) {
   min-height: 2.75rem;
   border-color: rgb(209 213 219);
@@ -599,10 +755,29 @@ onMounted(async () => {
 .shop-modal :deep(.input-field::placeholder) {
   color: rgb(156 163 175);
 }
+</style>
 
-:global(.dark) .shop-modal :deep(.input-field) {
-  border-color: rgb(55 65 81);
-  background-color: rgb(17 24 39);
-  color: white;
+<style>
+/* 深色覆盖必须放在**非 scoped** 块里：Vue 的 scoped-CSS 编译器会把
+   `:global(.dark) X` 编译成只剩 `.dark`，X 被丢弃，导致生产构建深色规则失效。
+   这里的选择器都带页面独有类名（.shop-modal / .tool-modal），不会外泄影响其它页面。 */
+
+.dark .shop-modal {
+  color: rgb(243 244 246);
+}
+
+.dark .shop-field > span {
+  color: rgb(229 231 235);
+}
+
+.dark .shop-thumb {
+  background: linear-gradient(135deg, #16171b 0%, #0f1013 100%);
+  color: rgba(255, 255, 255, 0.34);
+}
+
+.dark .shop-modal .input-field {
+  border-color: rgb(55 65 81) !important;
+  background-color: rgb(17 24 39) !important;
+  color: #fff !important;
 }
 </style>

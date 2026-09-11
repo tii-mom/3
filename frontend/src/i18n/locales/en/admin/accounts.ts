@@ -500,11 +500,11 @@ export default {
           "Effective only when the switch above is on. When enabled, this account also allows third-party clients that embed the Codex engine over the app-server protocol (e.g. Claude Code's codex plugin); they still pass the global engine-fingerprint gate. OR-combined with the global app-server toggle.",
         codexImageTool: 'Codex image bridge policy',
         codexImageToolDesc:
-          'Controls the hosted image_generation bridge and client-declared image tools on Codex /responses text requests. Hosted auto-injection applies only to non-Responses Lite requests. Account policy takes precedence over channel and global settings; standalone image-generation endpoints are unaffected.',
+          'Controls the hosted image_generation bridge and client-declared image tools on Codex /responses text requests. Hosted mode replaces local image_gen declarations, and Lite requests carrying image tools are promoted to standard Responses. Account policy takes precedence over channel and global settings; standalone image-generation endpoints are unaffected.',
         codexImageToolInherit: 'Follow channel',
         codexImageToolInheritDesc: 'No account override; hosted injection for non-Lite requests follows the channel or global policy, while client-provided hosted tools and local image_gen declarations pass through.',
         codexImageToolEnabled: 'Enable hosted bridge',
-        codexImageToolEnabledDesc: 'Inject the hosted image_generation tool only for non-Responses Lite requests; client-provided image tools still pass through.',
+        codexImageToolEnabledDesc: 'Inject the hosted image_generation tool for standard Responses requests and replace local image_gen declarations; Lite requests carrying image tools are promoted to standard Responses.',
         codexImageToolDisabled: 'No hosted injection',
         codexImageToolDisabledDesc: 'Do not inject the hosted tool; client-provided hosted tools and local image_gen declarations still pass through.',
         codexImageToolBlock: 'Strip client image tools',

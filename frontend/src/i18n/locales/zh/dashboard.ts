@@ -593,7 +593,24 @@ export default {
     codeRedeemSuccess: '兑换成功！',
     failedToRedeem: '兑换失败，请检查兑换码后重试。',
     subscriptionRefreshFailed: '兑换成功，但订阅状态刷新失败。',
-    pleaseEnterCode: '请输入兑换码'
+    pleaseEnterCode: '请输入兑换码',
+    errors: {
+      VOUCHER_DISABLED: '额度兑换码功能当前已关闭。',
+      VOUCHER_NOT_FOUND: '找不到该额度兑换码。',
+      VOUCHER_INVALID: '额度兑换码格式无效。',
+      VOUCHER_UNAVAILABLE: '该额度兑换码已使用、撤销、过期或被锁定。',
+      VOUCHER_SELF_REDEEM: '发行人不能兑换自己生成的额度码，请使用其他账号兑换，或撤销额度码收回预扣额度。',
+      VOUCHER_INSUFFICIENT_TRANSFERABLE_CREDIT: '可转让额度不足，无法生成该额度码。',
+      VOUCHER_LIMIT_EXCEEDED: '今日额度码生成次数或金额已达到上限。',
+      VOUCHER_STEP_UP_REQUIRED: '生成该面值需要验证器动态码。',
+      VOUCHER_AMOUNT_OUT_OF_RANGE: '额度码面值超出允许范围。',
+      CREDIT_BUCKETS_NOT_ENFORCED: '额度账户保护尚未准备完成，暂不能使用额度码。',
+      VOUCHER_IDEMPOTENCY_UNAVAILABLE: '额度码重试保护暂不可用，请稍后重试。',
+      VOUCHER_IDEMPOTENCY_CONFLICT: '该重试标识已用于不同的额度码请求。',
+      VOUCHER_IDEMPOTENCY_REPLAY_UNAVAILABLE: '无法恢复原额度码响应，请先联系客服，不要重复生成。',
+      IDEMPOTENCY_KEY_REQUIRED: '缺少请求重试标识，请刷新页面后重试。',
+      IDEMPOTENCY_KEY_INVALID: '请求重试标识无效，请刷新页面后重试。'
+    }
   },
 
   // Profile

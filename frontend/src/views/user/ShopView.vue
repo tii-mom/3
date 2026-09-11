@@ -1,17 +1,17 @@
 <template>
   <AppLayout>
     <div class="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
-      <section class="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900">
-        <div v-if="banners.length" class="relative isolate overflow-hidden bg-slate-950">
+      <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900">
+        <div v-if="banners.length" class="relative isolate min-h-56 overflow-hidden bg-slate-950 sm:min-h-72">
           <img
-            :src="shopImage(activeBanner.image_url) || defaultBannerImage"
+            v-if="shopImage(activeBanner.image_url)"
+            :src="shopImage(activeBanner.image_url)"
             :alt="activeBanner.title"
-            class="h-56 w-full object-cover opacity-45 sm:h-72"
+            class="h-56 w-full object-cover opacity-40 sm:h-72"
           >
-          <div class="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/90 to-slate-950/55"></div>
-          <div class="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(251,146,60,0.28),transparent_28rem)]"></div>
+          <div class="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/92 to-slate-950/60"></div>
           <div class="absolute inset-0 flex items-center p-6 sm:p-10">
-            <div class="max-w-xl rounded-3xl border border-white/15 bg-slate-950/55 p-5 text-white shadow-2xl backdrop-blur-md sm:p-6">
+            <div class="max-w-xl rounded-2xl border border-white/15 bg-slate-950/55 p-5 text-white shadow-2xl backdrop-blur-md sm:p-6">
               <p class="mb-3 inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-orange-100 backdrop-blur">3API 商城</p>
               <h1 class="text-2xl font-bold tracking-tight sm:text-4xl">{{ activeBanner.title }}</h1>
               <p class="mt-3 text-sm leading-6 text-white/90 sm:text-base">{{ activeBanner.subtitle }}</p>
@@ -26,9 +26,9 @@
           </div>
         </div>
         <div v-else class="relative isolate flex min-h-56 items-center overflow-hidden bg-slate-950 p-6 text-white sm:p-10">
-          <div class="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(251,146,60,0.34),transparent_24rem),radial-gradient(circle_at_78%_12%,rgba(14,165,233,0.22),transparent_24rem)]"></div>
+          <div class="absolute inset-0 bg-[radial-gradient(circle_at_22%_18%,rgba(251,146,60,0.16),transparent_26rem)]"></div>
           <div class="absolute inset-0 bg-[linear-gradient(135deg,rgba(15,23,42,0.96),rgba(2,6,23,0.88))]"></div>
-          <div class="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-orange-200/50 to-transparent"></div>
+          <div class="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent"></div>
           <div class="relative max-w-2xl">
             <p class="mb-3 inline-flex rounded-full border border-orange-200/30 bg-orange-300/15 px-3 py-1 text-sm font-semibold text-orange-100 shadow-sm">3API 商城</p>
             <h1 class="text-2xl font-bold tracking-tight text-white sm:text-4xl">购买平台商品，付款后等待后台处理</h1>
@@ -40,7 +40,7 @@
       <section class="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
         <div>
           <h2 class="text-xl font-bold text-gray-950 dark:text-white">精选商品</h2>
-          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">选择商品后直接付款，支付成功后会进入订单，等待管理员处理发货。</p>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">与官网首页同一套商品。选择商品后直接付款，支付成功后会进入订单，等待管理员处理发货。</p>
         </div>
         <select v-if="paymentMethods.length > 0" v-model="paymentType" class="input-field min-w-40">
           <option v-for="method in paymentMethods" :key="method" :value="method">{{ paymentLabel(method) }}</option>
@@ -50,46 +50,89 @@
         </div>
       </section>
 
-      <section class="rounded-3xl border border-orange-100 bg-gradient-to-br from-orange-50 via-white to-white p-5 shadow-sm dark:border-orange-400/20 dark:from-orange-500/10 dark:via-dark-900 dark:to-dark-900">
+      <div v-if="catalogTabs.length > 2" class="flex flex-wrap gap-2">
+        <button
+          v-for="tab in catalogTabs"
+          :key="tab.value"
+          type="button"
+          class="rounded-full px-4 py-2 text-sm font-medium transition"
+          :class="catalogTab === tab.value
+            ? 'bg-orange-500 text-white shadow-sm'
+            : 'border border-gray-200 bg-white text-gray-600 hover:border-orange-200 hover:text-orange-600 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300'"
+          @click="catalogTab = tab.value"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
+
+      <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-900">
         <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p class="text-sm font-semibold text-orange-600 dark:text-orange-200">售后服务</p>
+            <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">售后服务</p>
             <h2 class="mt-1 text-lg font-bold text-gray-950 dark:text-white">购买后需要帮助，可以联系平台客服</h2>
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">付款、发货、安装、使用问题，都可以通过下面的客服信息处理。</p>
           </div>
-          <div class="rounded-2xl border border-orange-200 bg-white/85 px-4 py-3 text-sm shadow-sm dark:border-orange-400/20 dark:bg-white/5">
-            <div class="text-xs font-semibold text-orange-700 dark:text-orange-200">客服信息</div>
+          <div class="rounded-2xl border border-orange-200 bg-white/85 px-4 py-3 text-sm shadow-sm dark:border-dark-700 dark:bg-dark-800">
+            <div class="text-xs font-semibold text-gray-500 dark:text-gray-400">客服信息</div>
             <div class="mt-1 whitespace-pre-wrap break-words font-semibold text-gray-950 dark:text-white">{{ afterSalesContact || '管理员暂未填写客服联系方式，请前往后台系统设置补充。' }}</div>
           </div>
         </div>
       </section>
 
       <div v-if="loading" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <div v-for="i in 6" :key="i" class="h-72 animate-pulse rounded-3xl bg-gray-100 dark:bg-dark-800"></div>
+        <div v-for="i in 6" :key="i" class="h-72 animate-pulse rounded-2xl bg-gray-100 dark:bg-dark-800"></div>
       </div>
 
-      <div v-else-if="products.length === 0" class="rounded-3xl border border-dashed border-gray-300 bg-white p-10 text-center shadow-sm dark:border-dark-600 dark:bg-dark-900">
+      <div v-else-if="products.length === 0" class="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center shadow-sm dark:border-dark-600 dark:bg-dark-900">
         <p class="text-base font-semibold text-gray-900 dark:text-white">商城商品正在准备中</p>
         <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">管理员上架商品后会显示在这里。</p>
       </div>
 
+      <div v-else-if="visibleProducts.length === 0" class="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center shadow-sm dark:border-dark-600 dark:bg-dark-900">
+        <p class="text-base font-semibold text-gray-900 dark:text-white">该分类下暂无商品</p>
+        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">切换到「全部」查看其它商品。</p>
+      </div>
+
       <div v-else class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
         <article
-          v-for="product in products"
+          v-for="product in visibleProducts"
           :id="`shop-product-${product.id}`"
           :key="product.id"
-          class="group overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl dark:border-dark-700 dark:bg-dark-900"
+          class="group relative overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl dark:bg-dark-900"
+          :class="product.highlight ? 'border-orange-300 ring-1 ring-orange-200 dark:border-orange-500/40 dark:ring-orange-500/20' : 'border-gray-200 dark:border-dark-700'"
         >
-          <div class="relative h-44 overflow-hidden bg-gradient-to-br from-orange-50 via-white to-slate-100 dark:from-dark-800 dark:via-dark-800 dark:to-dark-900">
-            <img :src="shopImage(product.image_url) || defaultProductImage" :alt="product.name" class="h-full w-full object-cover transition duration-500 group-hover:scale-105">
-            <span class="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-gray-900 shadow-sm dark:bg-dark-950/80 dark:text-white">
-              {{ productTypeLabel(product.product_type) }}
-            </span>
+          <div class="relative h-44 overflow-hidden">
+            <img
+              v-if="shopImage(product.image_url)"
+              :src="shopImage(product.image_url)"
+              :alt="product.name"
+              class="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+            >
+            <div v-else class="shop-placeholder" aria-hidden="true">
+              <span class="shop-placeholder__glyph">3</span>
+            </div>
+            <div class="absolute left-4 top-4 flex flex-wrap gap-2">
+              <span class="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-gray-900 shadow-sm dark:bg-dark-950/80 dark:text-white">
+                {{ fulfillmentLabel(product.fulfillment_mode) }}
+              </span>
+              <span v-if="product.badge_text" class="rounded-full bg-orange-500 px-3 py-1 text-xs font-semibold text-white shadow-sm">
+                {{ product.badge_text }}
+              </span>
+            </div>
+            <span v-if="isSoldOut(product)" class="absolute inset-0 flex items-center justify-center bg-slate-950/55 text-sm font-semibold text-white">暂时缺货</span>
           </div>
           <div class="space-y-4 p-5">
             <div>
               <h3 class="line-clamp-1 text-lg font-bold text-gray-950 dark:text-white">{{ product.name }}</h3>
+              <p v-if="product.spec_label" class="mt-1 text-xs font-medium text-orange-600 dark:text-orange-300">{{ product.spec_label }}</p>
               <p class="mt-2 line-clamp-2 min-h-[2.5rem] text-sm leading-5 text-gray-500 dark:text-gray-400">{{ product.description || '付款后等待管理员发货。' }}</p>
+              <p v-if="product.delivery_form_hint" class="mt-1 text-xs text-gray-400 dark:text-gray-500">{{ product.delivery_form_hint }}</p>
+              <div class="mt-2 flex flex-wrap gap-3 text-xs text-gray-400 dark:text-gray-500">
+                <span v-if="product.stock_quantity !== null && product.stock_quantity !== undefined">
+                  {{ product.stock_quantity > 0 ? (product.stock_quantity <= 5 ? `仅剩 ${product.stock_quantity} 件` : `库存 ${product.stock_quantity}`) : '已售罄' }}
+                </span>
+                <span v-if="product.sold_count > 0">已售 {{ product.sold_count }} 份</span>
+              </div>
             </div>
             <div class="flex items-end justify-between gap-3">
               <div>
@@ -111,17 +154,18 @@
               </div>
             </div>
             <button
-              class="btn-primary w-full justify-center rounded-2xl py-3"
-              :disabled="creatingProductID === product.id || !availablePaymentType(product)"
+              class="w-full justify-center rounded-2xl py-3"
+              :class="product.highlight ? 'btn-primary' : 'btn-secondary'"
+              :disabled="creatingProductID === product.id || !availablePaymentType(product) || isSoldOut(product)"
               @click="buy(product)"
             >
-              {{ !availablePaymentType(product) ? '支付暂未开启' : creatingProductID === product.id ? '正在创建订单...' : '立即购买' }}
+              {{ isSoldOut(product) ? '暂时缺货' : !availablePaymentType(product) ? '支付暂未开启' : creatingProductID === product.id ? '正在创建订单...' : '立即购买' }}
             </button>
           </div>
         </article>
       </div>
 
-      <section class="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-900">
+      <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-900">
         <div class="mb-4 flex items-center justify-between">
           <h2 class="text-lg font-bold text-gray-950 dark:text-white">我的商城订单</h2>
           <button class="btn-secondary rounded-xl px-3 py-2 text-sm" @click="loadOrders">刷新</button>
@@ -131,27 +175,85 @@
         </div>
         <div v-if="orders.length === 0" class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">暂无商城订单</div>
         <div v-else class="divide-y divide-gray-100 dark:divide-dark-700">
-          <div v-for="order in orders" :key="order.id" class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div class="font-semibold text-gray-950 dark:text-white">{{ order.snapshot_name }}</div>
-              <div class="text-xs text-gray-500 dark:text-gray-400">订单 #{{ order.id }} · {{ orderLabel(order) }}</div>
-              <div v-if="order.fulfillment_note" class="mt-1 text-xs text-amber-600 dark:text-amber-300">发货内容：{{ order.fulfillment_note }}</div>
-            </div>
-            <div class="flex items-center gap-3 sm:justify-end">
-              <div class="text-sm font-bold text-gray-950 dark:text-white">¥{{ formatMoney(order.snapshot_price_cny_minor) }}</div>
-              <button
-                v-if="canCancelOrder(order)"
-                type="button"
-                class="rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60 dark:border-dark-600 dark:text-gray-300 dark:hover:border-red-500/30 dark:hover:bg-red-500/10 dark:hover:text-red-200"
-                :disabled="cancellingOrderID === order.id"
-                @click="cancelShopPaymentOrder(order)"
-              >
-                {{ cancellingOrderID === order.id ? '取消中...' : '取消订单' }}
-              </button>
+          <div v-for="order in orders" :key="order.id" class="flex flex-col gap-3 py-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div class="font-semibold text-gray-950 dark:text-white">{{ order.snapshot_name }}</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">
+                  订单 #{{ order.id }}<template v-if="order.order_no"> · {{ order.order_no }}</template> · {{ orderLabel(order) }}
+                </div>
+                <div v-if="needsDelivery(order)" class="mt-1 text-xs">
+                  <span v-if="deliverySubmitted(order)" class="text-emerald-600 dark:text-emerald-300">
+                    资料已提交<template v-if="order.delivery_hint">：{{ order.delivery_hint }}</template>
+                  </span>
+                  <span v-else-if="order.status === 'pending'" class="text-gray-400">支付完成后即可提交{{ deliveryRequirementLabel(order) }}</span>
+                  <span v-else class="text-amber-600 dark:text-amber-300">待提交{{ deliveryRequirementLabel(order) }}，提交后开始处理</span>
+                </div>
+                <div v-if="order.fulfillment_note" class="mt-1 text-xs text-amber-600 dark:text-amber-300">发货内容：{{ order.fulfillment_note }}</div>
+              </div>
+              <div class="flex items-center gap-3 sm:justify-end">
+                <div class="text-sm font-bold text-gray-950 dark:text-white">¥{{ formatMoney(order.snapshot_price_cny_minor) }}</div>
+                <button
+                  v-if="needsDelivery(order) && order.status !== 'pending'"
+                  type="button"
+                  class="rounded-xl bg-orange-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-orange-600"
+                  @click="openDeliveryDialog(order)"
+                >
+                  {{ deliverySubmitted(order) ? '重新提交' : '提交资料' }}
+                </button>
+                <button
+                  v-if="canCancelOrder(order)"
+                  type="button"
+                  class="rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60 dark:border-dark-600 dark:text-gray-300 dark:hover:border-red-500/30 dark:hover:bg-red-500/10 dark:hover:text-red-200"
+                  :disabled="cancellingOrderID === order.id"
+                  @click="cancelShopPaymentOrder(order)"
+                >
+                  {{ cancellingOrderID === order.id ? '取消中...' : '取消订单' }}
+                </button>
+              </div>
             </div>
           </div>
         </div>
+
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4 dark:border-dark-700">
+          <p class="text-xs text-gray-500 dark:text-gray-400">在官网首页以免登录方式下过单？输入订单号和联系方式即可归入这里统一管理。</p>
+          <button type="button" class="rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 transition hover:border-orange-200 hover:text-orange-600 dark:border-dark-600 dark:text-gray-300" @click="claimDialog.open = true">
+            认领订单
+          </button>
+        </div>
       </section>
+
+      <BaseDialog :show="deliveryDialog.open" title="提交交付资料" @close="deliveryDialog.open = false">
+        <DeliveryForm
+          v-if="deliveryDialog.open && deliveryDialog.order"
+          mode="user"
+          :order-id="deliveryDialog.order.id"
+          :fulfillment-mode="(deliveryDialog.order.snapshot_fulfillment_mode || 'manual') as FulfillmentMode"
+          :submitted="deliverySubmitted(deliveryDialog.order)"
+          :hint="deliveryDialog.order.delivery_hint || ''"
+          @submitted="onDeliverySubmitted"
+        />
+      </BaseDialog>
+
+      <BaseDialog :show="claimDialog.open" title="认领订单" width="narrow" @close="claimDialog.open = false">
+        <div class="space-y-4">
+          <p class="text-sm text-gray-500 dark:text-gray-400">填写在官网首页下单时的订单号与联系方式，订单会归入你的账号。</p>
+          <label class="block">
+            <span class="mb-1 block text-sm text-gray-600 dark:text-gray-300">订单号</span>
+            <input v-model="claimDialog.orderNo" type="text" class="input-field w-full" placeholder="例如 C20260909AB12CD" autocomplete="off">
+          </label>
+          <label class="block">
+            <span class="mb-1 block text-sm text-gray-600 dark:text-gray-300">联系方式</span>
+            <input v-model="claimDialog.contact" type="text" class="input-field w-full" placeholder="下单时填写的手机号或邮箱" autocomplete="off">
+          </label>
+          <div class="flex justify-end gap-3">
+            <button type="button" class="btn-secondary rounded-xl px-4 py-2" @click="claimDialog.open = false">取消</button>
+            <button type="button" class="btn-primary rounded-xl px-4 py-2" :disabled="claimDialog.submitting" @click="claimOrder">
+              {{ claimDialog.submitting ? '认领中...' : '确认认领' }}
+            </button>
+          </div>
+        </div>
+      </BaseDialog>
 
       <BaseDialog :show="payDialog.open" title="请完成支付" width="narrow" @close="closePayDialog">
         <PaymentStatusPanel
@@ -175,12 +277,14 @@
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { resolveShopAssetUrl, shopAPI, type ShopBanner, type ShopOrder, type ShopProduct } from '@/api/shop'
+import { FULFILLMENT_LABELS, type FulfillmentMode } from '@/api/publicShop'
 import { paymentAPI } from '@/api/payment'
 import userAPI from '@/api/user'
 import { useAppStore } from '@/stores'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
+import DeliveryForm from '@/components/shop/DeliveryForm.vue'
 import { getPaymentPopupFeatures } from '@/components/payment/providerConfig'
 import { decidePaymentLaunch, getVisibleMethods, normalizeVisibleMethod } from '@/components/payment/paymentFlow'
 import { useClipboard } from '@/composables/useClipboard'
@@ -211,23 +315,92 @@ const payDialog = reactive({
   payUrl: '',
 })
 
-const defaultBannerImage = 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1600&q=80'
-const defaultProductImage = 'data:image/svg+xml;utf8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600"%3E%3Cdefs%3E%3ClinearGradient id="g" x1="0" y1="0" x2="1" y2="1"%3E%3Cstop offset="0" stop-color="%23fff7ed"/%3E%3Cstop offset="1" stop-color="%23fed7aa"/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width="900" height="600" fill="url(%23g)"/%3E%3Ccircle cx="702" cy="108" r="92" fill="%23fb923c" opacity=".20"/%3E%3Ccircle cx="152" cy="480" r="132" fill="%230ea5e9" opacity=".12"/%3E%3Ctext x="72" y="292" font-family="Arial, sans-serif" font-size="64" font-weight="800" fill="%237c2d12"%3E3API%3C/text%3E%3Ctext x="72" y="350" font-family="Arial, sans-serif" font-size="32" fill="%239a3412"%3E%E5%B9%B3%E5%8F%B0%E5%95%86%E5%93%81%3C/text%3E%3C/svg%3E'
+// 商品分组与官网首页保持一致：按交付模式划分
+const catalogTab = ref<'all' | FulfillmentMode>('all')
+const catalogTabs = computed(() => {
+  const modes = new Set(products.value.map(item => item.fulfillment_mode || 'manual'))
+  const list: { value: 'all' | FulfillmentMode; label: string }[] = [{ value: 'all', label: '全部' }]
+  const order: FulfillmentMode[] = ['session_topup', 'account_delivery', 'rental', 'manual']
+  order.forEach(mode => {
+    if (modes.has(mode)) list.push({ value: mode, label: FULFILLMENT_LABELS[mode] })
+  })
+  return list
+})
+const visibleProducts = computed(() =>
+  catalogTab.value === 'all' ? products.value : products.value.filter(item => (item.fulfillment_mode || 'manual') === catalogTab.value)
+)
+
+// 订单交付资料提交
+const deliveryDialog = reactive<{ open: boolean; order: ShopOrder | null }>({ open: false, order: null })
+
+function needsDelivery(order: ShopOrder): boolean {
+  const mode = order.snapshot_fulfillment_mode || 'manual'
+  return mode !== 'manual' && order.status !== 'cancelled' && order.status !== 'refunded'
+}
+
+function deliverySubmitted(order: ShopOrder): boolean {
+  return !!order.delivery_submitted_at
+}
+
+function deliveryRequirementLabel(order: ShopOrder): string {
+  switch (order.snapshot_fulfillment_mode) {
+    case 'session_topup': return '登录凭证'
+    case 'account_delivery': return '接收邮箱'
+    case 'rental': return '接收邮箱与租期'
+    default: return '补充信息'
+  }
+}
+
+function openDeliveryDialog(order: ShopOrder) {
+  deliveryDialog.order = order
+  deliveryDialog.open = true
+}
+
+async function onDeliverySubmitted() {
+  deliveryDialog.open = false
+  deliveryDialog.order = null
+  await loadOrders()
+}
+
+// 认领首页免登录订单
+const claimDialog = reactive({ open: false, orderNo: '', contact: '', submitting: false })
+
+async function claimOrder() {
+  if (!claimDialog.orderNo.trim() || !claimDialog.contact.trim() || claimDialog.submitting) return
+  claimDialog.submitting = true
+  try {
+    await shopAPI.claimOrder({ order_no: claimDialog.orderNo.trim(), contact: claimDialog.contact.trim() })
+    appStore.showToast('success', '订单已归入你的账号', 3000)
+    claimDialog.open = false
+    claimDialog.orderNo = ''
+    claimDialog.contact = ''
+    await loadOrders()
+  } catch (error: any) {
+    appStore.showToast('error', error?.message || '认领失败，请核对订单号与联系方式', 3500)
+  } finally {
+    claimDialog.submitting = false
+  }
+}
 
 const activeBanner = computed(() => banners.value[activeBannerIndex.value] || banners.value[0])
 const paymentMethods = computed(() => Object.keys(paymentMethodLimits.value))
 const afterSalesContact = computed(() => appStore.contactInfo?.trim() || '')
 
 function formatMoney(minor: number): string {
-  return (minor / 100).toFixed(2)
+  const value = Number(minor || 0) / 100
+  return value.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 }
 
 function shopImage(url?: string | null): string {
   return resolveShopAssetUrl(url)
 }
 
-function productTypeLabel(type: string): string {
-  return type === 'platform_usd_balance' ? '平台权益' : '平台商品'
+function fulfillmentLabel(mode?: string): string {
+  return FULFILLMENT_LABELS[(mode || 'manual') as FulfillmentMode] || '商品'
+}
+
+function isSoldOut(product: ShopProduct): boolean {
+  return product.stock_quantity !== null && product.stock_quantity !== undefined && product.stock_quantity <= 0
 }
 
 function paymentLabel(method: string): string {
@@ -485,3 +658,41 @@ onMounted(() => {
   void Promise.all([appStore.fetchPublicSettings(), loadData(), loadAffiliateDetail()])
 })
 </script>
+
+<style scoped>
+/* 无商品图时的占位：跟随明暗主题，避免深色模式出现刺眼亮块 */
+.shop-placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #f4f4f5 0%, #e8e8ea 100%);
+}
+
+
+.shop-placeholder__glyph {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(9, 9, 11, 0.06);
+  color: rgba(9, 9, 11, 0.34);
+  font-size: 20px;
+  font-weight: 700;
+}
+</style>
+
+<style>
+/* 深色覆盖放在**非 scoped** 块中：Vue 的 scoped-CSS 编译器会把
+   `:global(.dark) X` 编译成只有 `.dark`，X 被丢弃，导致生产构建里
+   深色规则整体失效。与 SettingsView 的处理方式保持一致。 */
+.dark .shop-placeholder {
+  background: linear-gradient(135deg, #16171b 0%, #0f1013 100%);
+}
+
+.dark .shop-placeholder__glyph {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.34);
+}
+</style>

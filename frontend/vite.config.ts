@@ -4,6 +4,7 @@ import checker from 'vite-plugin-checker'
 import { resolve } from 'path'
 import { readFileSync, writeFileSync } from 'node:fs'
 import seoPages from './src/content/seo-pages.json'
+import homeFaq from './src/content/home-faq.json'
 
 const siteUrl = 'https://3api.shop'
 
@@ -52,7 +53,8 @@ function renderStructuredData(page: SeoPage | null): string {
     '@type': 'Organization',
     name: '3API',
     url: siteUrl,
-    description: '3API 为国内开发者提供 OpenAI、Claude、Gemini 等模型的统一 API 接入，适配 Claude Code、Codex、Cursor、Agent 和应用开发场景。',
+    logo: OG_IMAGE,
+    description: '3API 提供 ChatGPT Plus / Pro 官方直充、独享成品号与租号服务，支付宝微信支付，支付后提交 Session 即可到账，全程人工质保。',
   }
   const website = {
     '@context': 'https://schema.org',
@@ -79,22 +81,60 @@ function renderStructuredData(page: SeoPage | null): string {
         acceptedAnswer: { '@type': 'Answer', text: faq.answer },
       })),
     },
-  ] : [organization, website]
+  ] : [
+    organization,
+    website,
+    {
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      // 数据源与首页 FAQ 展示区块共用 home-faq.json，保证结构化数据与页面内容一致
+      mainEntity: homeFaq.map((item) => ({
+        '@type': 'Question',
+        name: item.q,
+        acceptedAnswer: { '@type': 'Answer', text: item.a },
+      })),
+    },
+  ]
 
   return data.map((item) => `<script type="application/ld+json" data-seo-structured-data="true">${JSON.stringify(item).replace(/</g, '\\u003c')}</script>`).join('')
 }
 
+const OG_IMAGE = new URL('/og-home.png', siteUrl).toString()
+
 function withSeoMetadata(html: string, page: SeoPage | null): string {
-  const title = page?.title || '3API - AI API 中转站与多模型统一接入'
-  const description = page?.description || '3API 为国内开发者提供 OpenAI、Claude、Gemini 等模型的统一 API 接入，适配 Claude Code、Codex、Cursor、Agent 和应用开发场景。'
+  // 首页（page 为 null）不再用硬编码默认值覆盖 meta：title / description / canonical
+  // 以 index.html 源文件为准（跟随销售业务），改源文件即生效，避免「改了不生效」。
+  // 专题落地页（page 非空）仍由 seo-pages.json 提供独立 meta。
+  const title = page?.title
+  const description = page?.description
   const path = page?.path || '/'
   const canonical = new URL(path, siteUrl).toString()
-  let output = replaceTag(html, /<title>[^<]*<\/title>/i, `<title>${escapeHtml(title)}</title>`)
-  output = replaceTag(output, /<meta\s+name=["']description["'][^>]*>/i, `<meta name="description" content="${escapeHtml(description)}" />`)
+
+  let output = html
+  if (title) {
+    output = replaceTag(output, /<title>[^<]*<\/title>/i, `<title>${escapeHtml(title)}</title>`)
+    output = replaceTag(output, /<meta\s+property=["']og:title["'][^>]*>/i, `<meta property="og:title" content="${escapeHtml(title)}" />`)
+  }
+  if (description) {
+    output = replaceTag(output, /<meta\s+name=["']description["'][^>]*>/i, `<meta name="description" content="${escapeHtml(description)}" />`)
+    output = replaceTag(output, /<meta\s+property=["']og:description["'][^>]*>/i, `<meta property="og:description" content="${escapeHtml(description)}" />`)
+  }
   output = replaceTag(output, /<link\s+rel=["']canonical["'][^>]*>/i, `<link rel="canonical" href="${canonical}" />`)
-  output = replaceTag(output, /<meta\s+property=["']og:title["'][^>]*>/i, `<meta property="og:title" content="${escapeHtml(title)}" />`)
-  output = replaceTag(output, /<meta\s+property=["']og:description["'][^>]*>/i, `<meta property="og:description" content="${escapeHtml(description)}" />`)
   output = replaceTag(output, /<meta\s+property=["']og:url["'][^>]*>/i, `<meta property="og:url" content="${canonical}" />`)
+  // 社交分享卡片：og:image 1200x630 + twitter 大图
+  output = replaceTag(output, /<meta\s+property=["']og:image["'][^>]*>/i, `<meta property="og:image" content="${OG_IMAGE}" />`)
+  output = replaceTag(output, /<meta\s+name=["']twitter:card["'][^>]*>/i, `<meta name="twitter:card" content="summary_large_image" />`)
+  output = replaceTag(
+    output,
+    /<\/head>/i,
+    [
+      `<meta property="og:image:width" content="1200" />`,
+      `<meta property="og:image:height" content="630" />`,
+      `<meta name="twitter:title" content="${escapeHtml(title || '3API')}" />`,
+      `<meta name="twitter:image" content="${OG_IMAGE}" />`,
+      `\n</head>`,
+    ].join(''),
+  )
   output = output.replace('</head>', `${renderStructuredData(page)}</head>`)
   return output
 }
@@ -123,7 +163,7 @@ function generateSeoFiles(): Plugin {
       })
       const urls = ['/', ...Object.values(seoPages).map((page) => page.path)]
       const today = new Date().toISOString().slice(0, 10)
-      const sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((path) => `  <url><loc>${new URL(path, siteUrl)}</loc><lastmod>${today}</lastmod></url>`).join('\n')}\n</urlset>\n`
+      const sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((path) => `  <url><loc>${new URL(path, siteUrl)}</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq><priority>${path === '/' ? '1.0' : '0.8'}</priority></url>`).join('\n')}\n</urlset>\n`
       writeFileSync(resolve(outDir, 'sitemap.xml'), sitemap)
       writeFileSync(resolve(outDir, 'robots.txt'), `User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /console\nDisallow: /dashboard\nDisallow: /keys\nDisallow: /usage\nDisallow: /profile\nDisallow: /login\nDisallow: /register\nDisallow: /purchase\nDisallow: /shop\nDisallow: /orders\nDisallow: /payment\nSitemap: ${siteUrl}/sitemap.xml\n`)
     },

@@ -16,7 +16,13 @@
 
       <!-- Main Content -->
       <main id="main-content" tabindex="-1" class="outline-none">
-        <slot />
+        <!-- 后台页面统一套用 style.css 中既有的 admin-page-redesign 令牌体系
+             （卡片圆角、表头样式、hairline 边框、90rem 内容宽度）。
+             多包一层是为了让各页根节点成为 .admin-page-redesign 的直接子元素，
+             使 `> section` / `> .space-y-6` 这类直系选择器也能命中。 -->
+        <div :class="isAdminRoute ? 'admin-page-redesign' : ''">
+          <slot />
+        </div>
       </main>
     </div>
   </div>
@@ -25,6 +31,7 @@
 <script setup lang="ts">
 import '@/styles/onboarding.css'
 import { computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores'
 import { useAuthStore } from '@/stores/auth'
 import { useOnboardingTour } from '@/composables/useOnboardingTour'
@@ -34,8 +41,10 @@ import AppHeader from './AppHeader.vue'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
+const route = useRoute()
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 const isAdmin = computed(() => authStore.user?.role === 'admin')
+const isAdminRoute = computed(() => route.path.startsWith('/admin'))
 
 const { replayTour } = useOnboardingTour({
   storageKey: isAdmin.value ? 'admin_guide' : 'user_guide',

@@ -588,7 +588,24 @@ export default {
     codeRedeemSuccess: 'Code redeemed successfully!',
     failedToRedeem: 'Failed to redeem code. Please check the code and try again.',
     subscriptionRefreshFailed: 'Redeemed successfully, but failed to refresh subscription status.',
-    pleaseEnterCode: 'Please enter a redeem code'
+    pleaseEnterCode: 'Please enter a redeem code',
+    errors: {
+      VOUCHER_DISABLED: 'Balance vouchers are currently disabled.',
+      VOUCHER_NOT_FOUND: 'This balance voucher does not exist.',
+      VOUCHER_INVALID: 'This balance voucher format is invalid.',
+      VOUCHER_UNAVAILABLE: 'This balance voucher has already been used, cancelled, expired, or locked.',
+      VOUCHER_SELF_REDEEM: 'The issuer cannot redeem their own voucher. Use another account or cancel the voucher to recover the reserved credit.',
+      VOUCHER_INSUFFICIENT_TRANSFERABLE_CREDIT: 'There is not enough transferable credit for this voucher.',
+      VOUCHER_LIMIT_EXCEEDED: 'The voucher creation limit for today has been reached.',
+      VOUCHER_STEP_UP_REQUIRED: 'Authenticator verification is required for this amount.',
+      VOUCHER_AMOUNT_OUT_OF_RANGE: 'The voucher amount is outside the allowed range.',
+      CREDIT_BUCKETS_NOT_ENFORCED: 'Credit account protection is not ready for vouchers yet.',
+      VOUCHER_IDEMPOTENCY_UNAVAILABLE: 'Voucher retry protection is temporarily unavailable. Please try again.',
+      VOUCHER_IDEMPOTENCY_CONFLICT: 'This retry key was already used for a different voucher request.',
+      VOUCHER_IDEMPOTENCY_REPLAY_UNAVAILABLE: 'The original voucher response cannot be recovered. Please contact support before retrying.',
+      IDEMPOTENCY_KEY_REQUIRED: 'A request retry key is required. Please refresh and try again.',
+      IDEMPOTENCY_KEY_INVALID: 'The request retry key is invalid. Please refresh and try again.'
+    }
   },
 
   // Profile

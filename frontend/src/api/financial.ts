@@ -34,7 +34,11 @@ export interface DistributionAnalyticsSummary { recharge_cny_minor: number; comm
 export interface DistributionForecastHorizon { eligible: boolean; reason?: 'insufficient_history' | 'insufficient_activity'; estimated_recharge_cny_minor: number; estimated_commission_cny_minor: number; recharge_growth_percent: number; commission_growth_percent: number }
 export interface DistributionAnalytics { as_of: string; range_days: number; series: DistributionAnalyticsPoint[]; summary: DistributionAnalyticsSummary; forecast: { method: string; seven_days: DistributionForecastHorizon; thirty_days: DistributionForecastHorizon } }
 
-export async function createVoucher(amount: string, totpCode = ''): Promise<Voucher> { return (await apiClient.post<Voucher>('/user/vouchers', { amount, totp_code: totpCode })).data }
+export async function createVoucher(amount: string, totpCode: string, idempotencyKey: string): Promise<Voucher> {
+  return (await apiClient.post<Voucher>('/user/vouchers', { amount, totp_code: totpCode }, {
+    headers: { 'Idempotency-Key': idempotencyKey },
+  })).data
+}
 export async function listVouchers(page = 1): Promise<Paginated<Voucher>> { return (await apiClient.get<Paginated<Voucher>>('/user/vouchers', { params: { page } })).data }
 export async function cancelVoucher(id: number): Promise<Voucher> { return (await apiClient.post<Voucher>(`/user/vouchers/${id}/cancel`)).data }
 export async function getVoucherAvailability(): Promise<VoucherAvailability> { return (await apiClient.get<VoucherAvailability>('/user/vouchers/availability')).data }

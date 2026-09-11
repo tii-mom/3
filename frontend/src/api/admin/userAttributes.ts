@@ -17,7 +17,7 @@ import type {
  */
 export async function listDefinitions(): Promise<UserAttributeDefinition[]> {
   const { data } = await apiClient.get<UserAttributeDefinition[]>('/admin/user-attributes')
-  return data
+  return data ?? []
 }
 
 /**
@@ -27,7 +27,7 @@ export async function listEnabledDefinitions(): Promise<UserAttributeDefinition[
   const { data } = await apiClient.get<UserAttributeDefinition[]>('/admin/user-attributes', {
     params: { enabled: true }
   })
-  return data
+  return data ?? []
 }
 
 /**

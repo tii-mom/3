@@ -206,7 +206,7 @@
               </form>
 
               <div class="rounded-lg bg-gray-50 p-4 text-sm text-gray-600 dark:bg-dark-800 dark:text-dark-300">
-                {{ t('finance.vouchers.reservePreview', { fee: formatUSD(estimatedVoucherFee), total: formatUSD(estimatedVoucherTotal), days: voucherAvailability.expiry_days }) }}
+                {{ t('finance.vouchers.reservePreview', { fee: estimatedVoucherFee === null ? t('common.notAvailable') : formatUSD(estimatedVoucherFee), total: estimatedVoucherTotal === null ? t('common.notAvailable') : formatUSD(estimatedVoucherTotal), days: voucherAvailability.expiry_days }) }}
               </div>
             </template>
 
@@ -277,7 +277,7 @@
                   {{ t('redeem.redeemSuccess') }}
                 </h3>
                 <div class="mt-2 text-sm text-emerald-700 dark:text-emerald-400">
-                  <p>{{ redeemResult.message }}</p>
+                  <p>{{ redeemResult.message === 'success' ? t('redeem.codeRedeemSuccess') : redeemResult.message }}</p>
                   <div class="mt-3 space-y-1">
                     <p v-if="redeemResult.type === 'balance'" class="font-medium">
                       {{ t('redeem.added') }}: ${{ redeemResult.value.toFixed(2) }}
@@ -524,7 +524,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
@@ -541,6 +541,7 @@ import {
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { formatDateTime } from '@/utils/format'
+import { extractI18nErrorMessage } from '@/utils/apiError'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
@@ -577,6 +578,16 @@ const voucherAvailabilityLoading = ref(false)
 const voucherAvailability = ref<VoucherAvailability | null>(null)
 const voucherItems = ref<Voucher[]>([])
 const voucherIssuedCode = ref('')
+const voucherCreateIdempotencyKey = ref('')
+
+const createIdempotencyKey = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
+  return `voucher-create-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+watch([voucherAmount, voucherTotpCode], () => {
+  if (!voucherCreating.value) voucherCreateIdempotencyKey.value = ''
+})
 
 const parseMoney = (value: string | number | undefined | null): number => {
   const parsed = Number(value ?? 0)
@@ -594,11 +605,18 @@ const formatUSD = (value: string | number | undefined | null): string => {
 
 const maximumVoucherAmount = computed(() => parseMoney(voucherAvailability.value?.maximum_face_value_usd))
 const enteredVoucherAmount = computed(() => parseMoney(voucherAmount.value))
-const estimatedVoucherFee = computed(() => {
-  const feeBps = voucherAvailability.value?.fee_bps ?? 0
-  return enteredVoucherAmount.value > 0 ? enteredVoucherAmount.value * feeBps / 10000 : 0
+const voucherFeeBps = computed<number | null>(() => {
+  const feeBps = voucherAvailability.value?.fee_bps
+  return typeof feeBps === 'number' && Number.isFinite(feeBps) ? feeBps : null
 })
-const estimatedVoucherTotal = computed(() => enteredVoucherAmount.value + estimatedVoucherFee.value)
+const estimatedVoucherFee = computed<number | null>(() => {
+  if (enteredVoucherAmount.value <= 0 || voucherFeeBps.value === null) return null
+  return enteredVoucherAmount.value * voucherFeeBps.value / 10000
+})
+const estimatedVoucherTotal = computed<number | null>(() => {
+  if (estimatedVoucherFee.value === null) return null
+  return enteredVoucherAmount.value + estimatedVoucherFee.value
+})
 const requiresVoucherTotp = computed(() => {
   const threshold = parseMoney(voucherAvailability.value?.step_up_minimum_usd)
   return threshold > 0 && enteredVoucherAmount.value >= threshold
@@ -609,6 +627,7 @@ const canCreateVoucher = computed(() => {
   if (enteredVoucherAmount.value <= 0) return false
   if (enteredVoucherAmount.value < parseMoney(voucherAvailability.value.minimum_usd)) return false
   if (enteredVoucherAmount.value > maximumVoucherAmount.value) return false
+  if (voucherFeeBps.value === null) return false
   if (requiresVoucherTotp.value && !/^\d{6}$/.test(voucherTotpCode.value.trim())) return false
   return true
 })
@@ -693,14 +712,16 @@ const handleCreateVoucher = async () => {
   errorMessage.value = ''
   errorMode.value = null
   try {
-    const result = await createVoucher(voucherAmount.value.trim(), requiresVoucherTotp.value ? voucherTotpCode.value.trim() : '')
+    if (!voucherCreateIdempotencyKey.value) voucherCreateIdempotencyKey.value = createIdempotencyKey()
+    const result = await createVoucher(voucherAmount.value.trim(), requiresVoucherTotp.value ? voucherTotpCode.value.trim() : '', voucherCreateIdempotencyKey.value)
     voucherIssuedCode.value = result.code || ''
     voucherAmount.value = ''
     voucherTotpCode.value = ''
+    voucherCreateIdempotencyKey.value = ''
     await Promise.all([loadVoucherData(), authStore.refreshUser()])
     appStore.showSuccess(t('finance.vouchers.createdCode'))
   } catch (error: any) {
-    errorMessage.value = error.response?.data?.detail || error.message || t('finance.vouchers.createFailed')
+    errorMessage.value = extractI18nErrorMessage(error, t, 'redeem.errors', t('finance.vouchers.createFailed'))
     errorMode.value = 'create'
     appStore.showError(errorMessage.value)
   } finally {
@@ -763,10 +784,10 @@ const handleRedeem = async () => {
     // Show success toast
     appStore.showSuccess(t('redeem.codeRedeemSuccess'))
   } catch (error: any) {
-    errorMessage.value = error.response?.data?.detail || t('redeem.failedToRedeem')
+    errorMessage.value = extractI18nErrorMessage(error, t, 'redeem.errors', t('redeem.failedToRedeem'))
     errorMode.value = 'redeem'
 
-    appStore.showError(t('redeem.redeemFailed'))
+    appStore.showError(errorMessage.value)
   } finally {
     submitting.value = false
   }

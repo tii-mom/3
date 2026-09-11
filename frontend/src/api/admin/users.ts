@@ -107,7 +107,8 @@ export async function list(
     params,
     signal: options?.signal
   })
-  return data
+  // 后端返回 null（未初始化 / 空结果）时兜底为空分页，避免调用方 .filter/.length 崩溃
+  return data ?? { items: [], total: 0, page: 1, page_size: 20, pages: 0 }
 }
 
 /**

@@ -53,18 +53,20 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { cancelVoucher, createVoucher, listVouchers, type Voucher } from '@/api/financial'
 import { useAppStore } from '@/stores/app'
-import { extractApiErrorMessage } from '@/utils/apiError'
+import { extractI18nErrorMessage } from '@/utils/apiError'
 
 const { t } = useI18n(); const app = useAppStore()
-const amount = ref(''); const totpCode = ref(''); const creating = ref(false); const loading = ref(false); const items = ref<Voucher[]>([]); const issuedCode = ref('')
-async function load() { loading.value = true; try { items.value = (await listVouchers()).items } catch (e) { app.showError(extractApiErrorMessage(e)) } finally { loading.value = false } }
-async function create() { creating.value = true; try { const item = await createVoucher(amount.value, totpCode.value); issuedCode.value = item.code || ''; amount.value = ''; totpCode.value = ''; await load() } catch (e) { app.showError(extractApiErrorMessage(e)) } finally { creating.value = false } }
-async function cancel(id: number) { try { await cancelVoucher(id); await load() } catch (e) { app.showError(extractApiErrorMessage(e)) } }
+const amount = ref(''); const totpCode = ref(''); const creating = ref(false); const loading = ref(false); const items = ref<Voucher[]>([]); const issuedCode = ref(''); const createIdempotencyKey = ref('')
+const newIdempotencyKey = () => typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `voucher-create-${Date.now()}-${Math.random().toString(36).slice(2)}`
+watch([amount, totpCode], () => { if (!creating.value) createIdempotencyKey.value = '' })
+async function load() { loading.value = true; try { items.value = (await listVouchers()).items } catch (e) { app.showError(extractI18nErrorMessage(e, t, 'redeem.errors', t('finance.vouchers.createFailed'))) } finally { loading.value = false } }
+async function create() { creating.value = true; try { if (!createIdempotencyKey.value) createIdempotencyKey.value = newIdempotencyKey(); const item = await createVoucher(amount.value, totpCode.value, createIdempotencyKey.value); issuedCode.value = item.code || ''; amount.value = ''; totpCode.value = ''; createIdempotencyKey.value = ''; await load() } catch (e) { app.showError(extractI18nErrorMessage(e, t, 'redeem.errors', t('finance.vouchers.createFailed'))) } finally { creating.value = false } }
+async function cancel(id: number) { try { await cancelVoucher(id); await load() } catch (e) { app.showError(extractI18nErrorMessage(e, t, 'redeem.errors', t('finance.vouchers.createFailed'))) } }
 async function copyIssued() { if (issuedCode.value) { await navigator.clipboard.writeText(issuedCode.value); app.showSuccess(t('common.copied')) } }
 onMounted(load)
 </script>

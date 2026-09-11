@@ -101,21 +101,21 @@
     </div>
     <div
       v-else-if="activeView === 'model_distribution' && displayModelStats.length > 0 && chartData"
-      class="flex items-center gap-6"
+      class="flex flex-wrap items-center gap-x-6 gap-y-4"
     >
-      <div class="h-48 w-48">
+      <div class="h-44 w-44 shrink-0">
         <Doughnut :data="chartData" :options="doughnutOptions" />
       </div>
-      <div class="max-h-48 flex-1 overflow-y-auto">
-        <table class="w-full text-xs">
+      <div class="max-h-48 min-w-[16rem] flex-1 overflow-x-auto overflow-y-auto">
+        <table class="w-full text-xs tabular-nums">
           <thead>
             <tr class="text-gray-500 dark:text-gray-400">
               <th class="pb-2 text-left">{{ t('admin.dashboard.model') }}</th>
-              <th class="pb-2 text-right">{{ t('admin.dashboard.requests') }}</th>
-              <th class="pb-2 text-right">{{ t('admin.dashboard.tokens') }}</th>
-              <th class="pb-2 text-right">{{ t('admin.dashboard.actual') }}</th>
+              <th class="whitespace-nowrap pb-2 pl-3 text-right">{{ t('admin.dashboard.requests') }}</th>
+              <th class="whitespace-nowrap pb-2 pl-3 text-right">{{ t('admin.dashboard.tokens') }}</th>
+              <th class="whitespace-nowrap pb-2 pl-3 text-right">{{ t('admin.dashboard.actual') }}</th>
               <th v-if="showAccountCost" class="pb-2 text-right">{{ t('admin.dashboard.accountCost') }}</th>
-              <th class="pb-2 text-right">{{ t('admin.dashboard.standard') }}</th>
+              <th class="whitespace-nowrap pb-2 pl-3 text-right">{{ t('admin.dashboard.standard') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -136,19 +136,19 @@
                     {{ model.model }}
                   </span>
                 </td>
-                <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">
+                <td class="whitespace-nowrap py-1.5 pl-3 text-right text-gray-600 dark:text-gray-400">
                   {{ formatNumber(model.requests) }}
                 </td>
-                <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">
+                <td class="whitespace-nowrap py-1.5 pl-3 text-right text-gray-600 dark:text-gray-400">
                   {{ formatTokens(model.total_tokens) }}
                 </td>
-                <td class="py-1.5 text-right text-green-600 dark:text-green-400">
+                <td class="whitespace-nowrap py-1.5 pl-3 text-right text-green-600 dark:text-green-400">
                   ${{ formatCost(model.actual_cost) }}
                 </td>
-                <td v-if="showAccountCost" class="py-1.5 text-right text-orange-500 dark:text-orange-400">
+                <td v-if="showAccountCost" class="whitespace-nowrap py-1.5 pl-3 text-right text-orange-500 dark:text-orange-400">
                   ${{ formatCost(model.account_cost) }}
                 </td>
-                <td class="py-1.5 text-right text-gray-400 dark:text-gray-500">
+                <td class="whitespace-nowrap py-1.5 pl-3 text-right text-gray-400 dark:text-gray-500">
                   ${{ formatCost(model.cost) }}
                 </td>
               </tr>
@@ -182,18 +182,18 @@
     >
       {{ t('admin.dashboard.failedToLoad') }}
     </div>
-    <div v-else-if="rankingDisplayItems.length > 0 && rankingChartData" class="flex items-center gap-6">
-      <div class="h-48 w-48">
+    <div v-else-if="rankingDisplayItems.length > 0 && rankingChartData" class="flex flex-wrap items-center gap-x-6 gap-y-4">
+      <div class="h-44 w-44 shrink-0">
         <Doughnut :data="rankingChartData" :options="rankingDoughnutOptions" />
       </div>
-      <div class="max-h-48 flex-1 overflow-y-auto">
-        <table class="w-full text-xs">
+      <div class="max-h-48 min-w-[16rem] flex-1 overflow-x-auto overflow-y-auto">
+        <table class="w-full text-xs tabular-nums">
           <thead>
             <tr class="text-gray-500 dark:text-gray-400">
               <th class="pb-2 text-left">{{ t('admin.dashboard.spendingRankingUser') }}</th>
-              <th class="pb-2 text-right">{{ t('admin.dashboard.spendingRankingRequests') }}</th>
-              <th class="pb-2 text-right">{{ t('admin.dashboard.spendingRankingTokens') }}</th>
-              <th class="pb-2 text-right">{{ t('admin.dashboard.spendingRankingSpend') }}</th>
+              <th class="whitespace-nowrap pb-2 pl-3 text-right">{{ t('admin.dashboard.spendingRankingRequests') }}</th>
+              <th class="whitespace-nowrap pb-2 pl-3 text-right">{{ t('admin.dashboard.spendingRankingTokens') }}</th>
+              <th class="whitespace-nowrap pb-2 pl-3 text-right">{{ t('admin.dashboard.spendingRankingSpend') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -219,13 +219,13 @@
                   </span>
                 </div>
               </td>
-              <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">
+              <td class="whitespace-nowrap py-1.5 pl-3 text-right text-gray-600 dark:text-gray-400">
                 {{ formatNumber(item.requests) }}
               </td>
-              <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">
+              <td class="whitespace-nowrap py-1.5 pl-3 text-right text-gray-600 dark:text-gray-400">
                 {{ formatTokens(item.tokens) }}
               </td>
-              <td class="py-1.5 text-right text-green-600 dark:text-green-400">
+              <td class="whitespace-nowrap py-1.5 pl-3 text-right text-green-600 dark:text-green-400">
                 ${{ formatCost(item.actual_cost) }}
               </td>
             </tr>

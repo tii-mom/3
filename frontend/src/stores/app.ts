@@ -50,6 +50,12 @@ export const useAppStore = defineStore('app', () => {
   // Auto-incrementing ID for toasts
   let toastIdCounter = 0
 
+  // 相同 toast 的去重窗口（毫秒）与最近展示记录
+  const TOAST_DEDUP_WINDOW_MS = 4000
+  const recentToastKeys = new Map<string, number>()
+  // 同时存在的 error toast 上限
+  const MAX_ERROR_TOASTS = 3
+
   // ==================== Computed ====================
 
   const hasActiveToasts = computed(() => toasts.value.length > 0)
@@ -110,6 +116,38 @@ export const useAppStore = defineStore('app', () => {
    * @returns Toast ID for manual dismissal
    */
   function showToast(type: ToastType, message: string, duration?: number): string {
+    // 去重：同一类型 + 同一文案在窗口期内重复触发时只保留一条。
+    // 后台页面常有多个子模块并行请求，任一失败会各自弹一次，
+    // 不去重会出现「一次故障连弹 5 条相同提示」的噪音。
+    const dedupKey = `${type}::${message}`
+    const now = Date.now()
+    const lastShownAt = recentToastKeys.get(dedupKey)
+    if (lastShownAt !== undefined && now - lastShownAt < TOAST_DEDUP_WINDOW_MS) {
+      const existing = toasts.value.find((item) => item.type === type && item.message === message)
+      if (existing) {
+        return existing.id
+      }
+    }
+    recentToastKeys.set(dedupKey, now)
+    // 防止 Map 无界增长：窗口外的键定期清理
+    if (recentToastKeys.size > 50) {
+      for (const [key, shownAt] of recentToastKeys) {
+        if (now - shownAt >= TOAST_DEDUP_WINDOW_MS) {
+          recentToastKeys.delete(key)
+        }
+      }
+    }
+
+    // 错误提示限流：后台页面常因同一接口故障引发多个子模块分别报错，
+    // 一瞬间弹出 5+ 条 error toast 会糊满屏幕。错误 toast 同时最多
+    // 保留 3 条（去重之后再计），超出的直接丢弃。
+    if (type === 'error') {
+      const errorCount = toasts.value.filter((item) => item.type === 'error').length
+      if (errorCount >= MAX_ERROR_TOASTS) {
+        return ''
+      }
+    }
+
     const id = `toast-${++toastIdCounter}`
     const toast: Toast = {
       id,

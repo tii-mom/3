@@ -23,10 +23,24 @@ const robotsTxt = await readDistFile('robots.txt')
 assert(!indexHtml.includes('id="seo-snapshot"'), 'Homepage index.html must not embed a visible SEO snapshot.')
 assert(!indexHtml.includes('id="seo-snapshot-style"'), 'Homepage index.html must not include SEO snapshot styles.')
 assert(indexHtml.includes('<div id="app"></div>'), 'Homepage index.html must remain a clean Vue app shell.')
-assert(indexHtml.includes('<title>3API - AI API 中转站与多模型统一接入</title>'), 'Homepage title must use 3API.')
+
+// 销售业务首页：title/description 以源文件为准（不得回退为旧 API 中转站文案）
+assert(indexHtml.includes('<title>3API - ChatGPT Plus/Pro 代充值与成品号独享账号</title>'), 'Homepage title must reflect the sales business.')
+assert(/<meta\s+name="description"\s+content="3API 提供 ChatGPT/.test(indexHtml), 'Homepage description must reflect the sales business.')
+assert(!/AI API 中转站与多模型统一接入/.test(indexHtml), 'Homepage must not use the legacy API-relay title.')
 assert(!/Sub2API|Subscription to API Conversion Platform/i.test(indexHtml), 'Homepage must not expose legacy Sub2API branding.')
+
+// 社交分享与结构化数据
+assert(indexHtml.includes('og-home.png'), 'Homepage must include an OG share image.')
+assert(/<meta\s+name="twitter:card"\s+content="summary_large_image"/.test(indexHtml), 'Homepage must declare a large Twitter card.')
+assert(indexHtml.includes('"FAQPage"'), 'Homepage must include FAQPage structured data.')
+assert(indexHtml.includes('"Question"') && indexHtml.includes('"acceptedAnswer"'), 'FAQPage must contain Question/Answer entries.')
+
 assert(robotsTxt.includes('Disallow: /console'), 'robots.txt must disallow console routes.')
 assert(robotsTxt.includes('Disallow: /payment'), 'robots.txt must disallow payment routes.')
+assert(sitemapXml.includes('https://3api.shop/'), 'sitemap.xml must list the homepage.')
+assert(sitemapXml.includes('<priority>1.0</priority>'), 'Homepage must have priority 1.0.')
+assert(sitemapXml.includes('<changefreq>weekly</changefreq>'), 'Sitemap entries must declare changefreq.')
 
 for (const page of seoPageSlugs) {
   const html = await readDistFile(`${page}.html`)

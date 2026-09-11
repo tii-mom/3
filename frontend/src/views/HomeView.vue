@@ -1,1481 +1,1496 @@
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import FAQ_ITEMS from '@/content/home-faq.json'
+import { useAppStore } from '@/stores/app'
+import { publicShopAPI, type FulfillmentMode, type PublicBanner, type PublicProduct } from '@/api/publicShop'
+import userAPI from '@/api/user'
+import { resolveShopAssetUrl } from '@/api/shop'
+import { useGuestCheckout } from '@/composables/useGuestCheckout'
+import PlanCard from '@/components/home/PlanCard.vue'
+import OrderSheet from '@/components/home/OrderSheet.vue'
+import SessionGuide from '@/components/home/SessionGuide.vue'
+import BaseDialog from '@/components/common/BaseDialog.vue'
+import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
+
+const appStore = useAppStore()
+const {
+  isLoggedIn,
+  submitting,
+  payDialog,
+  startCheckout,
+  goToOrderPage,
+  closePayDialog,
+  methodsForAmount,
+  loadPaymentMethods
+} = useGuestCheckout()
+
+const products = ref<PublicProduct[]>([])
+const banners = ref<PublicBanner[]>([])
+const affCode = ref('')
+const loading = ref(true)
+const activeTab = ref<FulfillmentMode>('session_topup')
+const sheetOpen = ref(false)
+const selectedProduct = ref<PublicProduct | null>(null)
+const openFaq = ref<number | null>(0)
+
+const TABS: { value: FulfillmentMode; label: string; blurb: string }[] = [
+  { value: 'session_topup', label: '代充值', blurb: '给自己已有的 ChatGPT 账号续费升级' },
+  { value: 'account_delivery', label: '成品号', blurb: '直接拿一个开通好的独享账号' },
+  { value: 'rental', label: '租号', blurb: '按周或按月短期使用，成本更低' }
+]
+
+const availableTabs = computed(() => TABS.filter((tab) => products.value.some((item) => item.fulfillment_mode === tab.value)))
+const visibleProducts = computed(() => products.value.filter((item) => item.fulfillment_mode === activeTab.value))
+const activeTabBlurb = computed(() => availableTabs.value.find((tab) => tab.value === activeTab.value)?.blurb || '')
+const contactInfo = computed(() => appStore.contactInfo?.trim() || '')
+// 下单抽屉里的支付方式：后台配置 ∩ 当前商品金额在单笔限额内
+const sheetPaymentMethods = computed(() =>
+  selectedProduct.value ? methodsForAmount(selectedProduct.value.price_cny_minor) : []
+)
+
+const ASSURANCE = [
+  { title: '官方渠道充值', desc: '按官方订阅流程开通，不开后门、不刷额度' },
+  { title: '1-3 分钟到账', desc: '凭证提交后自动进入处理队列' },
+  { title: '30 天质保', desc: '非用户原因中断，按条款处理' },
+  { title: '订单可查', desc: '凭订单号 + 联系方式随时看进度' },
+  { title: '正规发票', desc: '按实际金额开票，报销无忧' },
+  { title: '边界透明', desc: '第三方独立服务，非 OpenAI 官方' }
+]
+
+const METRICS = [
+  { value: '1-3', unit: '分钟', label: '平均到账时间' },
+  { value: '30', unit: '天', label: '非人为中断质保' },
+  { value: '0', unit: '个', label: '索要的账号密码' },
+  { value: '24', unit: '小时', label: '售后响应窗口' }
+]
+
+const COMPARISON = [
+  { label: '适合谁', topup: '已有账号要续费', account: '想换个新号', rental: '短期试用' },
+  { label: '需要提供', topup: '登录凭证', account: '接收邮箱', rental: '接收邮箱' },
+  { label: '账号归属', topup: '你自己的号', account: '交付给你', rental: '租期内使用' },
+  { label: '交付时效', topup: '1-3 分钟', account: '人工发货', rental: '人工发货' },
+  { label: '成本', topup: '低', account: '中', rental: '最低' }
+]
+
+onMounted(async () => {
+  // 支付渠道与控制台商城同源，后台开关与限额即时生效
+  void loadPaymentMethods()
+  try {
+    const [productRes, bannerRes] = await Promise.all([
+      publicShopAPI.listProducts(),
+      publicShopAPI.listBanners().catch(() => null)
+    ])
+    products.value = productRes.data || []
+    const list = bannerRes?.data || []
+    banners.value = list.filter((item) => item.enabled)
+  } catch {
+    products.value = []
+  } finally {
+    loading.value = false
+    const first = availableTabs.value[0]
+    if (first && !products.value.some((item) => item.fulfillment_mode === activeTab.value)) {
+      activeTab.value = first.value
+    }
+  }
+  // 推广奖励只在登录后展示
+  if (isLoggedIn.value) {
+    try {
+      const detail = await userAPI.getAffiliateDetail()
+      affCode.value = detail?.aff_code?.trim() || ''
+    } catch {
+      affCode.value = ''
+    }
+  }
+})
+
+function openSheet(product: PublicProduct) {
+  selectedProduct.value = product
+  sheetOpen.value = true
+}
+
+function openBannerProduct(productID: number) {
+  const product = products.value.find((item) => item.id === productID)
+  if (!product) return
+  activeTab.value = product.fulfillment_mode
+  openSheet(product)
+}
+
+async function handleSubmit(payload: { contact: string; paymentType: string }) {
+  if (!selectedProduct.value) return
+  const ok = await startCheckout(selectedProduct.value, payload.contact, payload.paymentType)
+  if (ok) {
+    sheetOpen.value = false
+  }
+}
+
+function handlePaymentSuccess() {
+  goToOrderPage()
+}
+</script>
+
 <template>
-  <div class="home-redesign min-h-screen bg-slate-50 dark:bg-dark-950 font-sans text-slate-800 dark:text-gray-100 relative overflow-hidden selection:bg-primary-500/20">
-    <!-- Custom Home Content Branch (Preserved logic) -->
-    <div v-if="homeContent" class="fixed inset-0 z-50 bg-dark-950">
-      <iframe
-        v-if="isHomeContentUrl"
-        :src="homeContentUrl"
-        sandbox="allow-scripts allow-forms allow-popups"
-        referrerpolicy="no-referrer"
-        class="w-full h-full border-0"
-      ></iframe>
-      <div
-        v-else
-        v-html="sanitizedHomeContent"
-        class="w-full h-full overflow-auto p-6"
-      ></div>
-    </div>
+  <div class="sales-home">
+    <header class="nav">
+      <div class="nav__inner">
+        <a class="nav__brand" href="/">
+          <span class="nav__mark">3</span>
+          <span class="nav__name">3API</span>
+        </a>
+        <nav class="nav__links">
+          <a href="#plans">套餐</a>
+          <a href="#workflow">流程</a>
+          <a href="#faq">常见问题</a>
+          <RouterLink to="/order">查订单</RouterLink>
+        </nav>
+        <div class="nav__actions">
+          <RouterLink class="nav__ghost" to="/login">登录</RouterLink>
+          <a class="nav__cta" href="#plans">立即充值</a>
+        </div>
+      </div>
+    </header>
 
-    <!-- Default Home Page Branch -->
-    <div v-else class="relative z-10">
-      <!-- Quiet technical atmosphere -->
-      <div class="home-atmosphere pointer-events-none fixed inset-0 z-0 overflow-hidden"></div>
-
-
-
-      <!-- Main Layout -->
-      <main class="home-main max-w-6xl mx-auto px-4 md:px-6 relative z-10 pt-16 pb-32">
-
-        <!-- Hero Section -->
-        <section class="home-hero grid grid-cols-1 lg:grid-cols-12 gap-12 items-center mb-24">
-          <!-- Hero Left Content -->
-          <div class="lg:col-span-7 max-w-3xl space-y-8 text-left reveal active">
-            <!-- Brand Logo & Name directly in Hero -->
-            <div class="flex max-w-full flex-wrap items-center gap-4 mb-6">
-              <img v-if="siteLogo" :src="siteLogo" alt="Logo" class="h-14 w-auto max-w-[min(16rem,70vw)] rounded-lg object-contain sm:h-16" />
-              <div v-else class="h-14 w-14 shrink-0 rounded-lg bg-primary-505 bg-gradient-primary flex items-center justify-center text-white font-black text-xl shadow-sm select-none sm:h-16 sm:w-16">
-                3
-              </div>
-              <span class="text-xl font-black text-slate-900 dark:text-white sm:text-2xl">{{ siteName }}</span>
-            </div>
-
-            <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-7.5xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.15]">
-              <span class="text-gradient">{{ siteName }}</span>
-              <span class="block text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-800 dark:text-gray-200 mt-4 leading-normal">
-                {{ t('home.heroSubtitle') }}
-              </span>
-            </h1>
-
-            <p
-              v-if="showSiteSubtitle"
-              class="home-hero-description text-lg text-slate-600 dark:text-gray-400 max-w-lg leading-relaxed font-sans"
-            >
-              {{ siteSubtitle.startsWith('home.') ? t(siteSubtitle) : siteSubtitle }}
+    <main>
+      <section class="hero">
+        <div class="hero__grid" aria-hidden="true" />
+        <div class="hero__inner">
+          <div class="hero__copy">
+            <p class="eyebrow">ChatGPT Plus / Pro 充值 · 成品号直供</p>
+            <h1 class="hero__title">给你的 ChatGPT 续上<br>官方会员与独享账号</h1>
+            <p class="hero__desc">
+              官方渠道代充值，1-3 分钟到账，30 天质保，可开发票。
+              不想动自己的账号？成品号与租号即买即用，全程不需要账号密码。
             </p>
-
-            <div class="flex flex-wrap items-center gap-4">
-              <router-link
-                :to="isAuthenticated ? dashboardPath : '/login'"
-                class="btn rounded-full bg-gradient-primary px-8 py-3.5 text-base font-bold text-white shadow-glow hover:scale-[1.02] active:scale-[0.98] transition-all"
-              >
-                <span>{{ isAuthenticated ? t('home.goToDashboard') : t('home.getStarted') }}</span>
-              </router-link>
-
-              <a
-                v-if="docUrl"
-                :href="docUrl"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="btn rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 px-8 py-3.5 text-base font-semibold text-slate-700 hover:text-slate-900 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] dark:border-white/[0.06] dark:text-gray-300 dark:hover:text-white transition-all active:scale-[0.98]"
-              >
-                <Icon name="book" class="h-5 w-5 text-slate-400 dark:text-gray-400" />
-                <span>{{ t('home.docs') }}</span>
-              </a>
-
-              <!-- Integrated Lang & Theme controls -->
-              <div class="flex items-center gap-2 p-1.5 rounded-full bg-slate-100/50 dark:bg-white/[0.04] border border-slate-200/50 dark:border-white/[0.06] shadow-sm">
-                <LocaleSwitcher />
-                <div class="h-4 w-px bg-slate-200 dark:bg-white/[0.08]"></div>
-                <button
-                  @click="toggleTheme"
-                  class="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-white/[0.06] text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white transition-all duration-200"
-                  :title="isDark ? t('home.switchToLight') : t('home.switchToDark')"
-                >
-                  <Icon :name="isDark ? 'sun' : 'moon'" class="h-4 w-4" />
-                </button>
-              </div>
+            <div class="hero__actions">
+              <a class="sh-btn sh-btn--primary" href="#plans">选择套餐</a>
+              <a class="sh-btn sh-btn--ghost" href="#workflow">查看充值流程</a>
             </div>
+            <ul class="hero__trust">
+              <li>不需要账号密码</li>
+              <li>支付后凭订单号查进度</li>
+              <li>独立第三方服务</li>
+            </ul>
           </div>
 
-          <!-- Concentric Double Bezel Terminal Wrapper -->
-          <div class="rounded-4xl p-1.5 bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200/50 dark:border-white/[0.05] shadow-glass shadow-primary-500/2 reveal active lg:col-span-5 flex h-fit">
-            <div class="home-routing-console rounded-[calc(2rem-0.375rem)] bg-white dark:bg-dark-900 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] overflow-hidden w-full flex flex-col" aria-label="3API routing control preview">
-              <div class="home-console-head">
-                <div class="flex items-center gap-2"><span class="home-console-dot"></span><span>3API ROUTING CORE</span></div>
-                <span class="home-console-live">LIVE</span>
+          <aside class="hero__panel" aria-hidden="true">
+            <div class="panel">
+              <div class="panel__head">
+                <span class="panel__pulse" />
+                <span>充值进度</span>
+                <span class="panel__tag">实时</span>
               </div>
-              <div class="home-console-body">
-                <div class="home-console-request">
-                  <span class="home-eyebrow">REQUEST</span>
-                  <strong>responses.create</strong>
-                  <div class="home-request-row"><span>model</span><code>gpt-5.6</code></div>
-                  <div class="home-request-row"><span>stream</span><code>true</code></div>
-                  <div class="home-request-row"><span>billing</span><code>token</code></div>
-                  <span class="home-console-trace">trace_92fa18</span>
-                </div>
-                <div class="home-console-routes">
-                  <div class="home-route home-route-active"><span class="home-provider-mark">O</span><span>{{ t('home.routes.openaiMain') }}</span><strong>684ms</strong></div>
-                  <div class="home-route"><span class="home-provider-mark">A</span><span>{{ t('home.routes.claudeBackup') }}</span><strong>ready</strong></div>
-                  <div class="home-route"><span class="home-provider-mark">G</span><span>{{ t('home.routes.geminiDirect') }}</span><strong>ready</strong></div>
-                  <router-link class="home-route" :to="isAuthenticated ? '/distribution' : '/login'"><Icon name="users" /><span>{{ t('home.routes.computeNetwork') }}</span><strong>{{ t('home.routes.companyUnitsCount') }}</strong></router-link>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- 3-Step Onboarding Section ("三步即可使用") -->
-        <section class="mb-32">
-          <div class="text-center max-w-3xl mx-auto mb-12 reveal">
-            <h2 class="text-4xl md:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              {{ t('home.onboarding.title') }}
-            </h2>
-            <p class="text-slate-600 dark:text-gray-400 mt-5 text-lg leading-relaxed">
-              {{ t('home.onboarding.subtitle') }}
-            </p>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <!-- Step 1 Card -->
-            <div class="md:col-span-2 rounded-4xl p-1.5 bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200/50 dark:border-white/[0.05] shadow-glass shadow-primary-500/2 reveal flex">
-              <div class="rounded-[calc(2rem-0.375rem)] bg-white dark:bg-dark-900/80 p-6 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] grid grid-cols-1 md:grid-cols-12 gap-6 w-full">
-                <!-- Step 1 Left Column -->
-                <div class="md:col-span-6 flex flex-col justify-between h-full">
+              <ol class="panel__steps">
+                <li class="panel__step is-done">
+                  <span class="panel__node" />
                   <div>
-                    <div class="flex items-center justify-between mb-6">
-                      <span class="h-10 w-10 rounded-2xl bg-primary-500/10 border border-primary-500/20 flex items-center justify-center text-primary-500 font-bold font-mono">1</span>
-                      <div class="p-2 rounded-xl bg-slate-100 dark:bg-white/[0.04] border border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-gray-300 md:hidden">
-                        <Icon name="download" class="h-5 w-5" />
-                      </div>
-                    </div>
-                    <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-2">{{ t('home.onboarding.step1Title') }}</h3>
-                    <p class="text-sm text-slate-600 dark:text-gray-400 leading-relaxed">
-                      {{ t('home.onboarding.step1Desc') }}
-                    </p>
+                    <p>选择套餐</p>
+                    <small>确认价格与服务说明</small>
                   </div>
-                  <div class="hidden md:block mt-6">
-                    <div class="inline-flex p-3 rounded-2xl bg-primary-500/10 border border-primary-500/20 text-primary-500">
-                      <Icon name="download" class="h-6 w-6" />
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Step 1 Right Column (Client Downloads) -->
-                <div class="md:col-span-6 space-y-2 flex flex-col justify-center h-full">
-                  <a
-                    href="https://pub-e818eceec7614e3084a8a2ad38b6e3f1.r2.dev/Codex-x64.msix"
-                    aria-label="Download OpenAI Codex Client for Windows"
-                    class="group w-full rounded-2xl bg-slate-100/80 hover:bg-primary-500 hover:text-white border border-slate-200 hover:border-primary-400 text-slate-800 dark:bg-white/[0.04] dark:hover:bg-primary-500/15 dark:border-white/[0.06] dark:text-white flex items-center justify-between px-4 py-3 transition-all duration-200"
-                  >
-                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.45H0V3.449zM0 12.45h9.75v9.45L0 20.551v-8.1zM10.95 1.95L24 0v11.55H10.95V1.95zM10.95 12.45H24v11.55l-13.05-1.95v-9.6z"/></svg>
-                    <span class="flex items-center gap-3"><span class="text-left"><strong class="block text-sm">{{ t('home.download.windows') }}</strong><small class="block text-[10px] opacity-60">{{ t('home.download.windowsDesc') }}</small></span></span><Icon name="download" class="h-4 w-4 opacity-50 group-hover:opacity-100" />
-                  </a>
-                  <a
-                    href="https://pub-e818eceec7614e3084a8a2ad38b6e3f1.r2.dev/Codex-mac-arm64.dmg"
-                    aria-label="Download OpenAI Codex Client for Apple Silicon macOS"
-                    class="group w-full rounded-2xl bg-slate-100/80 hover:bg-primary-500 hover:text-white border border-slate-200 hover:border-primary-400 text-slate-800 dark:bg-white/[0.04] dark:hover:bg-primary-500/15 dark:border-white/[0.06] dark:text-white flex items-center justify-between px-4 py-3 transition-all duration-200"
-                  >
-                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-1 .04-2.22.67-2.94 1.5-.62.71-1.16 1.85-1.01 2.96 1.12.09 2.27-.58 2.96-1.4z"/></svg>
-                    <span class="flex items-center gap-3"><span class="text-left"><strong class="block text-sm">{{ t('home.download.macArm') }}</strong><small class="block text-[10px] opacity-60">{{ t('home.download.macArmDesc') }}</small></span></span><Icon name="download" class="h-4 w-4 opacity-50 group-hover:opacity-100" />
-                  </a>
-                  <a
-                    href="https://pub-e818eceec7614e3084a8a2ad38b6e3f1.r2.dev/Codex-mac-x64.dmg"
-                    aria-label="Download OpenAI Codex Client for Intel macOS"
-                    class="group w-full rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 dark:bg-white/[0.02] dark:hover:bg-white/[0.06] dark:border-white/[0.04] dark:text-gray-400 flex items-center justify-between px-4 py-3 transition-all"
-                  >
-                    <span class="text-left"><strong class="block text-sm">{{ t('home.download.macIntel') }}</strong><small class="block text-[10px] opacity-60">{{ t('home.download.macIntelDesc') }}</small></span><Icon name="download" class="h-4 w-4 opacity-40 group-hover:opacity-80" />
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            <!-- Step 2 Card -->
-            <div class="md:col-span-1 rounded-4xl p-1.5 bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200/50 dark:border-white/[0.05] shadow-glass shadow-primary-500/2 reveal delay-100 flex">
-              <div class="rounded-[calc(2rem-0.375rem)] bg-white dark:bg-dark-900/80 p-6 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] flex flex-col justify-between w-full">
-                <div>
-                  <div class="flex items-center justify-between mb-6">
-                    <span class="h-10 w-10 rounded-2xl bg-primary-500/10 border border-primary-500/20 flex items-center justify-center text-primary-500 font-bold font-mono">2</span>
-                    <div class="p-2 rounded-xl bg-slate-100 dark:bg-white/[0.04] border border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-gray-300">
-                      <Icon name="edit" class="h-5 w-5" />
-                    </div>
-                  </div>
-                  <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-2">{{ t('home.onboarding.step2Title') }}</h3>
-                  <p class="text-sm text-slate-600 dark:text-gray-400 leading-relaxed mb-4">
-                    {{ t('home.onboarding.step2Desc') }}
-                  </p>
-
-                  <!-- Tab switcher for mockup options -->
-                  <div class="flex space-x-1 rounded-lg bg-slate-100 dark:bg-white/[0.04] border border-slate-200/50 dark:border-white/[0.08] p-1 mb-4 text-[10px] font-mono">
-                    <button
-                      type="button"
-                      class="flex-1 rounded py-1.5 transition-all text-center"
-                      :class="step2Tab === 'api' ? 'bg-white dark:bg-dark-800 text-slate-900 dark:text-white shadow-sm font-bold' : 'text-slate-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-white'"
-                      @click="step2Tab = 'api'"
-                    >
-                      API Config
-                    </button>
-                    <button
-                      type="button"
-                      class="flex-1 rounded py-1.5 transition-all text-center"
-                      :class="step2Tab === 'ccs' ? 'bg-white dark:bg-dark-800 text-slate-900 dark:text-white shadow-sm font-bold' : 'text-slate-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-white'"
-                      @click="step2Tab = 'ccs'"
-                    >
-                      CC Switch
-                    </button>
-                  </div>
-                </div>
-
-                <div class="mt-auto">
-                  <div v-if="step2Tab === 'api'" class="rounded-xl border border-slate-200/80 dark:border-white/[0.06] bg-dark-950 p-4 text-left font-mono text-[11px] leading-relaxed text-gray-300 space-y-1">
-                    <div>
-                      <span class="text-primary-400">{{ t('home.terminal.comment') }}</span>
-                    </div>
-                    <div>
-                      <span class="text-gray-500">API_URL=</span><span class="text-emerald-400">"https://api.3api.shop/v1"</span>
-                    </div>
-                    <div>
-                      <span class="text-gray-500">API_KEY=</span><span class="text-emerald-400">"sk-your-3api-token"</span>
-                    </div>
-                  </div>
-                  <div v-else class="rounded-2xl border border-white/[0.06] bg-[#0d0e14] p-4 text-left">
-                    <div class="flex items-center justify-between border-b border-white/[0.06] pb-3 mb-3">
-                      <div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-primary-500"></span><span class="font-mono text-[11px] text-gray-400">api.3api.shop</span></div>
-                      <span class="rounded-full bg-primary-500/10 px-2 py-1 text-[10px] font-semibold text-primary-400">{{ t('home.ccswitch.consoleTitle') }}</span>
-                    </div>
-                    <div class="space-y-2 text-[11px]">
-                      <div class="flex items-center justify-between border-b border-white/[0.04] pb-2"><span class="text-gray-500">{{ t('home.ccswitch.keyName') }}</span><span class="font-mono text-white">3API_Production_Key</span></div>
-                      <div class="flex items-center justify-between"><span class="text-gray-500">{{ t('home.ccswitch.keyVal') }}</span><span class="font-mono text-primary-400">sk-proj-3api-***</span></div>
-                    </div>
-                    <div class="mt-4 rounded-xl border border-primary-500/20 bg-primary-500/[0.04] p-3 flex flex-col gap-3">
-                      <div class="flex items-center justify-between"><span class="text-xs font-semibold text-white">{{ t('home.ccswitch.clientTitle') }}</span><span class="text-[10px] text-primary-400">{{ isCcsImported ? t('home.ccswitch.enabled') : t('home.ccswitch.waitImport') }}</span></div>
-                      <a
-                        href="https://ccswitch.lovable.app/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="group flex items-center justify-center gap-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold py-2.5 px-3 transition-colors shadow-sm w-full select-none"
-                      >
-                        <Icon name="download" class="h-3.5 w-3.5 transition-transform group-hover:translate-y-0.5" />
-                        <span>{{ t('home.ccswitch.clientDownloadBtn') }}</span>
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Step 3 Card -->
-            <div class="md:col-span-1 rounded-4xl p-1.5 bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200/50 dark:border-white/[0.05] shadow-glass shadow-primary-500/2 reveal delay-200 flex">
-              <div class="rounded-[calc(2rem-0.375rem)] bg-white dark:bg-dark-900/80 p-6 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] flex flex-col justify-between w-full">
-                <div>
-                  <div class="flex items-center justify-between mb-6">
-                    <span class="h-10 w-10 rounded-2xl bg-primary-500/10 border border-primary-500/20 flex items-center justify-center text-primary-500 font-bold font-mono">3</span>
-                    <div class="p-2 rounded-xl bg-slate-100 dark:bg-white/[0.04] border border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-gray-300">
-                      <Icon name="brain" class="h-5 w-5" />
-                    </div>
-                  </div>
-                  <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-2">{{ t('home.onboarding.step3Title') }}</h3>
-                  <p class="text-sm text-slate-600 dark:text-gray-400 leading-relaxed">
-                    {{ t('home.onboarding.step3Desc') }}
-                  </p>
-                </div>
-
-                <!-- Middle integration list to align height -->
-                <div class="my-6 space-y-2.5">
-                  <div class="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200/50 bg-slate-50/50 dark:border-white/[0.04] dark:bg-white/[0.02]">
-                    <div class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-                    <span class="text-xs font-semibold text-slate-700 dark:text-gray-350 font-sans">Cursor / VS Code</span>
-                  </div>
-                  <div class="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200/50 bg-slate-50/50 dark:border-white/[0.04] dark:bg-white/[0.02]">
-                    <div class="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
-                    <span class="text-xs font-semibold text-slate-700 dark:text-gray-350 font-sans">Obsidian / Lobe Chat</span>
-                  </div>
-                  <div class="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200/50 bg-slate-50/50 dark:border-white/[0.04] dark:bg-white/[0.02]">
-                    <div class="w-2.5 h-2.5 rounded-full bg-primary-500"></div>
-                    <span class="text-xs font-semibold text-slate-700 dark:text-gray-350 font-sans">Chatbox / Next Web</span>
-                  </div>
-                </div>
-
-                <!-- Compatible platforms list -->
-                <div class="grid grid-cols-3 gap-2 text-center text-[10px] font-semibold text-slate-700 dark:text-gray-300 font-mono mt-auto">
-                  <div class="py-2.5 rounded-lg border border-slate-200 bg-slate-50/50 dark:border-white/[0.03] dark:bg-white/[0.01]">{{ t('home.platform.mobile') }}</div>
-                  <div class="py-2.5 rounded-lg border border-slate-200 bg-slate-50/50 dark:border-white/[0.03] dark:bg-white/[0.01]">{{ t('home.platform.web') }}</div>
-                  <div class="py-2.5 rounded-lg border border-slate-200 bg-slate-50/50 dark:border-white/[0.03] dark:bg-white/[0.01]">{{ t('home.platform.desktop') }}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-
-
-        <!-- Compute Company & 5-Level Distribution Network -->
-        <section class="home-business mb-32 reveal">
-          <div class="rounded-4xl p-1.5 bg-slate-100/50 dark:bg-white/[0.03] border border-slate-200/50 dark:border-white/[0.05] shadow-glass shadow-primary-500/2 w-full">
-            <div class="rounded-[calc(2rem-0.375rem)] bg-white dark:bg-dark-900/80 p-8 md:p-12 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-              <div class="lg:col-span-6 space-y-6">
-                <span class="home-eyebrow">COMPUTE COMPANY</span>
-                <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white mt-1">
-                  {{ t('home.business.computeTitle') }}
-                </h2>
-                <p class="text-slate-600 dark:text-gray-400 mt-4 leading-relaxed font-sans text-sm max-w-xl">
-                  {{ t('home.business.computeDesc') }}
-                </p>
-                <div>
-                  <router-link :to="isAuthenticated ? '/distribution' : '/login'" class="btn btn-primary rounded-full px-6 py-2.5 inline-flex items-center gap-2 font-medium">
-                    <span>{{ t('home.business.openCompute') }}</span>
-                    <Icon name="arrowRight" class="h-4 w-4" />
-                  </router-link>
-                </div>
-              </div>
-              <div class="lg:col-span-6 bg-slate-50 dark:bg-[#121418]/60 border border-slate-200/60 dark:border-white/[0.06] rounded-2xl p-6 relative overflow-hidden">
-                <div class="home-network-preview flex flex-col justify-center items-center gap-6 py-6" aria-hidden="true">
-                  <div class="flex items-center gap-8 w-full justify-center relative">
-                    <div class="flex flex-col gap-2 shrink-0">
-                      <span class="px-4 py-2 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-center text-xs font-mono">{{ t('home.architecture.directPartner') }}</span>
-                      <span class="px-4 py-2 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-center text-xs font-mono">{{ t('home.architecture.directPartner') }}</span>
-                    </div>
-
-                    <!-- Connection Lines -->
-                    <div class="flex-1 h-px bg-primary-500/30 relative flex items-center justify-between">
-                      <span class="h-2 w-2 rounded-full bg-primary-500 -mt-0.5"></span>
-                      <span class="h-2 w-2 rounded-full bg-primary-500 -mt-0.5"></span>
-                    </div>
-
-                    <div class="px-6 py-4 border border-primary-500/30 bg-primary-500/5 rounded text-center shrink-0">
-                      <strong class="block text-sm text-slate-900 dark:text-white font-bold">{{ t('home.architecture.computeCompany') }}</strong>
-                      <span class="text-[10px] text-primary-500 font-mono">{{ t('home.architecture.performanceBadge') }}</span>
-                    </div>
-
-                    <div class="flex-1 h-px bg-primary-500/30 relative flex items-center justify-between">
-                      <span class="h-2 w-2 rounded-full bg-primary-500 -mt-0.5"></span>
-                      <span class="h-2 w-2 rounded-full bg-primary-500 -mt-0.5"></span>
-                    </div>
-
-                    <div class="flex flex-col gap-2 shrink-0">
-                      <span class="px-4 py-2 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-center text-xs font-mono">{{ t('home.architecture.endUser') }}</span>
-                      <span class="px-4 py-2 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-center text-xs font-mono">{{ t('home.architecture.endUser') }}</span>
-                    </div>
-                  </div>
-
-                  <div class="w-full h-px bg-slate-200 dark:bg-white/[0.06] my-2"></div>
-
-                  <div class="flex gap-2 justify-center">
-                    <span class="px-3 py-1 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-[10px] font-mono">{{ t('home.architecture.t1') }}</span>
-                    <span class="px-3 py-1 border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-dark-900 rounded text-[10px] font-mono">{{ t('home.architecture.t2') }}</span>
-                    <span class="px-3 py-1 border border-primary-500/50 bg-primary-500/5 text-primary-500 rounded text-[10px] font-mono font-bold">{{ t('home.architecture.t3') }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- Interactive Codex Window Mockup Section -->
-        <section class="mb-32">
-          <div class="text-center max-w-2xl mx-auto mb-16 reveal">
-            <h2 class="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              {{ t('home.codex.title') }}
-            </h2>
-            <p class="text-slate-600 dark:text-gray-400 mt-4 text-base">
-              {{ t('home.codex.subtitle') }}
-            </p>
-          </div>
-
-          <!-- Codex Window container (kept dark intentionally for terminal aesthetics) -->
-          <div class="rounded-3xl border border-white/[0.08] bg-dark-900/90 backdrop-blur-xl shadow-2xl p-0 overflow-hidden reveal">
-            <!-- macOS Traffic light buttons -->
-            <div class="flex items-center justify-between px-6 py-4 border-b border-white/[0.06] bg-dark-950/40">
-              <div class="flex items-center gap-1.5">
-                <span class="h-3 w-3 rounded-full bg-red-500/60"></span>
-                <span class="h-3 w-3 rounded-full bg-amber-500/60"></span>
-                <span class="h-3 w-3 rounded-full bg-emerald-500/60"></span>
-              </div>
-              <span class="text-xs font-mono text-gray-400">OpenAI Codex Desktop</span>
-              <div class="h-3 w-3"></div> <!-- Placeholder to balance flex spacer -->
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-12 min-h-[480px]">
-              <!-- Codex Left Sidebar -->
-              <aside class="lg:col-span-3 border-r border-white/[0.06] bg-dark-950/20 p-4 flex flex-col justify-between">
-                <div class="space-y-6">
-                  <!-- Header -->
-                  <div class="flex items-center justify-between text-gray-400">
-                    <span class="text-xs font-bold uppercase tracking-wider">Codex Client</span>
-                    <Icon name="search" class="h-4 w-4" />
-                  </div>
-
-                  <!-- Nav list -->
-                  <ul class="space-y-1 text-left">
-                    <li>
-                      <button type="button" class="flex w-full items-center gap-3 px-3 py-2 rounded-lg bg-white/[0.04] text-left text-xs font-semibold text-white" aria-current="page">
-                        <Icon name="edit" class="h-4 w-4 text-primary-400" />
-                        <span>{{ t('home.codex.newtask') }}</span>
-                      </button>
-                    </li>
-                    <li>
-                      <button type="button" class="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-left text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/[0.02] transition-all">
-                        <Icon name="clock" class="h-4 w-4" />
-                        <span>{{ t('home.codex.scheduled') }}</span>
-                      </button>
-                    </li>
-                    <li>
-                      <button type="button" class="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-left text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/[0.02] transition-all">
-                        <Icon name="swap" class="h-4 w-4" />
-                        <span>{{ t('home.codex.plugins') }}</span>
-                      </button>
-                    </li>
-                  </ul>
-                </div>
-
-                <!-- Footer options -->
-                <div class="pt-4 border-t border-white/[0.04] flex items-center justify-between text-gray-400">
-                  <div class="flex items-center gap-2">
-                    <div class="h-5 w-5 rounded-full bg-white/[0.06] flex items-center justify-center text-[10px] font-bold text-white font-mono">U</div>
-                    <span class="text-xs">{{ t('home.codex.settings') }}</span>
-                  </div>
-                  <Icon name="download" class="h-4 w-4" />
-                </div>
-              </aside>
-
-              <!-- Codex Right Interactive Chat Area -->
-              <section class="lg:col-span-7 p-6 flex flex-col justify-between">
-                <!-- Chat top stats banner -->
-                <div class="flex items-center justify-between pb-4 border-b border-white/[0.06]">
-                  <div class="flex items-center gap-2">
-                    <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
-                    <span class="text-xs font-bold text-white">{{ t('home.codex.tasks') }}</span>
-                  </div>
-                  <span class="text-[10px] font-mono text-gray-500">Connection: SECURE</span>
-                </div>
-
-                <div class="flex flex-wrap gap-2 py-4 border-b border-white/[0.06]">
-                  <button v-for="task in codexTasks" :key="task.id" @click="activeCodexTask = task.id" class="rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors" :class="activeCodexTask === task.id ? 'bg-primary-500 text-white' : 'bg-white/[0.04] text-gray-400 hover:text-white'">{{ task.label }}</button>
-                </div>
-
-                <!-- Messages area -->
-                <div class="my-6 space-y-6 flex-1 flex flex-col justify-end text-left">
-                  <!-- User message bubble -->
-                  <div class="flex items-start gap-4 max-w-xl">
-                    <div class="h-8 w-8 rounded-full bg-white/[0.08] flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
-                      U
-                    </div>
-                    <div class="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 text-xs text-gray-300 leading-relaxed">
-                      {{ activeTask.prompt }}
-                    </div>
-                  </div>
-
-                  <!-- Assistant typewriter bubble -->
-                  <div class="flex items-start gap-4 max-w-xl">
-                    <div class="h-8 w-8 rounded-full bg-primary-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
-                      C
-                    </div>
-                    <div class="rounded-2xl border border-primary-500/20 bg-primary-500/[0.02] p-4 text-xs text-white leading-relaxed font-mono relative">
-                      <span>{{ activeTask.response }}</span>
-                      <span class="inline-block w-1.5 h-4 bg-primary-500 ml-1 animate-pulse"></span>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="mb-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-left">
-                  <div class="flex items-center justify-between text-[11px] text-gray-400"><span>{{ activeTask.status }}</span><span class="font-mono text-emerald-400">{{ t('home.codex.apiConnected') }}</span></div>
-                  <div class="mt-2 flex items-center gap-2 text-[10px] text-gray-500"><span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>{{ t('home.codex.streamingResponse') }}</div>
-                </div>
-
-                <!-- Bottom input interface -->
-                <div class="pt-4 border-t border-white/[0.06] flex items-center justify-between gap-4">
-                  <div class="flex-1 relative">
-                    <input
-                      type="text"
-                      readonly
-                      :placeholder="t('home.codex.inputPlaceholder')"
-                      class="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl px-4 py-2.5 text-xs text-gray-400 focus:outline-none"
-                    />
-                    <div class="absolute right-3 top-1.5 flex items-center gap-2">
-                      <span class="text-[9px] font-bold text-primary-400 bg-primary-500/10 px-2 py-0.5 rounded-full">{{ t('home.codex.fullAccess') }}</span>
-                      <span class="text-[10px] font-semibold text-white">{{ t('home.codex.demoGpt') }}</span>
-                    </div>
-                  </div>
-
-                  <button class="p-2.5 rounded-xl bg-gradient-primary text-white shadow-glow hover:opacity-90 transition-all">
-                    <Icon name="arrowRight" class="h-4 w-4" />
-                  </button>
-                </div>
-              </section>
-              <aside class="hidden lg:block lg:col-span-2 border-l border-white/[0.06] bg-dark-950/30 p-4 text-left">
-                <div class="flex items-center justify-between mb-5"><span class="text-xs font-semibold text-gray-300">{{ t('home.codex.envInfo') }}</span><span class="text-gray-500">＋</span></div>
-                <div class="space-y-3 text-[11px] text-gray-400">
-                  <div class="flex items-center justify-between"><span>{{ t('home.codex.envChanges') }}</span><span class="text-emerald-400">+181</span></div>
-                  <div class="flex items-center justify-between"><span>{{ t('home.codex.envLocal') }}</span><span></span></div>
-                  <div class="flex items-center justify-between"><span>main</span><span></span></div>
-                  <div class="border-t border-white/[0.06] pt-3"><span class="text-gray-500">{{ t('home.codex.envBackground') }}</span><p class="mt-2 text-gray-300">pnpm dev</p></div>
-                  <div class="border-t border-white/[0.06] pt-3"><span class="text-gray-500">{{ t('home.codex.envBrowser') }}</span><p class="mt-2 text-gray-300">Home · 3API</p></div>
-                </div>
-              </aside>
-            </div>
-          </div>
-        </section>
-
-        <!-- Testimonials Loop Marquee Section -->
-        <section class="mb-32 overflow-hidden relative">
-          <div class="text-center max-w-2xl mx-auto mb-16 reveal">
-            <h2 class="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              {{ t('home.testimonials.title') }}
-            </h2>
-            <p class="text-slate-600 dark:text-gray-400 mt-4 text-base">
-              {{ t('home.testimonials.subtitle') }}
-            </p>
-          </div>
-
-          <!-- Scrolling container with gradient edges -->
-          <div class="relative w-full">
-            <div class="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-slate-50 dark:from-dark-950 to-transparent z-10 pointer-events-none"></div>
-            <div class="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-slate-50 dark:from-dark-950 to-transparent z-10 pointer-events-none"></div>
-
-            <div class="flex gap-6 py-4 animate-marquee hover:[animation-play-state:paused]">
-              <!-- First loop -->
-              <div
-                v-for="(item, idx) in reviewsList"
-                :key="'rev-1-' + idx"
-                class="w-[320px] shrink-0 card-premium p-6 text-left flex flex-col justify-between"
-              >
-                <p class="text-xs text-slate-600 dark:text-gray-400 italic mb-6 leading-relaxed">
-                  "{{ item.text }}"
-                </p>
-                <div class="flex items-center gap-3">
-                  <div class="h-8 w-8 rounded-full bg-primary-500/20 text-primary-400 flex items-center justify-center font-bold text-xs font-mono">
-                    {{ item.avatar }}
-                  </div>
+                </li>
+                <li class="panel__step is-done">
+                  <span class="panel__node" />
                   <div>
-                    <h4 class="text-xs font-bold text-slate-800 dark:text-white">{{ item.name }}</h4>
-                    <p class="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5">{{ item.role }}</p>
+                    <p>填写联系方式</p>
+                    <small>仅用于查单与售后</small>
                   </div>
-                </div>
-              </div>
-
-              <!-- Duplicate loop for seamless scroll -->
-              <div
-                v-for="(item, idx) in reviewsList"
-                :key="'rev-2-' + idx"
-                class="w-[320px] shrink-0 card-premium p-6 text-left flex flex-col justify-between"
-              >
-                <p class="text-xs text-slate-600 dark:text-gray-400 italic mb-6 leading-relaxed">
-                  "{{ item.text }}"
-                </p>
-                <div class="flex items-center gap-3">
-                  <div class="h-8 w-8 rounded-full bg-primary-500/20 text-primary-400 flex items-center justify-center font-bold text-xs font-mono">
-                    {{ item.avatar }}
-                  </div>
+                </li>
+                <li class="panel__step is-active">
+                  <span class="panel__node" />
                   <div>
-                    <h4 class="text-xs font-bold text-slate-800 dark:text-white">{{ item.name }}</h4>
-                    <p class="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5">{{ item.role }}</p>
+                    <p>提交登录凭证</p>
+                    <small>支付后随时可补交</small>
                   </div>
-                </div>
-              </div>
+                </li>
+                <li class="panel__step">
+                  <span class="panel__node" />
+                  <div>
+                    <p>到账完成</p>
+                    <small>平均 1-3 分钟</small>
+                  </div>
+                </li>
+              </ol>
             </div>
-          </div>
-        </section>
+          </aside>
+        </div>
+      </section>
 
-        <!-- Supported Providers Marquee -->
-        <section class="mb-32 overflow-hidden relative">
-          <div class="text-center max-w-2xl mx-auto mb-12 reveal">
-            <h2 class="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-              {{ t('home.providers.title') }}
-            </h2>
-          </div>
-
-          <div class="relative w-full">
-            <div class="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-slate-50 dark:from-dark-950 to-transparent z-10 pointer-events-none"></div>
-            <div class="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-slate-50 dark:from-dark-950 to-transparent z-10 pointer-events-none"></div>
-
-            <div class="flex gap-8 py-2 animate-marquee hover:[animation-play-state:paused]">
-              <!-- First loop -->
-              <div
-                v-for="(item, idx) in topModels"
-                :key="'model-1-' + idx"
-                class="flex items-center gap-2.5 px-5 py-2.5 rounded-full border border-slate-200 bg-slate-100/50 dark:border-white/[0.04] dark:bg-white/[0.01]"
-              >
-                <img :src="item.logo" alt="Model Logo" class="h-4 w-4 opacity-70" />
-                <span class="text-xs font-bold text-slate-700 dark:text-gray-300 font-mono">{{ item.name }}</span>
-              </div>
-
-              <!-- Duplicate loop -->
-              <div
-                v-for="(item, idx) in topModels"
-                :key="'model-2-' + idx"
-                class="flex items-center gap-2.5 px-5 py-2.5 rounded-full border border-slate-200 bg-slate-100/50 dark:border-white/[0.04] dark:bg-white/[0.01]"
-              >
-                <img :src="item.logo" alt="Model Logo" class="h-4 w-4 opacity-70" />
-                <span class="text-xs font-bold text-slate-700 dark:text-gray-300 font-mono">{{ item.name }}</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- Bottom CTA -->
-        <section class="reveal">
-          <div class="card-premium p-12 text-center max-w-3xl mx-auto relative overflow-hidden">
-
-            <h2 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-4">
-              {{ t('home.cta.title') }}
-            </h2>
-            <p class="text-slate-600 dark:text-gray-400 text-sm max-w-lg mx-auto mb-8 leading-relaxed">
-              {{ t('home.cta.description') }}
+      <section class="metrics">
+        <div class="metrics__inner">
+          <div v-for="item in METRICS" :key="item.label" class="metric">
+            <p class="metric__value">
+              {{ item.value }}<span>{{ item.unit }}</span>
             </p>
-
-            <router-link
-              :to="isAuthenticated ? dashboardPath : '/login'"
-              class="btn rounded-full bg-gradient-primary px-10 py-4 text-base font-bold text-white shadow-glow hover:scale-[1.02] active:scale-[0.98] transition-all inline-flex"
-            >
-              <span>{{ isAuthenticated ? t('home.cta.goToDashboard') : t('home.cta.button') }}</span>
-              <Icon name="arrowRight" class="h-5 w-5" />
-            </router-link>
-          </div>
-        </section>
-
-      </main>
-
-      <!-- Footer Section -->
-      <footer class="max-w-6xl mx-auto px-4 md:px-6 py-10 border-t border-slate-200/80 dark:border-white/[0.06] relative z-10">
-        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400 dark:text-gray-500">
-          <p>© {{ new Date().getFullYear() }} {{ siteName }}. {{ t('home.footer.allRightsReserved') }}</p>
-          <div class="flex flex-wrap items-center justify-center gap-4">
-            <router-link to="/api-relay" class="hover:text-slate-600 dark:hover:text-gray-300 transition-colors">API 中转站</router-link>
-            <router-link to="/claude-code-api" class="hover:text-slate-600 dark:hover:text-gray-300 transition-colors">Claude Code</router-link>
-            <router-link to="/codex-api" class="hover:text-slate-600 dark:hover:text-gray-300 transition-colors">Codex</router-link>
-            <router-link to="/cursor-api-key" class="hover:text-slate-600 dark:hover:text-gray-300 transition-colors">Cursor</router-link>
-            <router-link to="/openai-api" class="hover:text-slate-600 dark:hover:text-gray-300 transition-colors">OpenAI API</router-link>
-            <router-link to="/token-guide" class="hover:text-slate-600 dark:hover:text-gray-300 transition-colors">Token 指南</router-link>
-            <router-link to="/compute-company" class="hover:text-slate-600 dark:hover:text-gray-300 transition-colors">渠道合作</router-link>
-            <a v-if="docUrl" :href="docUrl" target="_blank" rel="noopener noreferrer" class="hover:text-slate-600 dark:hover:text-gray-300 transition-colors">
-              {{ t('home.docs') }}
-            </a>
+            <p class="metric__label">{{ item.label }}</p>
           </div>
         </div>
-      </footer>
+      </section>
+
+      <section v-if="banners.length" class="banners">
+        <div class="section__inner">
+          <div class="banners__track">
+            <article v-for="banner in banners" :key="banner.id" class="banner">
+              <div v-if="banner.image_url" class="banner__media">
+                <img :src="resolveShopAssetUrl(banner.image_url)" :alt="banner.title" loading="lazy">
+              </div>
+              <div class="banner__body">
+                <h3 class="banner__title">{{ banner.title }}</h3>
+                <p v-if="banner.subtitle" class="banner__subtitle">{{ banner.subtitle }}</p>
+                <button
+                  v-if="banner.product_id"
+                  type="button"
+                  class="banner__cta"
+                  @click="openBannerProduct(banner.product_id)"
+                >
+                  {{ banner.button_text || '立即查看' }}
+                </button>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="plans" class="plans">
+        <div class="section__inner">
+          <header class="section__head">
+            <h2 class="section__title">选择套餐</h2>
+            <p class="section__desc">价格以支付前页面显示为准，支持支付宝与微信支付</p>
+          </header>
+
+          <div v-if="availableTabs.length" class="sh-tabs">
+            <div class="sh-tabs__track" role="tablist">
+              <button
+                v-for="tab in availableTabs"
+                :key="tab.value"
+                type="button"
+                role="tab"
+                class="sh-tabs__item"
+                :class="{ 'sh-tabs__item--active': activeTab === tab.value }"
+                :aria-selected="activeTab === tab.value"
+                @click="activeTab = tab.value"
+              >
+                {{ tab.label }}
+              </button>
+            </div>
+            <p v-if="activeTabBlurb" class="sh-tabs__blurb">{{ activeTabBlurb }}</p>
+          </div>
+
+          <div v-if="loading" class="plans__grid">
+            <div v-for="i in 3" :key="i" class="sh-skeleton" />
+          </div>
+
+          <div v-else-if="visibleProducts.length" class="plans__grid">
+            <PlanCard
+              v-for="product in visibleProducts"
+              :key="product.id"
+              :product="product"
+              :show-commission="isLoggedIn"
+              :aff-code="affCode"
+              @select="openSheet"
+            />
+          </div>
+
+          <div v-else class="empty">
+            <p class="empty__title">这个分类的套餐正在准备中</p>
+            <p class="empty__desc">可以先看看其他分类，或联系客服咨询</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="workflow" class="workflow">
+        <div class="section__inner">
+          <header class="section__head">
+            <h2 class="section__title">三步完成充值</h2>
+            <p class="section__desc">先选套餐付款，再补交凭证，全程不需要账号密码</p>
+          </header>
+
+          <div class="workflow__grid">
+            <article class="step">
+              <span class="step__num">01</span>
+              <h3>选择套餐</h3>
+              <p>在上方选择代充值、成品号或租号，确认价格与服务说明</p>
+            </article>
+            <article class="step">
+              <span class="step__num">02</span>
+              <h3>留联系方式并支付</h3>
+              <p>填写手机号或邮箱用于查单与售后，选择支付宝或微信完成支付</p>
+            </article>
+            <article class="step">
+              <span class="step__num">03</span>
+              <h3>提交信息等待到账</h3>
+              <p>代充值粘贴登录凭证，成品号与租号留接收邮箱，随后等待交付</p>
+            </article>
+          </div>
+
+          <div class="guide-wrap">
+            <div class="guide-wrap__head">
+              <h3>怎么拿到登录凭证</h3>
+              <p>四步搞定，复制粘贴即可，不需要懂技术</p>
+            </div>
+            <SessionGuide />
+          </div>
+        </div>
+      </section>
+
+      <section class="compare">
+        <div class="section__inner">
+          <header class="section__head">
+            <h2 class="section__title">三种方式怎么选</h2>
+            <p class="section__desc">一张表看懂差异</p>
+          </header>
+          <div class="sh-table-wrap">
+            <table class="sh-table">
+              <thead>
+                <tr>
+                  <th />
+                  <th>代充值</th>
+                  <th>成品号</th>
+                  <th>租号</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in COMPARISON" :key="row.label">
+                  <th scope="row">{{ row.label }}</th>
+                  <td>{{ row.topup }}</td>
+                  <td>{{ row.account }}</td>
+                  <td>{{ row.rental }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="assurance">
+        <div class="section__inner">
+          <header class="section__head">
+            <h2 class="section__title">服务保障</h2>
+            <p class="section__desc">流程写清楚，售后才有据可依</p>
+          </header>
+          <div class="assurance__grid">
+            <article v-for="item in ASSURANCE" :key="item.title" class="assurance__card">
+              <h3>{{ item.title }}</h3>
+              <p>{{ item.desc }}</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="faq" class="faq">
+        <div class="section__inner section__inner--narrow">
+          <header class="section__head">
+            <h2 class="section__title">常见问题</h2>
+            <p class="section__desc">下单前最常被问到的几件事</p>
+          </header>
+          <div class="faq__list">
+            <div
+              v-for="(item, index) in FAQ_ITEMS"
+              :key="item.q"
+              class="faq__item"
+              :class="{ 'faq__item--open': openFaq === index }"
+            >
+              <button type="button" class="faq__q" @click="openFaq = openFaq === index ? null : index">
+                <span>{{ item.q }}</span>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+                  <path d="M4 6.5l4 4 4-4" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+              <p v-if="openFaq === index" class="faq__a">{{ item.a }}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="closing">
+        <div class="section__inner section__inner--narrow closing__inner">
+          <h2>准备好开始了吗</h2>
+          <p>选择套餐后支付，1-3 分钟内完成。需要帮助随时联系客服。</p>
+          <div class="closing__actions">
+            <a class="sh-btn sh-btn--primary" href="#plans">选择套餐</a>
+            <RouterLink class="sh-btn sh-btn--ghost" to="/order">查询订单</RouterLink>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer__inner">
+        <div class="footer__brand">
+          <span class="nav__mark">3</span>
+          <p>3API · ChatGPT 充值与成品号服务</p>
+        </div>
+        <div class="footer__cols">
+          <div>
+            <h4>服务</h4>
+            <a href="#plans">代充值</a>
+            <a href="#plans">成品号</a>
+            <a href="#plans">租号</a>
+          </div>
+          <div>
+            <h4>帮助</h4>
+            <RouterLink to="/order">查订单</RouterLink>
+            <a href="#workflow">充值流程</a>
+            <a href="#faq">常见问题</a>
+          </div>
+          <div>
+            <h4>开发者</h4>
+            <RouterLink to="/api-relay">API 中转</RouterLink>
+            <RouterLink to="/openai-api">OpenAI 接入</RouterLink>
+            <RouterLink to="/login">控制台登录</RouterLink>
+          </div>
+          <div v-if="contactInfo">
+            <h4>客服</h4>
+            <p class="footer__contact">{{ contactInfo }}</p>
+          </div>
+        </div>
+      </div>
+      <p class="footer__legal">
+        本站为独立第三方服务平台，非 OpenAI 或 ChatGPT 官方网站，与相关官方主体不存在授权、代理或合作关系。
+      </p>
+    </footer>
+
+    <div class="mobile-cta">
+      <a href="#plans">立即充值</a>
     </div>
+
+    <OrderSheet
+      :open="sheetOpen"
+      :product="selectedProduct"
+      :payment-methods="sheetPaymentMethods"
+      :submitting="submitting"
+      @close="sheetOpen = false"
+      @submit="handleSubmit"
+    />
+
+    <BaseDialog :show="payDialog.open" title="请完成支付" width="narrow" @close="closePayDialog">
+      <PaymentStatusPanel
+        v-if="payDialog.open"
+        :order-id="payDialog.orderId"
+        :qr-code="payDialog.qrCode"
+        :expires-at="payDialog.expiresAt"
+        :payment-type="payDialog.paymentType"
+        :pay-url="payDialog.payUrl"
+        order-type="shop"
+        @done="closePayDialog"
+        @success="handlePaymentSuccess"
+      />
+    </BaseDialog>
   </div>
 </template>
 
-<script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useAuthStore, useAppStore } from '@/stores'
-import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
-import Icon from '@/components/icons/Icon.vue'
-import { sanitizeUrl } from '@/utils/url'
-import { PRODUCT_NAME } from '@/constants/brand'
-import { useTheme } from '@/composables/useTheme'
-import { hasBrowserAuthBootstrapHint } from '@/router/authBootstrap'
-import DOMPurify from 'dompurify'
-
-const { t, locale } = useI18n()
-
-const authStore = useAuthStore()
-const appStore = useAppStore()
-const { isDark, toggleTheme, syncThemeFromDOM } = useTheme()
-
-const topModels = [
-  { name: 'GPT', logo: '/logos/openai.svg' },
-  { name: 'Claude', logo: '/logos/claude.svg' },
-  { name: 'Gemini', logo: '/logos/gemini.svg' },
-  { name: 'Qwen', logo: '/logos/qwen.svg' },
-  { name: 'DeepSeek', logo: '/logos/deepseek.svg' },
-  { name: 'GLM', logo: '/logos/zhipu.svg' },
-  { name: 'Kimi', logo: '/logos/kimi.svg' },
-  { name: 'MINIMAX', logo: '/logos/minimax.svg' },
-  { name: 'GROK', logo: '/logos/grok.svg' },
-  { name: 'Muse Spark', logo: '/logos/meta.svg' }
-]
-
-const isCcsImported = ref(false)
-
-const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || PRODUCT_NAME)
-const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || t('home.heroDesc'))
-const showSiteSubtitle = computed(() => {
-  if (!String(locale.value).toLowerCase().startsWith('zh')) return true
-  return !/^AI API gateway for unified model access$/i.test(siteSubtitle.value.trim())
-})
-const siteLogo = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
-const docUrl = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.doc_url || appStore.docUrl || ''))
-const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
-
-const isHomeContentUrl = computed(() => {
-  const content = homeContent.value.trim()
-  return content.startsWith('https://') || (!import.meta.env.PROD && content.startsWith('http://'))
-})
-
-const homeContentUrl = computed(() => {
-  if (!isHomeContentUrl.value) return ''
-  return sanitizeUrl(homeContent.value.trim())
-})
-
-const sanitizedHomeContent = computed(() => DOMPurify.sanitize(homeContent.value, {
-  USE_PROFILES: { html: true },
-  FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'link', 'meta'],
-  FORBID_ATTR: ['style', 'srcdoc']
-}))
-
-const isAuthenticated = computed(() => authStore.isAuthenticated)
-const isAdmin = computed(() => authStore.isAdmin)
-const dashboardPath = computed(() => isAdmin.value ? '/admin/dashboard' : '/dashboard')
-
-
-const activeCodexTask = ref('website')
-const codexTasks = computed(() => [
-  { id: 'website', label: t('home.codex.taskWebsite'), prompt: t('home.codex.promptWebsite'), response: t('home.codex.responseWebsite'), status: 'Building responsive interface', progress: 86 },
-  { id: 'video', label: t('home.codex.taskVideo'), prompt: t('home.codex.promptVideo'), response: t('home.codex.responseVideo'), status: 'Rendering storyboard preview', progress: 72 },
-  { id: 'game', label: t('home.codex.taskGame'), prompt: t('home.codex.promptGame'), response: t('home.codex.responseGame'), status: 'Running gameplay tests', progress: 64 }
-])
-const activeTask = computed(() => codexTasks.value.find((task) => task.id === activeCodexTask.value) || codexTasks.value[0])
-let codexTaskTimer: ReturnType<typeof setInterval> | undefined
-const step2Tab = ref('api')
-
-const reviewsList = computed(() => [
-  { avatar: t('home.reviews.review1Avatar'), name: t('home.reviews.review1Name'), role: t('home.reviews.review1Role'), text: t('home.reviews.review1Text') },
-  { avatar: t('home.reviews.review2Avatar'), name: t('home.reviews.review2Name'), role: t('home.reviews.review2Role'), text: t('home.reviews.review2Text') },
-  { avatar: t('home.reviews.review3Avatar'), name: t('home.reviews.review3Name'), role: t('home.reviews.review3Role'), text: t('home.reviews.review3Text') },
-  { avatar: t('home.reviews.review4Avatar'), name: t('home.reviews.review4Name'), role: t('home.reviews.review4Role'), text: t('home.reviews.review4Text') }
-])
-
-onMounted(() => {
-  syncThemeFromDOM()
-
-  if (hasBrowserAuthBootstrapHint()) {
-    authStore.checkAuth()
-  }
-
-  if (!appStore.publicSettingsLoaded) {
-    appStore.fetchPublicSettings()
-  }
-
-  // Scroll Entrance Reveal Observer
-  const revealElements = document.querySelectorAll('.reveal')
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('active')
-        observer.unobserve(entry.target)
-      }
-    })
-  }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' })
-
-  revealElements.forEach((el) => {
-    const rect = el.getBoundingClientRect()
-    if (rect.top < window.innerHeight * 0.95 && rect.bottom > 0) {
-      el.classList.add('active')
-      return
-    }
-    observer.observe(el)
-  })
-
-  codexTaskTimer = setInterval(() => {
-    const currentIndex = codexTasks.value.findIndex((task) => task.id === activeCodexTask.value)
-    activeCodexTask.value = codexTasks.value[(currentIndex + 1) % codexTasks.value.length].id
-  }, 5200)
-})
-
-onUnmounted(() => {
-  if (codexTaskTimer) clearInterval(codexTaskTimer)
-})
-</script>
-
 <style scoped>
-/* Keyframes */
-@keyframes marquee {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+/* ============================================================
+   设计令牌 —— 明暗双主题
+   浅色：白底 + 中性灰阶 + 极低饱和描边（Stripe 式克制）
+   深色：近黑表面 + hairline 描边（Linear 式）
+   强调色全站仅一个：品牌橙，只用于 CTA / 激活态 / 小标记
+   ============================================================ */
+.sales-home {
+  --sh-bg: #ffffff;
+  --sh-surface: #ffffff;
+  --sh-surface-2: #f6f6f7;
+  --sh-border: rgba(9, 9, 11, 0.08);
+  --sh-border-strong: rgba(9, 9, 11, 0.16);
+  --sh-text: #09090b;
+  --sh-text-2: #56565f;
+  --sh-text-3: #8a8a93;
+  --sh-accent: #d85a28;
+  --sh-accent-hover: #c04f21;
+  --sh-accent-fg: #ffffff;
+  --sh-accent-soft: rgba(216, 90, 40, 0.08);
+  --sh-accent-text: #b34b1f;
+  --sh-grid: rgba(9, 9, 11, 0.05);
+  --sh-scrim: rgba(9, 9, 11, 0.55);
+  --sh-shadow: 0 1px 2px rgba(9, 9, 11, 0.04), 0 1px 3px rgba(9, 9, 11, 0.04);
+
+  min-height: 100vh;
+  background: var(--sh-bg);
+  color: var(--sh-text);
+  font-family: inherit;
+  -webkit-font-smoothing: antialiased;
 }
 
-@keyframes particleFlow {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+
+.section__inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px;
 }
 
-/* Animations classes */
-.animate-marquee {
-  display: flex;
-  width: max-content;
-  animation: marquee 30s linear infinite;
+.section__inner--narrow {
+  max-width: 760px;
 }
 
-.particle-anim-bar {
-  animation: particleFlow 1.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+.section__head {
+  margin-bottom: 40px;
+  max-width: 640px;
 }
 
-/* Scroll reveal styling */
-.reveal {
-  opacity: 0;
-  transform: translateY(24px);
-  transition: opacity 800ms cubic-bezier(0.16, 1, 0.3, 1), transform 800ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.reveal.active {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.delay-100 {
-  transition-delay: 100ms;
-}
-
-.delay-200 {
-  transition-delay: 200ms;
-}
-
-/* Vue Slide Transition */
-.fade-slide-enter-active,
-.fade-slide-leave-active {
-  transition: all 400ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.fade-slide-enter-from {
-  opacity: 0;
-  transform: translateY(12px) scale(0.98);
-}
-
-.fade-slide-leave-to {
-  opacity: 0;
-  transform: translateY(-12px) scale(0.98);
-}
-
-/* Precision infrastructure visual language */
-.home-redesign {
-  --home-paper: #f5f4f0;
-  --home-surface: #fffefa;
-  --home-ink: #1b1d20;
-  --home-muted: #6f726f;
-  --home-line: #deddd7;
-  --home-brand: #d85a28;
-  --home-brand-strong: #b9471d;
-  --home-soft: rgba(216, 90, 40, 0.09);
-  background: var(--home-paper) !important;
-  color: var(--home-ink);
-}
-
-.dark .home-redesign {
-  --home-paper: #101214;
-  --home-surface: #181b1e;
-  --home-ink: #f7f4ee;
-  --home-muted: #a5a6a1;
-  --home-line: rgba(255, 255, 255, 0.13);
-  --home-brand: #e26a35;
-  --home-brand-strong: #f0834c;
-  --home-soft: rgba(226, 106, 53, 0.14);
-}
-
-.home-redesign .home-atmosphere {
-  background-image: linear-gradient(rgba(102, 106, 101, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(102, 106, 101, 0.05) 1px, transparent 1px);
-  background-size: 34px 34px;
-  mask-image: linear-gradient(to bottom, black, transparent 85%);
-  opacity: 0.8;
-  animation: gridMove 25s linear infinite;
-}
-
-.dark .home-redesign .home-atmosphere {
-  background-image: linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-  opacity: 0.3;
-}
-
-@keyframes gridMove {
-  0% { background-position: 0 0; }
-  100% { background-position: 34px 34px; }
-}
-
-.home-redesign .home-header nav {
-  border-radius: 8px;
-  border-color: var(--home-line);
-  background: color-mix(in srgb, var(--home-paper) 88%, transparent);
-  box-shadow: 0 14px 40px rgba(28, 30, 31, 0.08);
-}
-
-.home-redesign .home-header nav > div:first-child img {
-  border-radius: 5px;
-}
-
-.home-redesign .home-eyebrow {
-  color: var(--home-brand);
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 0.7rem;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.home-redesign .text-gradient {
-  background: none !important;
-  color: var(--home-brand) !important;
-  -webkit-text-fill-color: currentColor;
-}
-
-.home-redesign .home-hero h1 {
-  max-width: 9ch;
-  letter-spacing: -0.065em;
-  line-height: 0.98;
-  text-wrap: balance;
-}
-
-.home-redesign .home-hero p {
-  max-width: 36rem;
-  color: var(--home-muted);
-}
-
-.home-redesign .home-hero .bg-gradient-primary,
-.home-redesign .home-hero .btn.bg-gradient-primary,
-.home-redesign .home-hero a.bg-gradient-primary {
-  background: var(--home-brand) !important;
-  box-shadow: 0 12px 26px rgba(216, 90, 40, 0.2) !important;
-}
-
-.home-redesign .home-hero .bg-gradient-primary:hover,
-.home-redesign .home-hero .btn.bg-gradient-primary:hover,
-.home-redesign .home-hero a.bg-gradient-primary:hover {
-  background: var(--home-brand-strong) !important;
-}
-
-.home-routing-console {
-  overflow: hidden;
-  min-height: 26rem;
-  border: 1px solid var(--home-line);
-  background: var(--home-surface);
-  color: var(--home-ink);
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.04);
-}
-
-.home-routing-console::before {
-  content: '';
-  display: block;
-  height: 4px;
-  background: var(--home-brand);
-}
-
-.home-console-head,
-.home-console-body {
-  display: grid;
-}
-
-.home-console-head {
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem 1.15rem;
-  border-bottom: 1px solid var(--home-line);
-  color: var(--home-muted);
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 0.7rem;
-}
-
-.home-console-dot {
-  width: 0.45rem;
-  height: 0.45rem;
-  border-radius: 999px;
-  background: #10b981;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
-}
-
-.home-console-live {
-  color: #10b981;
-}
-
-.home-console-body {
-  grid-template-columns: 0.82fr 1.18fr;
-  min-height: 22rem;
-}
-
-.home-console-request,
-.home-console-routes {
-  padding: 1.15rem;
-}
-
-.home-console-request {
-  display: grid;
-  align-content: space-between;
-  gap: 0.8rem;
-  border-right: 1px solid var(--home-line);
-}
-
-.home-console-request strong {
-  font-size: 1.05rem;
-  letter-spacing: -0.02em;
-}
-
-.home-request-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.65rem;
-  padding-block: 0.5rem;
-  border-bottom: 1px solid var(--home-line);
-  color: var(--home-muted);
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 0.75rem;
-}
-
-.home-request-row code {
-  color: var(--home-brand);
+.section__title {
+  font-size: 30px;
   font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--sh-text);
 }
 
-.home-console-trace {
-  color: var(--home-muted);
-  opacity: 0.6;
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 0.7rem;
-}
-
-.home-console-routes {
-  display: grid;
-  align-content: center;
-  gap: 0.65rem;
-}
-
-.home-route {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.65rem;
-  min-height: 2.9rem;
-  padding: 0.6rem 0.65rem;
-  border: 1px solid var(--home-line);
-  border-radius: 6px;
-  color: var(--home-ink);
-  font-size: 0.78rem;
-  text-decoration: none;
-  transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
-}
-
-.home-route:hover {
-  border-color: var(--home-brand);
-  background: var(--home-soft);
-  transform: translateY(-1px);
-}
-
-.home-route strong {
-  color: var(--home-brand);
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 0.7rem;
-  font-weight: 600;
-}
-
-.home-route-active {
-  border-color: var(--home-brand);
-  background: var(--home-soft);
-}
-
-.home-provider-mark {
-  display: grid;
-  width: 1.15rem;
-  height: 1.15rem;
-  place-items: center;
-  border: 1px solid currentColor;
-  border-radius: 50%;
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 0.65rem;
-}
-
-.home-business {
-  position: relative;
-}
-
-.home-section-intro {
-  max-width: 42rem;
-  margin-bottom: 2rem;
-}
-
-.home-section-intro h2 {
-  margin: 0.55rem 0 0.7rem;
-  font-size: clamp(2rem, 4vw, 3.25rem);
-  letter-spacing: -0.05em;
-  line-height: 1.02;
-  text-wrap: balance;
-}
-
-.home-section-intro p {
-  max-width: 38rem;
-  margin: 0;
-  color: var(--home-muted);
+.section__desc {
+  margin-top: 10px;
+  font-size: 15px;
   line-height: 1.7;
+  color: var(--sh-text-2);
 }
 
-.home-business-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
-  gap: 0.8rem;
+.eyebrow {
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: var(--sh-text-3);
 }
 
-.home-business-card {
-  display: grid;
-  gap: 1.6rem;
-  min-height: 31rem;
-  padding: clamp(1.2rem, 3vw, 2.25rem);
-  overflow: hidden;
-  border: 1px solid var(--home-line);
-  border-radius: 8px;
-  background: var(--home-surface);
-  color: var(--home-ink);
-  text-decoration: none;
-  box-shadow: 0 16px 48px rgba(26, 28, 30, 0.06);
-  transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+/* ---------- nav ---------- */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  border-bottom: 1px solid var(--sh-border);
+  background: color-mix(in srgb, var(--sh-bg) 82%, transparent);
+  backdrop-filter: saturate(180%) blur(14px);
 }
 
-.home-business-card:hover {
-  transform: translateY(-3px);
-  border-color: color-mix(in srgb, var(--home-brand) 42%, var(--home-line));
-  box-shadow: 0 24px 62px rgba(26, 28, 30, 0.11);
-}
-
-.home-business-copy {
-  max-width: 27rem;
-}
-
-.home-business-copy h3 {
-  margin: 0.65rem 0 0.7rem;
-  font-size: clamp(1.45rem, 2.5vw, 2.25rem);
-  letter-spacing: -0.045em;
-  line-height: 1.05;
-}
-
-.home-business-copy p {
-  margin: 0;
-  color: var(--home-muted);
-  line-height: 1.65;
-}
-
-.home-business-link {
-  display: inline-flex;
+.nav__inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 60px;
+  display: flex;
   align-items: center;
-  gap: 0.4rem;
-  margin-top: 1.1rem;
-  color: var(--home-brand-strong);
-  font-size: 0.82rem;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.nav__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.nav__mark {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--sh-text);
+  color: var(--sh-bg);
+  font-size: 14px;
   font-weight: 600;
 }
 
-.home-business-link svg {
-  width: 1rem;
-  height: 1rem;
-  transition: transform 180ms ease;
+.nav__name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--sh-text);
+  letter-spacing: -0.01em;
 }
 
-.home-business-card:hover .home-business-link svg {
-  transform: translateX(3px);
+.nav__links {
+  display: flex;
+  gap: 28px;
+  font-size: 14px;
 }
 
-.home-tenant-preview {
-  align-self: end;
-  overflow: hidden;
-  border: 1px solid var(--home-line);
-  border-radius: 6px;
-  background: var(--home-paper);
+.nav__links a {
+  color: var(--sh-text-2);
+  text-decoration: none;
+  transition: color 160ms ease-out;
 }
 
-.home-preview-toolbar {
+.nav__links a:hover {
+  color: var(--sh-text);
+}
+
+.nav__actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
-  padding: 0.7rem 0.8rem;
-  border-bottom: 1px solid var(--home-line);
-  color: var(--home-muted);
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 0.65rem;
-  letter-spacing: 0.08em;
+  gap: 14px;
 }
 
-.home-status-chip {
-  padding: 0.25rem 0.4rem;
-  border-radius: 3px;
-  background: rgba(40, 151, 101, 0.12);
-  color: #258d61;
+.nav__ghost {
+  font-size: 14px;
+  color: var(--sh-text-2);
+  text-decoration: none;
+  transition: color 160ms ease-out;
 }
 
-.home-preview-grid {
+.nav__ghost:hover {
+  color: var(--sh-text);
+}
+
+.nav__cta {
+  padding: 8px 15px;
+  border-radius: 8px;
+  background: var(--sh-accent);
+  color: var(--sh-accent-fg);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 160ms ease-out;
+}
+
+.nav__cta:hover {
+  background: var(--sh-accent-hover);
+}
+
+/* ---------- hero ---------- */
+.hero {
+  position: relative;
+  padding: 104px 0 80px;
+  overflow: hidden;
+}
+
+.hero__grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--sh-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--sh-grid) 1px, transparent 1px);
+  background-size: 68px 68px;
+  -webkit-mask-image: radial-gradient(ellipse 90% 62% at 50% 0%, #000 0%, transparent 72%);
+  mask-image: radial-gradient(ellipse 90% 62% at 50% 0%, #000 0%, transparent 72%);
+  pointer-events: none;
+}
+
+.hero__inner {
+  position: relative;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px;
   display: grid;
-  grid-template-columns: 0.58fr 1.42fr;
-  min-height: 14rem;
+  grid-template-columns: minmax(0, 1fr) 372px;
+  gap: 64px;
+  align-items: center;
 }
 
-.home-preview-controls {
-  display: grid;
-  align-content: start;
-  gap: 0.45rem;
-  padding: 0.8rem;
-  border-right: 1px solid var(--home-line);
+.hero__title {
+  margin-top: 18px;
+  font-size: 48px;
+  line-height: 1.12;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  color: var(--sh-text);
 }
 
-.home-preview-controls span {
-  padding: 0.45rem;
-  border: 1px solid var(--home-line);
-  border-radius: 4px;
-  color: var(--home-muted);
-  font-size: 0.65rem;
+.hero__desc {
+  margin-top: 20px;
+  max-width: 560px;
+  font-size: 16px;
+  line-height: 1.75;
+  color: var(--sh-text-2);
 }
 
-.home-tenant-screen {
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 0.75rem;
-  padding: 0.8rem;
-  background: var(--home-paper);
-}
-
-.home-tenant-screen > div:first-child {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 0.65rem;
-}
-
-.home-tenant-screen > div:nth-child(2) {
-  display: grid;
-  align-content: center;
-  gap: 0.55rem;
-  padding: 1rem;
-  border-radius: 4px;
-  background: var(--home-ink);
-  color: var(--home-paper);
-}
-
-.home-tenant-screen > div:nth-child(2) strong {
-  font-size: 1.1rem;
-  letter-spacing: -0.03em;
-}
-
-.home-tenant-screen > div:nth-child(2) small,
-.home-tenant-meta {
-  color: var(--home-muted);
-  font-size: 0.65rem;
-}
-
-.home-tenant-meta {
+.hero__actions {
+  margin-top: 32px;
   display: flex;
-  justify-content: space-between;
-  gap: 0.6rem;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
-.home-business-compute {
-  background: #242628;
-  color: #f5f2ec;
-}
-
-.home-business-compute .home-business-copy p {
-  color: rgba(245, 242, 236, 0.65);
-}
-
-.home-business-compute .home-business-link {
-  color: #f1a477;
-}
-
-.home-network-preview {
-  position: relative;
-  display: grid;
-  grid-template-columns: 0.82fr 1.1fr 0.82fr;
+.sh-btn {
+  display: inline-flex;
   align-items: center;
-  gap: 0.65rem;
-  min-height: 15rem;
-  padding: 1rem 0;
+  justify-content: center;
+  height: 46px;
+  padding: 0 22px;
+  border-radius: 9px;
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 160ms ease-out, border-color 160ms ease-out;
 }
 
-.home-network-line {
-  position: absolute;
-  top: 50%;
-  right: 7%;
-  left: 7%;
-  height: 1px;
-  background: rgba(226, 106, 53, 0.62);
+.sh-btn--primary {
+  background: var(--sh-accent);
+  color: var(--sh-accent-fg);
 }
 
-.home-network-column,
-.home-network-core {
-  position: relative;
-  z-index: 1;
+.sh-btn--primary:hover {
+  background: var(--sh-accent-hover);
+}
+
+.sh-btn--ghost {
+  border: 1px solid var(--sh-border-strong);
+  color: var(--sh-text);
+}
+
+.sh-btn--ghost:hover {
+  background: var(--sh-surface-2);
+}
+
+.hero__trust {
+  margin-top: 28px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  font-size: 13px;
+  color: var(--sh-text-3);
+}
+
+.hero__trust li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hero__trust li::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--sh-border-strong);
+}
+
+/* ---------- hero panel ---------- */
+.panel {
+  padding: 20px;
+  border-radius: 14px;
+  border: 1px solid var(--sh-border);
+  background: var(--sh-surface);
+  box-shadow: var(--sh-shadow);
+}
+
+.panel__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--sh-text-2);
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--sh-border);
+}
+
+.panel__pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #1a9e6f;
+  box-shadow: 0 0 0 3px rgba(26, 158, 111, 0.14);
+}
+
+.panel__tag {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--sh-border);
+  font-size: 11px;
+  color: var(--sh-text-3);
+}
+
+.panel__steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.panel__step {
+  display: flex;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--sh-border);
+}
+
+.panel__step:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.panel__node {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  margin-top: 6px;
+  border-radius: 50%;
+  border: 1.5px solid var(--sh-border-strong);
+}
+
+.panel__step.is-done .panel__node {
+  background: var(--sh-text-3);
+  border-color: var(--sh-text-3);
+}
+
+.panel__step.is-active .panel__node {
+  background: var(--sh-accent);
+  border-color: var(--sh-accent);
+  box-shadow: 0 0 0 4px var(--sh-accent-soft);
+}
+
+.panel__step p {
+  font-size: 14px;
+  color: var(--sh-text-3);
+}
+
+.panel__step.is-done p,
+.panel__step.is-active p {
+  color: var(--sh-text);
+}
+
+.panel__step small {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--sh-text-3);
+}
+
+/* ---------- metrics ---------- */
+.metrics {
+  border-top: 1px solid var(--sh-border);
+  border-bottom: 1px solid var(--sh-border);
+}
+
+.metrics__inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 40px 24px;
   display: grid;
-  gap: 0.5rem;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
 }
 
-.home-network-column span,
-.home-network-core {
-  padding: 0.7rem 0.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 4px;
-  background: #2b2e31;
-  color: rgba(245, 242, 236, 0.73);
-  font-size: 0.68rem;
+.metric__value {
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--sh-text);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric__value span {
+  margin-left: 4px;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--sh-text-3);
+}
+
+.metric__label {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--sh-text-3);
+}
+
+/* ---------- banners ---------- */
+.banners {
+  padding: 64px 0 0;
+}
+
+.banners__track {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.banner {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid var(--sh-border);
+  background: var(--sh-surface);
+}
+
+.banner__media {
+  height: 128px;
+  overflow: hidden;
+  background: var(--sh-surface-2);
+}
+
+.banner__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.banner__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 18px 20px 20px;
+}
+
+.banner__title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--sh-text);
+}
+
+.banner__subtitle {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--sh-text-2);
+}
+
+.banner__cta {
+  margin-top: 6px;
+  padding: 9px 18px;
+  border: 1px solid var(--sh-border-strong);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--sh-text);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 160ms ease-out;
+}
+
+.banner__cta:hover {
+  background: var(--sh-surface-2);
+}
+
+/* ---------- plans ---------- */
+.plans {
+  padding: 96px 0;
+}
+
+/* 分段控件：不是卡片，是一个整体 */
+.sh-tabs {
+  margin-bottom: 32px;
+}
+
+.sh-tabs__track {
+  display: inline-flex;
+  padding: 4px;
+  gap: 2px;
+  border-radius: 11px;
+  border: 1px solid var(--sh-border);
+  background: var(--sh-surface-2);
+}
+
+.sh-tabs__item {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sh-text-2);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 160ms ease-out, color 160ms ease-out;
+}
+
+.sh-tabs__item:hover {
+  color: var(--sh-text);
+}
+
+.sh-tabs__item--active {
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  box-shadow: var(--sh-shadow);
+}
+
+.sh-tabs__blurb {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--sh-text-3);
+}
+
+.plans__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.sh-skeleton {
+  height: 320px;
+  border-radius: 14px;
+  border: 1px solid var(--sh-border);
+  background: var(--sh-surface-2);
+}
+
+.empty {
+  padding: 64px 24px;
+  text-align: center;
+  border: 1px dashed var(--sh-border-strong);
+  border-radius: 14px;
+}
+
+.empty__title {
+  font-size: 16px;
+  color: var(--sh-text);
+}
+
+.empty__desc {
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--sh-text-3);
+}
+
+/* ---------- workflow ---------- */
+.workflow {
+  padding: 96px 0;
+  border-top: 1px solid var(--sh-border);
+}
+
+.workflow__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.step {
+  padding: 24px;
+  border-radius: 14px;
+  border: 1px solid var(--sh-border);
+  background: var(--sh-surface);
+}
+
+.step__num {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sh-text-3);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.step h3 {
+  margin-top: 14px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--sh-text);
+}
+
+.step p {
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--sh-text-2);
+}
+
+.guide-wrap {
+  margin-top: 32px;
+  padding: 28px;
+  border-radius: 14px;
+  border: 1px solid var(--sh-border);
+  background: var(--sh-surface);
+}
+
+.guide-wrap__head {
+  margin-bottom: 22px;
+}
+
+.guide-wrap__head h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--sh-text);
+}
+
+.guide-wrap__head p {
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--sh-text-2);
+}
+
+/* ---------- compare ---------- */
+.compare {
+  padding: 96px 0;
+  border-top: 1px solid var(--sh-border);
+}
+
+.sh-table-wrap {
+  overflow-x: auto;
+  border-radius: 14px;
+  border: 1px solid var(--sh-border);
+}
+
+.sh-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.sh-table th,
+.sh-table td {
+  padding: 16px 20px;
+  text-align: left;
+  border-bottom: 1px solid var(--sh-border);
+}
+
+.sh-table thead th {
+  font-weight: 500;
+  color: var(--sh-text);
+  background: var(--sh-surface-2);
+}
+
+.sh-table tbody th {
+  font-weight: 400;
+  color: var(--sh-text-3);
+  white-space: nowrap;
+}
+
+.sh-table td {
+  color: var(--sh-text);
+}
+
+.sh-table tbody tr:last-child th,
+.sh-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ---------- assurance ---------- */
+.assurance {
+  padding: 96px 0;
+  border-top: 1px solid var(--sh-border);
+}
+
+.assurance__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--sh-border);
+  border: 1px solid var(--sh-border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.assurance__card {
+  padding: 24px;
+  background: var(--sh-surface);
+}
+
+.assurance__card h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--sh-text);
+}
+
+.assurance__card p {
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--sh-text-2);
+}
+
+/* ---------- faq ---------- */
+.faq {
+  padding: 96px 0;
+  border-top: 1px solid var(--sh-border);
+}
+
+.faq__list {
+  border-top: 1px solid var(--sh-border);
+}
+
+.faq__item {
+  border-bottom: 1px solid var(--sh-border);
+}
+
+.faq__q {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 0;
+  background: transparent;
+  border: none;
+  color: var(--sh-text);
+  font-size: 16px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.faq__q svg {
+  flex-shrink: 0;
+  transition: transform 200ms ease-out;
+  color: var(--sh-text-3);
+}
+
+.faq__item--open .faq__q svg {
+  transform: rotate(180deg);
+}
+
+.faq__a {
+  padding: 0 0 22px;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--sh-text-2);
+}
+
+/* ---------- closing ---------- */
+.closing {
+  padding: 96px 0;
+  border-top: 1px solid var(--sh-border);
+}
+
+.closing__inner {
   text-align: center;
 }
 
-.home-network-core {
-  gap: 0.4rem;
-  padding-block: 1.35rem;
-  border-color: var(--home-brand);
-  background: rgba(216, 90, 40, 0.16);
+.closing h2 {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--sh-text);
 }
 
-.home-network-core strong {
-  color: #fff7ed;
-  font-size: 0.95rem;
+.closing p {
+  margin-top: 12px;
+  font-size: 15px;
+  color: var(--sh-text-2);
 }
 
-.home-network-core span {
-  color: #f0aa7e;
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 0.58rem;
-}
-
-.home-tier-rail {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
+.closing__actions {
+  margin-top: 32px;
   display: flex;
-  gap: 0.45rem;
   justify-content: center;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
-.home-tier-rail span {
-  padding: 0.25rem 0.45rem;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 3px;
-  color: rgba(245, 242, 236, 0.55);
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 0.58rem;
+/* ---------- footer ---------- */
+.footer {
+  border-top: 1px solid var(--sh-border);
+  padding: 56px 0 32px;
 }
 
-.home-tier-rail .is-current {
-  border-color: var(--home-brand);
-  color: #f0aa7e;
+.footer__inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 48px;
 }
 
-.home-redesign .card-premium {
-  border-radius: 7px;
-  box-shadow: 0 14px 44px rgba(26, 28, 30, 0.07);
+.footer__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--sh-text-2);
 }
 
-
-@media (max-width: 1023px) {
-  .home-redesign .home-hero {
-    gap: 2.5rem;
-  }
-
-  .home-routing-console {
-    min-height: 22rem;
-  }
+.footer__cols {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
 }
 
-@media (max-width: 767px) {
-  .home-redesign .home-header {
-    top: 0.75rem;
+.footer__cols h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sh-text);
+  margin-bottom: 12px;
+}
+
+.footer__cols a,
+.footer__cols p {
+  display: block;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--sh-text-3);
+  text-decoration: none;
+}
+
+.footer__cols a:hover {
+  color: var(--sh-text);
+}
+
+.footer__contact {
+  white-space: pre-wrap;
+}
+
+.footer__legal {
+  max-width: 1120px;
+  margin: 40px auto 0;
+  padding: 0 24px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--sh-text-3);
+}
+
+/* ---------- mobile ---------- */
+.mobile-cta {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .hero__inner {
+    grid-template-columns: 1fr;
+    gap: 40px;
   }
 
-  .home-redesign .home-header nav {
-    padding-inline: 0.85rem;
+  .hero__panel {
+    max-width: 460px;
   }
 
-  .home-redesign .home-main {
-    padding-top: 2.75rem;
-    padding-bottom: 6rem;
+  .metrics__inner {
+    grid-template-columns: repeat(2, 1fr);
   }
 
-  .home-redesign .home-hero {
-    gap: 1.75rem;
-    margin-bottom: 5.5rem;
-  }
-
-  .home-redesign .home-hero > div:first-child {
-    gap: 1.25rem;
-  }
-
-  .home-redesign .home-hero > div:first-child > div:first-child {
-    margin-bottom: 0;
-  }
-
-  .home-redesign .home-hero h1 {
-    font-size: clamp(2.55rem, 13.5vw, 3.65rem);
-    letter-spacing: 0;
-  }
-
-  .home-redesign .home-hero h1 span:last-child {
-    margin-top: 0.65rem;
-    font-size: clamp(1.35rem, 6.5vw, 1.8rem);
-    line-height: 1.25;
-  }
-
-  .home-redesign .home-hero .btn {
-    min-height: 3rem;
-    padding-inline: 1.5rem;
-  }
-
-  .home-routing-console {
-    min-height: 17.25rem;
-  }
-
-  .home-console-head {
-    padding: 0.75rem 0.85rem;
-  }
-
-  .home-console-body {
-    grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
-    min-height: 14.25rem;
-  }
-
-  .home-console-request,
-  .home-console-routes {
-    padding: 0.75rem;
-  }
-
-  .home-console-request {
-    gap: 0.45rem;
-    border-right: 1px solid var(--home-line);
-    border-bottom: 0;
-  }
-
-  .home-console-request strong {
-    font-size: 0.78rem;
-    overflow-wrap: anywhere;
-  }
-
-  .home-request-row,
-  .home-console-trace,
-  .home-route {
-    font-size: 0.6rem;
-  }
-
-  .home-route {
-    gap: 0.4rem;
-    min-height: 2.6rem;
-    padding: 0.55rem 0.6rem;
-  }
-
-  .home-route strong {
-    font-size: 0.56rem;
-  }
-
-  .home-preview-grid {
+  .workflow__grid,
+  .assurance__grid {
     grid-template-columns: 1fr;
   }
 
-  .home-preview-controls {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    border-right: 0;
-    border-bottom: 1px solid var(--home-line);
+  .footer__inner {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+}
+
+@media (max-width: 768px) {
+  .nav__links {
+    display: none;
   }
 
-  .home-business-grid {
+  .nav__actions {
+    gap: 14px;
+  }
+
+  .hero {
+    padding: 56px 0 48px;
+  }
+
+  .hero__title {
+    margin-top: 14px;
+    font-size: 32px;
+    line-height: 1.18;
+    letter-spacing: -0.03em;
+  }
+
+  .hero__desc {
+    margin-top: 16px;
+    font-size: 15px;
+  }
+
+  .hero__actions {
+    margin-top: 26px;
+  }
+
+  .hero__actions .sh-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .hero__trust {
+    margin-top: 22px;
+    gap: 6px 16px;
+  }
+
+  .banners {
+    padding-top: 48px;
+  }
+
+  .plans,
+  .workflow,
+  .compare,
+  .assurance,
+  .faq,
+  .closing {
+    padding: 64px 0;
+  }
+
+  .section__head {
+    margin-bottom: 28px;
+  }
+
+  .section__title {
+    font-size: 24px;
+  }
+
+  /* 分段控件横向滚动，避免竖排堆叠 */
+  .sh-tabs__track {
+    display: flex;
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .sh-tabs__track::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sh-tabs__item {
+    flex: 1 0 auto;
+    text-align: center;
+    padding: 8px 16px;
+  }
+
+  .plans__grid {
     grid-template-columns: 1fr;
   }
 
-  .home-business-card {
-    min-height: auto;
+  .sh-table th,
+  .sh-table td {
+    padding: 13px 14px;
+    font-size: 13px;
   }
 
-  .home-network-preview {
-    min-height: 13rem;
+  .footer__cols {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+
+  .mobile-cta {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    display: block;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--sh-bg) 92%, transparent);
+    border-top: 1px solid var(--sh-border);
+    backdrop-filter: blur(12px);
+  }
+
+  .mobile-cta a {
+    display: block;
+    height: 46px;
+    line-height: 46px;
+    text-align: center;
+    border-radius: 9px;
+    background: var(--sh-accent);
+    color: var(--sh-accent-fg);
+    font-size: 16px;
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .footer {
+    padding-bottom: 104px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-marquee,
-  .particle-anim-bar,
-  .home-redesign .home-atmosphere,
-  .home-business-card,
-  .home-route,
-  .home-business-link svg {
-    animation: none;
-    transition: none;
+  * {
+    transition-duration: 0.01ms !important;
   }
+}
+</style>
 
-  .reveal {
-    opacity: 1;
-    transform: none;
-    transition: none;
-  }
+<style>
+/* 深色覆盖放在**非 scoped** 块中：Vue 的 scoped-CSS 编译器会把
+   `:global(.dark) X` 编译成只有 `.dark`，X 被丢弃，导致生产构建里
+   深色规则整体失效。与 SettingsView 的处理方式保持一致。 */
+.dark .sales-home {
+  --sh-bg: #08090b;
+  --sh-surface: #0e0f12;
+  --sh-surface-2: #131418;
+  --sh-border: rgba(255, 255, 255, 0.08);
+  --sh-border-strong: rgba(255, 255, 255, 0.18);
+  --sh-text: #f4f4f5;
+  --sh-text-2: rgba(255, 255, 255, 0.6);
+  --sh-text-3: rgba(255, 255, 255, 0.4);
+  --sh-accent: #e0632f;
+  --sh-accent-hover: #ef7440;
+  --sh-accent-fg: #ffffff;
+  --sh-accent-soft: rgba(224, 99, 47, 0.13);
+  --sh-accent-text: #f0916a;
+  --sh-grid: rgba(255, 255, 255, 0.045);
+  --sh-scrim: rgba(0, 0, 0, 0.6);
+  --sh-shadow: none;
 }
 </style>

@@ -1,6 +1,6 @@
 <template>
   <AppLayout>
-    <div class="admin-page-redesign space-y-6">
+    <div class="space-y-6">
       <!-- Loading State -->
       <div v-if="loading" class="grid grid-cols-2 gap-px overflow-hidden border border-gray-200 bg-gray-200 lg:grid-cols-4 dark:border-dark-700 dark:bg-dark-700" role="status" :aria-label="t('common.loading')">
         <div v-for="item in 8" :key="item" class="min-h-24 bg-white p-4 motion-safe:animate-pulse dark:bg-dark-900">
@@ -227,7 +227,43 @@
               {{ t('admin.dashboard.quickActions') }}
             </h2>
           </div>
-          <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <button
+              type="button"
+              class="group flex items-center gap-3 border border-gray-200 bg-gray-50 p-3 text-left transition-colors hover:border-primary-300 hover:bg-primary-50 dark:border-dark-700 dark:bg-dark-800/50 dark:hover:border-primary-800 dark:hover:bg-primary-950/20"
+              @click="router.push('/admin/users')"
+            >
+              <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center border border-gray-200 bg-white text-primary-600 dark:border-dark-700 dark:bg-dark-900 dark:text-primary-400">
+                <Icon name="users" size="md" :stroke-width="2" />
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="block text-sm font-medium text-gray-900 dark:text-white">
+                  {{ t('admin.dashboard.manageUsers') }}
+                </span>
+                <span class="block text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.dashboard.viewUserAccounts') }}
+                </span>
+              </span>
+              <Icon name="chevronRight" size="sm" class="text-gray-400 group-hover:text-primary-600" />
+            </button>
+            <button
+              type="button"
+              class="group flex items-center gap-3 border border-gray-200 bg-gray-50 p-3 text-left transition-colors hover:border-primary-300 hover:bg-primary-50 dark:border-dark-700 dark:bg-dark-800/50 dark:hover:border-primary-800 dark:hover:bg-primary-950/20"
+              @click="router.push('/admin/accounts')"
+            >
+              <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center border border-gray-200 bg-white text-primary-600 dark:border-dark-700 dark:bg-dark-900 dark:text-primary-400">
+                <Icon name="server" size="md" :stroke-width="2" />
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="block text-sm font-medium text-gray-900 dark:text-white">
+                  {{ t('admin.dashboard.manageAccounts') }}
+                </span>
+                <span class="block text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.dashboard.configureAiAccounts') }}
+                </span>
+              </span>
+              <Icon name="chevronRight" size="sm" class="text-gray-400 group-hover:text-primary-600" />
+            </button>
             <button
               v-if="canUseBatchImage"
               type="button"
@@ -250,17 +286,17 @@
             <button
               type="button"
               class="group flex items-center gap-3 border border-gray-200 bg-gray-50 p-3 text-left transition-colors hover:border-primary-300 hover:bg-primary-50 dark:border-dark-700 dark:bg-dark-800/50 dark:hover:border-primary-800 dark:hover:bg-primary-950/20"
-              @click="router.push('/admin/groups')"
+              @click="router.push('/admin/settings')"
             >
               <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center border border-gray-200 bg-white text-primary-600 dark:border-dark-700 dark:bg-dark-900 dark:text-primary-400">
-                <Icon name="grid" size="md" :stroke-width="2" />
+                <Icon name="cog" size="md" :stroke-width="2" />
               </span>
               <span class="min-w-0 flex-1">
                 <span class="block text-sm font-medium text-gray-900 dark:text-white">
-                  {{ t('admin.dashboard.groupPricing') }}
+                  {{ t('admin.dashboard.systemSettings') }}
                 </span>
                 <span class="block text-xs text-gray-500 dark:text-gray-400">
-                  {{ t('admin.dashboard.groupPricingDesc') }}
+                  {{ t('admin.dashboard.configureSystem') }}
                 </span>
               </span>
               <Icon name="chevronRight" size="sm" class="text-gray-400 group-hover:text-primary-600" />

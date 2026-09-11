@@ -1,6 +1,6 @@
 <template>
   <AppLayout>
-  <div class="space-y-6 p-4 sm:p-6 lg:p-8">
+  <div class="space-y-6">
     <section class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm dark:border-dark-700 dark:bg-dark-900">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -213,10 +213,6 @@ onMounted(loadTools)
   color: rgb(17 24 39);
 }
 
-:global(.dark) .tool-modal {
-  color: rgb(243 244 246);
-}
-
 .tool-field {
   display: block;
 }
@@ -229,20 +225,30 @@ onMounted(loadTools)
   color: rgb(55 65 81);
 }
 
-:global(.dark) .tool-field > span {
-  color: rgb(229 231 235);
-}
-
 .tool-modal :deep(.input-field) {
   min-height: 2.75rem;
   border-color: rgb(209 213 219);
   background-color: white;
   color: rgb(17 24 39);
 }
+</style>
 
-:global(.dark) .tool-modal :deep(.input-field) {
-  border-color: rgb(55 65 81);
-  background-color: rgb(17 24 39);
-  color: white;
+<style>
+/* 深色覆盖必须放在**非 scoped** 块里：Vue 的 scoped-CSS 编译器会把
+   `:global(.dark) X` 编译成只剩 `.dark`，X 被丢弃，导致生产构建深色规则失效。
+   这里的选择器都带页面独有类名（.shop-modal / .tool-modal），不会外泄影响其它页面。 */
+
+.dark .tool-modal {
+  color: rgb(243 244 246);
+}
+
+.dark .tool-field > span {
+  color: rgb(229 231 235);
+}
+
+.dark .tool-modal .input-field {
+  border-color: rgb(55 65 81) !important;
+  background-color: rgb(17 24 39) !important;
+  color: #fff !important;
 }
 </style>

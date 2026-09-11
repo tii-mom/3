@@ -6,18 +6,17 @@ import { fileURLToPath } from 'node:url'
 const dir = dirname(fileURLToPath(import.meta.url))
 const source = readFileSync(resolve(dir, '../../../views/HomeView.vue'), 'utf8')
 
+// 旧首页支持后台自定义 HTML 区块（DOMPurify + sandboxed iframe）。
+// 首页改造为销售页后该能力已下线，因此这里断言的是当前实现的安全保证，
+// 同时保留防回归：一旦重新引入 v-html / iframe，必须配套净化与沙箱隔离。
 describe('HomeView custom content security', () => {
-  it('sanitizes custom HTML before using v-html', () => {
-    expect(source).toContain("import DOMPurify from 'dompurify'")
-    expect(source).toContain('v-html="sanitizedHomeContent"')
-    expect(source).toContain('FORBID_TAGS')
-    expect(source).not.toContain('v-html="homeContent"')
+  it('does not render untrusted HTML via v-html', () => {
+    expect(source).not.toContain('v-html')
+    expect(source).not.toContain('dompurify')
   })
 
-  it('isolates external content and requires HTTPS in production', () => {
-    expect(source).toContain('sandbox="allow-scripts allow-forms allow-popups"')
-    expect(source).toContain('referrerpolicy="no-referrer"')
-    expect(source).toContain("content.startsWith('https://')")
+  it('does not embed external content in iframes', () => {
+    expect(source).not.toContain('<iframe')
     expect(source).not.toContain('allow-same-origin')
   })
 })

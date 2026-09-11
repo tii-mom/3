@@ -402,7 +402,26 @@ describe('API Client', () => {
       await expect(apiClient.get('/test')).rejects.toEqual(
         expect.objectContaining({
           status: 0,
+          code: 'NETWORK_ERROR',
           message: 'Network error. Please check your connection.',
+        })
+      )
+    })
+
+    it('超时错误返回稳定的超时错误码', async () => {
+      const adapter = vi.fn().mockRejectedValue({
+        code: 'ECONNABORTED',
+        message: 'timeout of 30000ms exceeded',
+        config: { url: '/auth/login' },
+      })
+      apiClient.defaults.adapter = adapter
+
+      await expect(apiClient.post('/auth/login')).rejects.toEqual(
+        expect.objectContaining({
+          status: 0,
+          code: 'NETWORK_TIMEOUT',
+          message: 'The request timed out. Please try again.',
+          url: '/auth/login',
         })
       )
     })

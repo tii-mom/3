@@ -1189,6 +1189,19 @@
   background: var(--ui-surface);
 }
 
+/* 后台页面里零散使用的超大圆角（24px）统一收敛到 12px，
+   避免与设计体系的 7px 卡片并排时出现两种语言 */
+.admin-page-redesign .rounded-3xl {
+  border-radius: 12px !important;
+}
+
+/* 直接子级为普通 div 的页面（非 section/form）也统一卡片外观 */
+.admin-page-redesign > .card,
+.admin-page-redesign > .rounded-xl,
+.admin-page-redesign > .rounded-2xl {
+  border-color: var(--ui-line) !important;
+}
+
 .business-page-redesign .bg-white,
 .admin-page-redesign .bg-white {
   background: var(--ui-surface) !important;

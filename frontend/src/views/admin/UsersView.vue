@@ -5,9 +5,9 @@
       <template #filters>
         <div class="flex flex-wrap items-center gap-3">
           <!-- Left: Search + Active Filters -->
-          <div class="flex flex-1 flex-wrap items-center gap-3">
+          <div class="flex w-full min-w-0 flex-wrap items-center gap-3 lg:w-auto lg:flex-1">
             <!-- Search Box -->
-            <div class="relative w-full md:w-64">
+            <div class="relative w-full min-w-0 md:w-64">
               <Icon
                 name="search"
                 size="md"

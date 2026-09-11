@@ -5,6 +5,7 @@ import type { CreateOrderResult } from '@/types/payment'
 
 export type ShopProductType = 'virtual' | 'platform_usd_balance'
 export type ShopProductStatus = 'draft' | 'published' | 'archived'
+export type ShopFulfillmentMode = 'manual' | 'session_topup' | 'account_delivery' | 'rental'
 
 export interface ShopProduct {
   id: number
@@ -20,6 +21,11 @@ export interface ShopProduct {
   commission_bps: number
   status: ShopProductStatus
   sort_order: number
+  fulfillment_mode: ShopFulfillmentMode
+  delivery_form_hint: string
+  badge_text: string
+  spec_label: string
+  highlight: boolean
   created_at?: string
   updated_at?: string
 }
@@ -54,6 +60,13 @@ export interface ShopOrder {
   snapshot_grant_usd_amount: string
   snapshot_commission_bps: number
   fulfillment_note: string
+  order_no?: string
+  guest_token?: string
+  guest_contact?: string
+  snapshot_fulfillment_mode?: ShopFulfillmentMode
+  delivery_hint?: string
+  delivery_submitted_at?: string
+  rental_duration?: string
   created_at: string
   paid_at?: string
   fulfilled_at?: string
@@ -76,6 +89,11 @@ export interface ShopProductPayload {
   commission_bps?: number
   status: ShopProductStatus
   sort_order?: number
+  fulfillment_mode?: ShopFulfillmentMode
+  delivery_form_hint?: string
+  badge_text?: string
+  spec_label?: string
+  highlight?: boolean
 }
 
 export interface ShopBannerPayload {
@@ -117,6 +135,14 @@ export const shopAPI = {
   },
   myOrders(params?: { page?: number; page_size?: number }) {
     return apiClient.get<BasePaginationResponse<ShopOrder>>('/shop/orders/my', { params })
+  },
+  /** 登录用户为自己的订单补交交付资料（Session / 收货邮箱 / 租期） */
+  submitDelivery(id: number, data: { payload: string; rental_duration?: string }) {
+    return apiClient.post<{ submitted: boolean }>(`/shop/orders/${id}/delivery`, data)
+  },
+  /** 认领此前以免登录方式在首页下的订单，归入当前账号 */
+  claimOrder(data: { order_no: string; contact: string }) {
+    return apiClient.post<{ claimed: boolean }>('/shop/orders/claim', data)
   }
 }
 
@@ -150,6 +176,9 @@ export const adminShopAPI = {
   },
   fulfillOrder(id: number, data: { fulfillment_note: string }) {
     return apiClient.post(`/admin/shop/orders/${id}/fulfill`, data)
+  },
+  getOrderDelivery(id: number) {
+    return apiClient.get<{ payload: string }>(`/admin/shop/orders/${id}/delivery`)
   },
   uploadAsset(file: File) {
     const formData = new FormData()

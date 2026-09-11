@@ -320,10 +320,17 @@ apiClient.interceptors.response.use(
       })
     }
 
-    // Network error
+    // No HTTP response was received. Keep a stable semantic code so login and
+    // other views can distinguish transport failures from API errors.
+    const isTimeout = error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT'
     return Promise.reject({
       status: 0,
-      message: 'Network error. Please check your connection.'
+      code: isTimeout ? 'NETWORK_TIMEOUT' : 'NETWORK_ERROR',
+      message: isTimeout
+        ? 'The request timed out. Please try again.'
+        : 'Network error. Please check your connection.',
+      error: error.message,
+      url: String(error.config?.url || '')
     })
   }
 )

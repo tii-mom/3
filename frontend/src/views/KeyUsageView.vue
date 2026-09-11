@@ -133,21 +133,21 @@
         <div v-if="showLoading" class="space-y-6">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div class="rounded-2xl border border-gray-200 bg-white p-8 dark:border-dark-700 dark:bg-dark-900">
-              <div class="skeleton h-5 w-24 mb-6"></div>
-              <div class="flex justify-center"><div class="skeleton w-44 h-44 rounded-full"></div></div>
+              <div class="kv-skeleton h-5 w-24 mb-6"></div>
+              <div class="flex justify-center"><div class="kv-skeleton w-44 h-44 rounded-full"></div></div>
             </div>
             <div class="rounded-2xl border border-gray-200 bg-white p-8 dark:border-dark-700 dark:bg-dark-900">
-              <div class="skeleton h-5 w-24 mb-6"></div>
-              <div class="flex justify-center"><div class="skeleton w-44 h-44 rounded-full"></div></div>
+              <div class="kv-skeleton h-5 w-24 mb-6"></div>
+              <div class="flex justify-center"><div class="kv-skeleton w-44 h-44 rounded-full"></div></div>
             </div>
           </div>
           <div class="rounded-2xl border border-gray-200 bg-white p-8 dark:border-dark-700 dark:bg-dark-900">
-            <div class="skeleton h-5 w-32 mb-6"></div>
+            <div class="kv-skeleton h-5 w-32 mb-6"></div>
             <div class="space-y-4">
-              <div class="skeleton h-4 w-full"></div>
-              <div class="skeleton h-4 w-3/4"></div>
-              <div class="skeleton h-4 w-5/6"></div>
-              <div class="skeleton h-4 w-2/3"></div>
+              <div class="kv-skeleton h-4 w-full"></div>
+              <div class="kv-skeleton h-4 w-3/4"></div>
+              <div class="kv-skeleton h-4 w-5/6"></div>
+              <div class="kv-skeleton h-4 w-2/3"></div>
             </div>
           </div>
         </div>
@@ -963,15 +963,12 @@ onUnmounted(() => {
   0%   { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
-.skeleton {
+/* 改名为 kv-skeleton：避免与 style.css 里全局 .skeleton 撞名 */
+.kv-skeleton {
   background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
   background-size: 200% 100%;
   animation: shimmer-kv 1.8s ease-in-out infinite;
   border-radius: 8px;
-}
-:global(.dark) .skeleton {
-  background: linear-gradient(90deg, #334155 25%, #1e293b 50%, #334155 75%);
-  background-size: 200% 100%;
 }
 
 /* Fade up animation */
@@ -1000,5 +997,13 @@ onUnmounted(() => {
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
+}
+</style>
+
+<style>
+/* 非 scoped 块承载深色覆盖，否则 scoped 编译器会丢弃后代选择器 */
+.dark .kv-skeleton {
+  background: linear-gradient(90deg, #334155 25%, #1e293b 50%, #334155 75%);
+  background-size: 200% 100%;
 }
 </style>
