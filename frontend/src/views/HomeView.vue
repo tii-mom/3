@@ -9,6 +9,7 @@ import { resolveShopAssetUrl } from '@/api/shop'
 import { planHeroPromo } from '@/utils/heroPromo'
 import { useGuestCheckout } from '@/composables/useGuestCheckout'
 import { useRevealOnScroll } from '@/composables/useRevealOnScroll'
+import { useClipboard } from '@/composables/useClipboard'
 import PlanCard from '@/components/home/PlanCard.vue'
 import OrderSheet from '@/components/home/OrderSheet.vue'
 import SessionGuide from '@/components/home/SessionGuide.vue'
@@ -19,6 +20,7 @@ import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
 
 const appStore = useAppStore()
 const { vReveal } = useRevealOnScroll()
+const { copyToClipboard } = useClipboard()
 const {
   isLoggedIn,
   submitting,
@@ -141,6 +143,15 @@ const MARQUEE: string[] = [
   '全程不需要账号密码'
 ]
 
+/** 首页联系方式（用户要求固定展示，不依赖后台设置）：
+ *  QQ 交流群 / 售后 QQ，均带一键复制。微信客服沿用后台设置的 contactInfo。 */
+const QQ_GROUP = '531564948'
+const QQ_AFTERSALES = '290115835'
+
+async function copyQQ(value: string, label: string) {
+  await copyToClipboard(value, `${label}已复制：${value}`)
+}
+
 const contactInfo = computed(() => appStore.contactInfo?.trim() || '')
 // 下单抽屉里的支付方式：后台配置 ∩ 当前商品金额在单笔限额内
 const sheetPaymentMethods = computed(() =>
@@ -250,6 +261,7 @@ function handlePaymentSuccess() {
         <nav class="nav__links">
           <a href="#plans">套餐</a>
           <a href="#workflow">流程</a>
+          <a href="#contact">联系</a>
           <a href="#faq">常见问题</a>
           <RouterLink to="/order">查订单</RouterLink>
         </nav>
@@ -495,6 +507,68 @@ function handlePaymentSuccess() {
         <div class="section__inner closing__inner">
           <h2 class="closing__title">准备好开始了吗</h2>
           <a class="sh-btn sh-btn--primary" href="#plans">选择套餐</a>
+        </div>
+      </section>
+
+      <section id="contact" class="contact">
+        <div class="section__inner">
+          <header class="section__head" v-reveal>
+            <span class="section__no">05 — 联系我们</span>
+            <h2 class="section__title">下单前后都能找到人</h2>
+            <p class="section__desc">加 QQ 群获取活动通知，售后问题直接找专属客服，一键复制号码即可添加</p>
+          </header>
+
+          <div class="contact__grid">
+            <article class="contact__card" v-reveal="0">
+              <span class="contact__icon contact__icon--qq" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2.2c-3.1 0-5.6 2.3-5.6 5.3 0 1.1.3 2.1.9 3-.9.6-1.5 1.5-1.5 2.6 0 .7.3 1.3.8 1.8-.3.9-.4 1.9-.2 2.9.1.5.5.8 1 .7.8-.2 1.5-.7 2.1-1.3.5.1 1 .2 1.5.2h3.9c.5 0 1-.1 1.5-.2.6.6 1.3 1.1 2.1 1.3.5.1.9-.2 1-.7.2-1 .1-2-.2-2.9.5-.5.8-1.1.8-1.8 0-1.1-.6-2-1.5-2.6.6-.9.9-1.9.9-3 0-3-2.5-5.3-5.6-5.3zM9.6 9.3c.5 0 .9.4.9.9s-.4.9-.9.9-.9-.4-.9-.9.4-.9.9-.9zm4.8 0c.5 0 .9.4.9.9s-.4.9-.9.9-.9-.4-.9-.9.4-.9.9-.9z" />
+                </svg>
+              </span>
+              <div class="contact__body">
+                <p class="contact__label">QQ 交流群</p>
+                <p class="contact__value">{{ QQ_GROUP }}</p>
+              </div>
+              <button class="contact__copy" type="button" @click="copyQQ(QQ_GROUP, 'QQ 群')">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+                  <rect x="7" y="7" width="9" height="9" rx="2" />
+                  <path d="M4 13V5a2 2 0 0 1 2-2h8" stroke-linecap="round" />
+                </svg>
+                复制
+              </button>
+            </article>
+
+            <article class="contact__card" v-reveal="90">
+              <span class="contact__icon contact__icon--qq" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2.2c-3.1 0-5.6 2.3-5.6 5.3 0 1.1.3 2.1.9 3-.9.6-1.5 1.5-1.5 2.6 0 .7.3 1.3.8 1.8-.3.9-.4 1.9-.2 2.9.1.5.5.8 1 .7.8-.2 1.5-.7 2.1-1.3.5.1 1 .2 1.5.2h3.9c.5 0 1-.1 1.5-.2.6.6 1.3 1.1 2.1 1.3.5.1.9-.2 1-.7.2-1 .1-2-.2-2.9.5-.5.8-1.1.8-1.8 0-1.1-.6-2-1.5-2.6.6-.9.9-1.9.9-3 0-3-2.5-5.3-5.6-5.3zM9.6 9.3c.5 0 .9.4.9.9s-.4.9-.9.9-.9-.4-.9-.9.4-.9.9-.9zm4.8 0c.5 0 .9.4.9.9s-.4.9-.9.9-.9-.4-.9-.9.4-.9.9-.9z" />
+                </svg>
+              </span>
+              <div class="contact__body">
+                <p class="contact__label">售后 QQ</p>
+                <p class="contact__value">{{ QQ_AFTERSALES }}</p>
+              </div>
+              <button class="contact__copy" type="button" @click="copyQQ(QQ_AFTERSALES, '售后 QQ')">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+                  <rect x="7" y="7" width="9" height="9" rx="2" />
+                  <path d="M4 13V5a2 2 0 0 1 2-2h8" stroke-linecap="round" />
+                </svg>
+                复制
+              </button>
+            </article>
+
+            <article v-if="contactInfo" class="contact__card" v-reveal="180">
+              <span class="contact__icon contact__icon--wechat" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M9 3C4.9 3 1.6 5.9 1.6 9.4c0 2 1 3.8 2.7 5L3.3 16.8l2.8-1.4c.9.3 1.8.4 2.9.4h.6c-.3-.8-.4-1.6-.4-2.5 0-3.6 3.3-6.4 7.3-6.4h.6C16.1 5 12.9 3 9 3zm-2.4 5.1a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm4.8 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm11.4 3.1c-2.4 0-4.3 1.8-4.3 4.1 0 2.2 1.9 4.1 4.3 4.1.6 0 1.2-.1 1.7-.3l1.9 1-.6-1.6c1.1-.9 1.8-2.2 1.8-3.6 0-2.3-1.9-4.4-4.4-4.4zm-2 3.4a.8.8 0 1 1 0 1.6.8.8 0 0 1 0-1.6zm4 0a.8.8 0 1 1 0 1.6.8.8 0 0 1 0-1.6z" />
+                </svg>
+              </span>
+              <div class="contact__body">
+                <p class="contact__label">微信客服</p>
+                <p class="contact__value">{{ contactInfo }}</p>
+              </div>
+            </article>
+          </div>
         </div>
       </section>
     </main>
@@ -1525,6 +1599,117 @@ section[id],
   font-weight: 600;
   letter-spacing: -0.025em;
   color: var(--sh-text);
+}
+
+/* ---------- 联系我们（QQ 群 + 售后 QQ + 微信客服，带一键复制） ---------- */
+.contact {
+  padding: 72px 0;
+  border-top: 1px solid var(--sh-border);
+}
+
+.contact__grid {
+  margin-top: 36px;
+  display: grid;
+  /* auto-fit：后台未配置微信客服时只剩 2 张 QQ 卡，也不会留下空的第 3 列 */
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.contact__card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--sh-border);
+  border-radius: 14px;
+  background: var(--sh-surface);
+  transition: border-color 180ms ease-out, transform 180ms ease-out;
+}
+
+.contact__card:hover {
+  border-color: var(--sh-border-strong);
+  transform: translateY(-2px);
+}
+
+.contact__icon {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  color: #fff;
+}
+
+/* QQ 品牌色（腾讯蓝）；微信用微信绿，区分两种入口 */
+.contact__icon--qq {
+  background: linear-gradient(150deg, #2ba3f5, #1a8fe3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+.contact__icon--wechat {
+  background: linear-gradient(150deg, #2dd36f, #1aad5a);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+.contact__icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.contact__body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.contact__label {
+  font-size: 13px;
+  color: var(--sh-text-2);
+}
+
+.contact__value {
+  margin-top: 3px;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--sh-text);
+  /* 长号码允许换行，避免撑破卡片 */
+  overflow-wrap: anywhere;
+}
+
+.contact__copy {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 9px;
+  border: 1px solid var(--sh-border-strong);
+  background: var(--sh-surface-2);
+  color: var(--sh-text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 160ms ease-out, border-color 160ms ease-out;
+}
+
+.contact__copy:hover {
+  background: var(--sh-accent-soft);
+  border-color: var(--sh-accent);
+  color: var(--sh-accent-text);
+}
+
+.contact__copy svg {
+  width: 14px;
+  height: 14px;
+}
+
+@media (max-width: 768px) {
+  .contact__grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ---------- footer ---------- */
