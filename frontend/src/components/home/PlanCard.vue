@@ -1,340 +1,475 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { formatCNY, type PublicProduct } from '@/api/publicShop'
-import { resolveShopAssetUrl } from '@/api/shop'
+import { shopCategoryLabel, shopCategoryBenefits, shopModeFact } from '@/constants/shop'
+import BrandLogo from '@/components/home/BrandLogo.vue'
 
 const props = defineProps<{
   product: PublicProduct
   active?: boolean
-  /** 登录后展示推广奖励与推广链接 */
+  /** 登录后展示推广奖励 */
   showCommission?: boolean
   affCode?: string
 }>()
 
 defineEmits<{ select: [product: PublicProduct] }>()
 
-/** 主图 + 图廊合成一组；hover 时切到第二张，移开回到主图（不做自动轮播） */
-const images = computed(() =>
-  [props.product.image_url, ...(props.product.gallery || [])]
-    .map((url) => resolveShopAssetUrl(url))
-    .filter(Boolean)
-)
-const hovered = ref(false)
-const displayImage = computed(() => (hovered.value ? images.value[1] || images.value[0] : images.value[0]) || '')
-
+const featured = computed(() => props.product.highlight)
 const soldOut = computed(() => props.product.stock_quantity !== null && props.product.stock_quantity !== undefined && props.product.stock_quantity <= 0)
-const lowStock = computed(() => !soldOut.value && props.product.stock_quantity !== null && props.product.stock_quantity !== undefined && props.product.stock_quantity <= 5)
 const hasDiscount = computed(() => props.product.original_price_cny_minor > props.product.price_cny_minor)
-const hint = computed(() => props.product.delivery_form_hint?.trim() || '')
-const commissionPercent = computed(() => Math.round((props.product.commission_bps || 0) / 100))
-const showCommission = computed(() => !!props.showCommission && (props.product.commission_bps || 0) > 0)
-const stockText = computed(() => {
-  if (soldOut.value) return '暂时缺货'
-  if (props.product.stock_quantity === null || props.product.stock_quantity === undefined) return ''
-  return props.product.stock_quantity <= 5 ? `仅剩 ${props.product.stock_quantity} 件` : `库存 ${props.product.stock_quantity}`
+const discountPct = computed(() =>
+  hasDiscount.value ? Math.round(((props.product.original_price_cny_minor - props.product.price_cny_minor) / props.product.original_price_cny_minor) * 100) : 0
+)
+const saveAmount = computed(() => Math.round((props.product.original_price_cny_minor - props.product.price_cny_minor) / 100))
+
+const categoryLabel = computed(() => shopCategoryLabel(props.product.category))
+const benefits = computed(() => shopCategoryBenefits(props.product.category))
+const modeFact = computed(() => shopModeFact(props.product.fulfillment_mode))
+
+/** 价格右侧单位：从名称/规格里识别 月/季/年/周/天/次，识别不到就不显示 */
+const priceUnit = computed(() => {
+  const hay = `${props.product.spec_label} ${props.product.name}`.toLowerCase()
+  if (hay.includes('月')) return '/月'
+  if (hay.includes('季')) return '/季'
+  if (hay.includes('年')) return '/年'
+  if (hay.includes('周')) return '/周'
+  if (hay.includes('天')) return '/天'
+  if (hay.includes('次')) return '/次'
+  return ''
 })
 
-async function copyPromotionLink() {
-  if (!props.affCode) return
-  const url = new URL('/shop', window.location.origin)
-  url.searchParams.set('product', String(props.product.id))
-  url.searchParams.set('aff', props.affCode)
-  try {
-    await navigator.clipboard.writeText(url.toString())
-  } catch {
-    // 复制失败忽略，用户可手动复制
-  }
-}
+const commissionPercent = computed(() => Math.round((props.product.commission_bps || 0) / 100))
+const showCommission = computed(() => !!props.showCommission && (props.product.commission_bps || 0) > 0)
+
+/** 角标优先级：有折扣显示「省 X%」，否则显示后台填的角标文字 */
+const badgeText = computed(() => {
+  if (hasDiscount.value) return `省 ${discountPct.value}%`
+  return props.product.badge_text || ''
+})
 </script>
 
 <template>
   <article
-    class="plan-card"
-    :class="{ 'plan-card--featured': product.highlight, 'plan-card--soldout': soldOut }"
+    class="tier-card"
+    :class="{ 'tier-card--featured': featured, 'tier-card--soldout': soldOut }"
   >
-    <div
-      v-if="images.length"
-      class="plan-card__media"
-      @mouseenter="hovered = true"
-      @mouseleave="hovered = false"
-    >
-      <img :src="displayImage" :alt="product.name" loading="lazy">
-      <span v-if="images.length > 1" class="plan-card__media-count">{{ images.length }} 图</span>
-    </div>
+    <div v-if="featured" class="tier-card__ribbon">最受欢迎</div>
 
-    <header class="plan-card__head">
-      <!-- 角标放在标题行内：绝对定位到右上角会和商品图重叠，导致文字压在图上读不清 -->
-      <div class="plan-card__title-line">
-        <h3 class="plan-card__title">{{ product.name }}</h3>
-        <span v-if="product.badge_text" class="plan-card__badge">{{ product.badge_text }}</span>
+    <div class="tier-card__head">
+      <BrandLogo :product="product" :size="46" />
+      <div class="tier-card__heading">
+        <h3 class="tier-card__name">{{ product.name }}</h3>
+        <p class="tier-card__cat">{{ categoryLabel }}</p>
       </div>
-      <p v-if="product.description" class="plan-card__desc">{{ product.description }}</p>
-    </header>
-
-    <div class="plan-card__price">
-      <span class="plan-card__currency">¥</span>
-      <span class="plan-card__amount">{{ formatCNY(product.price_cny_minor) }}</span>
-      <span v-if="hasDiscount" class="plan-card__origin">¥{{ formatCNY(product.original_price_cny_minor) }}</span>
+      <span v-if="badgeText" class="tier-card__badge">{{ badgeText }}</span>
     </div>
 
-    <ul class="plan-card__meta">
-      <li v-if="product.spec_label">{{ product.spec_label }}</li>
-      <li v-if="hint">{{ hint }}</li>
-      <li v-if="product.sold_count > 0">已售 {{ product.sold_count }} 份</li>
-      <li v-if="stockText" :class="{ 'plan-card__meta--warn': lowStock }">{{ stockText }}</li>
-    </ul>
+    <p v-if="product.description" class="tier-card__desc">{{ product.description }}</p>
 
-    <div v-if="showCommission" class="plan-card__commission">
-      <span>推广奖励 <b>{{ commissionPercent }}%</b></span>
-      <button v-if="affCode" type="button" class="plan-card__commission-copy" @click.stop="copyPromotionLink">复制链接</button>
+    <div class="tier-card__price">
+      <span v-if="hasDiscount" class="tier-card__origin">¥{{ formatCNY(product.original_price_cny_minor) }}</span>
+      <div class="tier-card__price-now">
+        <span class="tier-card__currency">¥</span>
+        <span class="tier-card__amount">{{ formatCNY(product.price_cny_minor) }}</span>
+        <span v-if="priceUnit" class="tier-card__unit">{{ priceUnit }}</span>
+      </div>
     </div>
 
     <button
       type="button"
-      class="plan-card__cta"
+      class="tier-card__cta"
       :disabled="soldOut"
       @click="$emit('select', product)"
     >
       {{ soldOut ? '暂时缺货' : '立即下单' }}
     </button>
+
+    <div class="tier-card__panel">
+      <p class="tier-card__panel-label">
+        {{ modeFact.label }}<template v-if="product.spec_label"> · {{ product.spec_label }}</template>
+      </p>
+      <div class="tier-card__panel-divider" />
+      <div class="tier-card__panel-row"><span>到账时间</span><span>{{ modeFact.turnaround }}</span></div>
+      <div class="tier-card__panel-row"><span>账号归属</span><span>{{ modeFact.belongs }}</span></div>
+      <div v-if="product.delivery_form_hint" class="tier-card__panel-hint">{{ product.delivery_form_hint }}</div>
+    </div>
+
+    <div class="tier-card__save">
+      <span v-if="hasDiscount" class="tier-card__save-amt">立省 ¥{{ saveAmount }} · {{ discountPct }}%</span>
+      <span v-if="product.sold_count > 0" class="tier-card__sold">已售 {{ product.sold_count }} 份</span>
+    </div>
+
+    <div class="tier-card__divider" />
+
+    <div class="tier-card__benefits">
+      <p class="tier-card__benefits-label">套餐包含</p>
+      <ul>
+        <li v-for="(b, i) in benefits" :key="i">{{ b }}</li>
+      </ul>
+    </div>
+
+    <div v-if="showCommission" class="tier-card__footer">
+      <span>推广奖励</span>
+      <span class="tier-card__footer-amt">{{ commissionPercent }}%</span>
+    </div>
   </article>
 </template>
 
 <style scoped>
-/* 令牌继承自 HomeView 的 .sales-home，明暗主题自动切换 */
-.plan-card {
+/* 自包含令牌：卡片在任何页面（首页 / 商城）都一致，不依赖父级 --sh-* 变量 */
+.tier-card {
+  --tc-bg: #ffffff;
+  --tc-bg-soft: #f6f6f7;
+  --tc-border: rgba(9, 9, 11, 0.12);
+  --tc-border-strong: rgba(9, 9, 11, 0.2);
+  --tc-text: #09090b;
+  --tc-text-2: #56565f;
+  --tc-text-3: #8a8a93;
+  --tc-accent: #d85a30;
+  --tc-accent-soft: rgba(216, 90, 48, 0.08);
+  --tc-accent-text: #b34b1f;
+  --tc-accent-fg: #ffffff;
+  --tc-accent-hover: #c04f21;
+  --tc-save: #993c1d;
+  --tc-save-soft: #faece7;
+  --tc-commission: #0f6e56;
+  --tc-commission-soft: rgba(15, 110, 86, 0.08);
+
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 26px 22px 22px;
-  border: 1px solid var(--sh-border, rgba(9, 9, 11, 0.08));
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--tc-border);
   border-radius: 14px;
-  background: var(--sh-surface, #fff);
-  box-shadow: var(--sh-shadow, none);
+  background: var(--tc-bg);
+  color: var(--tc-text);
   transition: border-color 180ms ease-out, transform 180ms ease-out;
 }
 
-.plan-card:hover {
-  border-color: var(--sh-border-strong, rgba(9, 9, 11, 0.16));
+.tier-card:hover {
+  border-color: var(--tc-border-strong);
   transform: translateY(-2px);
 }
 
-/* 推荐项：只靠描边与顶部分隔条区分，不做放大变形 */
-.plan-card--featured {
-  border-color: color-mix(in srgb, var(--sh-accent, #d85a28) 42%, transparent);
-}
-
-.plan-card--soldout {
+.tier-card--soldout {
   opacity: 0.6;
 }
 
-.plan-card__title-line {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
+/* 推荐位：仅它用品牌橙描边 + 浅橙底 + 实心 CTA，全站唯一强调色 */
+.tier-card--featured {
+  border-color: var(--tc-accent);
+  background: #fdf7f4;
 }
 
-.plan-card__badge {
-  flex: 0 0 auto;
-  margin-top: 2px;
-  padding: 3px 9px;
-  border-radius: 6px;
-  background: var(--sh-accent-soft, rgba(216, 90, 40, 0.08));
-  color: var(--sh-accent-text, #b34b1f);
+.tier-card__ribbon {
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--tc-text);
+  color: #fff;
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-weight: 500;
+  padding: 3px 11px;
+  border-radius: 999px;
   white-space: nowrap;
 }
 
-.plan-card__title {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: -0.015em;
-  color: var(--sh-text, #09090b);
+.tier-card__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 0;
 }
 
-.plan-card__desc {
-  margin-top: 8px;
+.tier-card__heading {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.tier-card__cat {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--tc-text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tier-card__badge {
+  flex: none;
+  margin-left: auto;
+  font-size: 11px;
+  background: var(--tc-save-soft);
+  color: var(--tc-save);
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.tier-card--featured .tier-card__badge {
+  background: var(--tc-accent);
+  color: var(--tc-accent-fg);
+}
+
+.tier-card__head {
+  min-height: 0;
+}
+
+.tier-card__name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1.35;
+  color: var(--tc-text);
+}
+
+.tier-card__desc {
+  margin: 4px 0 0;
   font-size: 13px;
-  line-height: 1.7;
-  color: var(--sh-text-2, #56565f);
-  min-height: 44px;
-  /* 后台介绍支持换行，这里保留换行与多余空格的语义 */
-  white-space: pre-line;
-  /* 统一截到两行：同组卡片的图片/价格才能横向对齐，完整介绍在下单抽屉里看 */
+  line-height: 1.6;
+  color: var(--tc-text-2);
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
 }
 
-.plan-card__price {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  padding-top: 2px;
-}
-
-.plan-card__currency {
-  font-size: 15px;
-  color: var(--sh-text-3, #8a8a93);
-}
-
-.plan-card__amount {
-  font-size: 34px;
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  color: var(--sh-text, #09090b);
-  font-variant-numeric: tabular-nums;
-}
-
-.plan-card__origin {
-  font-size: 13px;
-  color: var(--sh-text-3, #8a8a93);
-  text-decoration: line-through;
-  font-variant-numeric: tabular-nums;
-}
-
-.plan-card__meta {
+.tier-card__price {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 0;
-  margin: 0;
-  list-style: none;
+  gap: 2px;
+}
+
+.tier-card__origin {
   font-size: 13px;
-  line-height: 1.6;
-  color: var(--sh-text-2, #56565f);
+  color: var(--tc-text-3);
+  text-decoration: line-through;
 }
 
-.plan-card__meta li {
-  position: relative;
-  padding-left: 18px;
-}
-
-/* 勾选式标记，比圆点更有"规格清单"的语义 */
-.plan-card__meta li::before {
-  content: '';
-  position: absolute;
-  left: 2px;
-  top: 7px;
-  width: 8px;
-  height: 4px;
-  border-left: 1.5px solid var(--sh-text-3, #8a8a93);
-  border-bottom: 1.5px solid var(--sh-text-3, #8a8a93);
-  transform: rotate(-45deg);
-}
-
-.plan-card__media {
-  position: relative;
-  height: 128px;
-  margin: -2px 0 2px;
-  overflow: hidden;
-  border-radius: 10px;
-  border: 1px solid var(--sh-border, rgba(9, 9, 11, 0.08));
-  background: var(--sh-surface-2, #f6f6f7);
-}
-
-.plan-card__media img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-/* 图廊角标：告诉用户还有更多图，hover 可切换 */
-.plan-card__media-count {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: rgba(9, 9, 11, 0.62);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-}
-
-.plan-card__meta--warn {
-  color: #c2831f;
-}
-
-.plan-card__commission {
+.tier-card__price-now {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 9px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(26, 158, 111, 0.24);
-  background: rgba(26, 158, 111, 0.07);
-  font-size: 12px;
-  color: #14795a;
+  align-items: baseline;
+  gap: 2px;
 }
 
+.tier-card__currency {
+  font-size: 16px;
+  color: var(--tc-text-3);
+}
 
-.plan-card__commission b {
+.tier-card__amount {
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
   font-variant-numeric: tabular-nums;
+  color: var(--tc-text);
 }
 
-.plan-card__commission-copy {
-  padding: 4px 10px;
-  border-radius: 6px;
-  border: 1px solid rgba(26, 158, 111, 0.35);
-  background: transparent;
-  color: inherit;
-  font-size: 12px;
-  cursor: pointer;
+.tier-card__unit {
+  font-size: 13px;
+  color: var(--tc-text-3);
+  font-weight: 400;
 }
 
-/* CTA：仅推荐项用实心强调色，其余走描边，避免一屏全橙 */
-.plan-card__cta {
-  margin-top: auto;
-  height: 44px;
+.tier-card__cta {
+  height: 40px;
   border-radius: 9px;
-  border: 1px solid var(--sh-border-strong, rgba(9, 9, 11, 0.16));
+  border: 1px solid var(--tc-border-strong);
   background: transparent;
-  color: var(--sh-text, #09090b);
-  font-size: 15px;
+  color: var(--tc-text);
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition: background 160ms ease-out, border-color 160ms ease-out;
 }
 
-.plan-card__cta:hover:not(:disabled) {
-  background: var(--sh-surface-2, #f6f6f7);
-  border-color: var(--sh-text-3, #8a8a93);
+.tier-card__cta:hover:not(:disabled) {
+  background: var(--tc-bg-soft);
 }
 
-.plan-card--featured .plan-card__cta {
-  border-color: var(--sh-accent, #d85a28);
-  background: var(--sh-accent, #d85a28);
-  color: var(--sh-accent-fg, #fff);
+.tier-card--featured .tier-card__cta {
+  border-color: var(--tc-accent);
+  background: var(--tc-accent);
+  color: var(--tc-accent-fg);
 }
 
-.plan-card--featured .plan-card__cta:hover:not(:disabled) {
-  background: var(--sh-accent-hover, #c04f21);
-  border-color: var(--sh-accent-hover, #c04f21);
+.tier-card--featured .tier-card__cta:hover:not(:disabled) {
+  background: var(--tc-accent-hover);
+  border-color: var(--tc-accent-hover);
 }
 
-.plan-card__cta:disabled {
+.tier-card__cta:disabled {
   cursor: not-allowed;
-  background: var(--sh-surface-2, #f6f6f7);
-  border-color: var(--sh-border, rgba(9, 9, 11, 0.08));
-  color: var(--sh-text-3, #8a8a93);
+  background: var(--tc-bg-soft);
+  border-color: var(--tc-border);
+  color: var(--tc-text-3);
+}
+
+/* 着色权益面板：把交付模式事实 + 规格说明收进一处 */
+.tier-card__panel {
+  background: var(--tc-bg-soft);
+  border-radius: 10px;
+  padding: 10px 11px;
+}
+
+.tier-card--featured .tier-card__panel {
+  background: var(--tc-save-soft);
+}
+
+.tier-card__panel-label {
+  margin: 0;
+  font-size: 11px;
+  color: var(--tc-text-2);
+}
+
+.tier-card--featured .tier-card__panel-label {
+  color: var(--tc-accent-text);
+}
+
+.tier-card__panel-divider {
+  height: 1px;
+  background: var(--tc-border);
+  margin: 8px 0;
+}
+
+.tier-card--featured .tier-card__panel-divider {
+  background: rgba(216, 90, 48, 0.22);
+}
+
+.tier-card__panel-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.tier-card__panel-row > span:first-child {
+  color: var(--tc-text-3);
+}
+
+.tier-card__panel-row > span:last-child {
+  color: var(--tc-text);
+}
+
+.tier-card__panel-hint {
+  margin-top: 7px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--tc-text-2);
+}
+
+.tier-card__save {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 11px;
+  min-height: 14px;
+}
+
+.tier-card__save-amt {
+  color: var(--tc-save);
+}
+
+.tier-card__sold {
+  color: var(--tc-text-3);
+}
+
+.tier-card__divider {
+  height: 1px;
+  background: var(--tc-border);
+}
+
+.tier-card__benefits-label {
+  margin: 0 0 7px;
+  font-size: 11px;
+  color: var(--tc-text-3);
+}
+
+.tier-card--featured .tier-card__benefits-label {
+  color: var(--tc-accent-text);
+}
+
+.tier-card__benefits ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 勾选式标记，比圆点更有「规格清单」语义（与旧 PlanCard 一致） */
+.tier-card__benefits li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--tc-text-2);
+}
+
+.tier-card__benefits li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 6px;
+  width: 8px;
+  height: 4px;
+  border-left: 1.5px solid var(--tc-text-3);
+  border-bottom: 1.5px solid var(--tc-text-3);
+  transform: rotate(-45deg);
+}
+
+/* 虚线 bonus 页脚：推广奖励 */
+.tier-card__footer {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border: 1px dashed var(--tc-border-strong);
+  border-radius: 9px;
+  padding: 9px 11px;
+  font-size: 11px;
+  color: var(--tc-text-2);
+}
+
+.tier-card--featured .tier-card__footer {
+  border-color: rgba(216, 90, 48, 0.4);
+}
+
+.tier-card__footer-amt {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--tc-commission);
 }
 </style>
 
 <style>
 /* 深色覆盖放在**非 scoped** 块中：Vue 的 scoped-CSS 编译器会把
-   `:global(.dark) X` 编译成只有 `.dark`，X 被丢弃，导致生产构建里
-   深色规则整体失效。与 SettingsView 的处理方式保持一致。 */
-.dark .plan-card__commission {
-  color: #6fd8b0;
+   `:global(.dark) X` 编译成只有 `.dark`，X 被丢弃，导致生产构建深色规则失效。 */
+.dark .tier-card {
+  --tc-bg: #18181b;
+  --tc-bg-soft: #232429;
+  --tc-border: rgba(255, 255, 255, 0.12);
+  --tc-border-strong: rgba(255, 255, 255, 0.22);
+  --tc-text: #f4f4f5;
+  --tc-text-2: #a1a1aa;
+  --tc-text-3: #71717a;
+  --tc-accent: #e8743f;
+  --tc-accent-soft: rgba(232, 116, 63, 0.14);
+  --tc-accent-text: #f0a574;
+  --tc-accent-fg: #1a1206;
+  --tc-accent-hover: #d8652f;
+  --tc-save: #e0ac52;
+  --tc-save-soft: rgba(224, 172, 82, 0.12);
+  --tc-commission: #6fd8b0;
+  --tc-commission-soft: rgba(111, 216, 176, 0.1);
+}
+
+.dark .tier-card--featured {
+  background: #211a16;
 }
 </style>

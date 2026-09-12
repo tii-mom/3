@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import FAQ_ITEMS from '@/content/home-faq.json'
-import { useAppStore } from '@/stores/app'
 import { formatCNY, publicShopAPI, type PublicBanner, type PublicProduct } from '@/api/publicShop'
 import { SHOP_CATEGORIES, normalizeShopCategory, type ShopCategory } from '@/constants/shop'
 import userAPI from '@/api/user'
@@ -18,7 +17,6 @@ import HeroFloatCards from '@/components/home/HeroFloatCards.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
 
-const appStore = useAppStore()
 const { vReveal } = useRevealOnScroll()
 const { copyToClipboard } = useClipboard()
 const {
@@ -67,6 +65,15 @@ const categoryGroups = computed(() => {
     items: (buckets.get(meta.value) || []).slice().sort(compareProducts)
   }))
 })
+
+/**
+ * 首页默认只展示 GPT 代充一组（信息有限、高级、精致）；其余品类收进
+ * 「查看更多服务」折叠区，点击才展开。primaryGroup = GPT 代充（若存在）。
+ */
+const PRIMARY_CATEGORY: ShopCategory = 'gpt_topup'
+const showAllCategories = ref(false)
+const primaryGroup = computed(() => categoryGroups.value.find((g) => g.value === PRIMARY_CATEGORY) || null)
+const otherGroups = computed(() => categoryGroups.value.filter((g) => g.value !== PRIMARY_CATEGORY))
 
 /** 按展示顺序（推荐位 → sort_order → id）排好的商品，首屏所有选品都从这里取 */
 const orderedProducts = computed(() => products.value.slice().sort(compareProducts))
@@ -143,16 +150,13 @@ const MARQUEE: string[] = [
   '全程不需要账号密码'
 ]
 
-/** 首页联系方式（用户要求固定展示，不依赖后台设置）：
- *  QQ 交流群 / 售后 QQ，均带一键复制。微信客服沿用后台设置的 contactInfo。 */
+/** 首页联系方式（用户要求固定展示，不依赖后台设置）：仅 QQ 交流群 / 售后 QQ，均带一键复制。 */
 const QQ_GROUP = '531564948'
 const QQ_AFTERSALES = '290115835'
 
 async function copyQQ(value: string, label: string) {
   await copyToClipboard(value, `${label}已复制：${value}`)
 }
-
-const contactInfo = computed(() => appStore.contactInfo?.trim() || '')
 // 下单抽屉里的支付方式：后台配置 ∩ 当前商品金额在单笔限额内
 const sheetPaymentMethods = computed(() =>
   selectedProduct.value ? methodsForAmount(selectedProduct.value.price_cny_minor) : []
@@ -252,6 +256,17 @@ function handlePaymentSuccess() {
 
 <template>
   <div class="sales-home">
+    <!-- 整页极光：固定层铺满视口，作为全站唯一的动态背景。
+         英雄区 / 套餐 / FAQ / 页脚共用它，去掉上深下浅的硬切。
+         颜色用 --aurora-1..4，跟随 .dark 切换明暗（浅色低饱和、深色高饱和）。 -->
+    <div class="sh-aurora" aria-hidden="true">
+      <span class="sh-aurora__glow sh-aurora__glow--a" />
+      <span class="sh-aurora__glow sh-aurora__glow--b" />
+      <span class="sh-aurora__glow sh-aurora__glow--c" />
+      <span class="sh-aurora__glow sh-aurora__glow--d" />
+      <span class="sh-aurora__grain" />
+    </div>
+
     <header class="nav">
       <div class="nav__inner">
         <a class="nav__brand" href="/">
@@ -274,13 +289,9 @@ function handlePaymentSuccess() {
 
     <main>
       <section class="hero">
-        <!-- 五层叠加：极光 → 透镜 → 内容 → 颗粒。纯 CSS，无 JS / canvas / 视频 -->
-        <span class="hero__glow hero__glow--a" aria-hidden="true" />
-        <span class="hero__glow hero__glow--b" aria-hidden="true" />
-        <span class="hero__glow hero__glow--c" aria-hidden="true" />
-        <span class="hero__glow hero__glow--d" aria-hidden="true" />
+        <!-- 英雄区只保留「透镜」景深层；极光与颗粒已提升到整页 .sh-aurora 固定层。
+             纯 CSS，无 JS / canvas / 视频。 -->
         <span class="hero__lens" aria-hidden="true" />
-        <span class="hero__grain" aria-hidden="true" />
 
         <div class="hero__inner">
           <div class="hero__copy">
@@ -378,7 +389,7 @@ function handlePaymentSuccess() {
           <header class="section__head" v-reveal>
             <span class="section__no">01 — 选择套餐</span>
             <h2 class="section__title">按你要的服务挑一个</h2>
-            <p class="section__desc">价格以支付前页面显示为准，支持支付宝与微信支付</p>
+            <p class="section__desc">价格以支付前页面显示为准，支持支付宝与微信支付 · 共 {{ products.length }} 个套餐</p>
           </header>
 
           <div v-if="loading" class="plans__grid">
@@ -386,20 +397,15 @@ function handlePaymentSuccess() {
           </div>
 
           <template v-else-if="categoryGroups.length">
-            <nav v-if="categoryGroups.length > 1" class="plans__nav" aria-label="商品分类">
-              <a v-for="group in categoryGroups" :key="group.value" class="plans__nav-item" :href="`#cat-${group.value}`">
-                {{ group.label }}
-              </a>
-            </nav>
-
-            <section v-for="group in categoryGroups" :id="`cat-${group.value}`" :key="group.value" class="plans__group">
+            <!-- 默认仅展示 GPT 代充；其余品类收进「查看更多服务」折叠区 -->
+            <section v-if="primaryGroup" :id="`cat-${primaryGroup.value}`" class="plans__group">
               <header class="plans__group-head">
-                <h3 class="plans__group-title">{{ group.label }}</h3>
-                <p v-if="group.blurb" class="plans__group-blurb">{{ group.blurb }}</p>
+                <h3 class="plans__group-title">{{ primaryGroup.label }}</h3>
+                <p v-if="primaryGroup.blurb" class="plans__group-blurb">{{ primaryGroup.blurb }}</p>
               </header>
               <div class="plans__grid">
                 <PlanCard
-                  v-for="product in group.items"
+                  v-for="product in primaryGroup.items"
                   :key="product.id"
                   :product="product"
                   :show-commission="isLoggedIn"
@@ -408,6 +414,48 @@ function handlePaymentSuccess() {
                 />
               </div>
             </section>
+
+            <div v-if="otherGroups.length" class="plans__more">
+              <button
+                type="button"
+                class="plans__more-btn"
+                :aria-expanded="showAllCategories"
+                @click="showAllCategories = !showAllCategories"
+              >
+                <span>{{ showAllCategories ? '收起其他服务' : '查看更多服务' }}</span>
+                <svg
+                  class="plans__more-chev"
+                  :class="{ 'is-open': showAllCategories }"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                >
+                  <path d="M4 6.5l4 4 4-4" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+
+              <div v-if="showAllCategories" class="plans__more-body">
+                <section v-for="group in otherGroups" :id="`cat-${group.value}`" :key="group.value" class="plans__group">
+                  <header class="plans__group-head">
+                    <h3 class="plans__group-title">{{ group.label }}</h3>
+                    <p v-if="group.blurb" class="plans__group-blurb">{{ group.blurb }}</p>
+                  </header>
+                  <div class="plans__grid">
+                    <PlanCard
+                      v-for="product in group.items"
+                      :key="product.id"
+                      :product="product"
+                      :show-commission="isLoggedIn"
+                      :aff-code="affCode"
+                      @select="openSheet"
+                    />
+                  </div>
+                </section>
+              </div>
+            </div>
           </template>
 
           <div v-else class="empty">
@@ -522,7 +570,7 @@ function handlePaymentSuccess() {
             <article class="contact__card" v-reveal="0">
               <span class="contact__icon contact__icon--qq" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2.2c-3.1 0-5.6 2.3-5.6 5.3 0 1.1.3 2.1.9 3-.9.6-1.5 1.5-1.5 2.6 0 .7.3 1.3.8 1.8-.3.9-.4 1.9-.2 2.9.1.5.5.8 1 .7.8-.2 1.5-.7 2.1-1.3.5.1 1 .2 1.5.2h3.9c.5 0 1-.1 1.5-.2.6.6 1.3 1.1 2.1 1.3.5.1.9-.2 1-.7.2-1 .1-2-.2-2.9.5-.5.8-1.1.8-1.8 0-1.1-.6-2-1.5-2.6.6-.9.9-1.9.9-3 0-3-2.5-5.3-5.6-5.3zM9.6 9.3c.5 0 .9.4.9.9s-.4.9-.9.9-.9-.4-.9-.9.4-.9.9-.9zm4.8 0c.5 0 .9.4.9.9s-.4.9-.9.9-.9-.4-.9-.9.4-.9.9-.9z" />
+                  <path d="M21.395 15.035a40 40 0 0 0-.803-2.264l-1.079-2.695c.001-.032.014-.562.014-.836C19.526 4.632 17.351 0 12 0S4.474 4.632 4.474 9.241c0 .274.013.804.014.836l-1.08 2.695a39 39 0 0 0-.802 2.264c-1.021 3.283-.69 4.643-.438 4.673.54.065 2.103-2.472 2.103-2.472 0 1.469.756 3.387 2.394 4.771-.612.188-1.363.479-1.845.835-.434.32-.379.646-.301.778.343.578 5.883.369 7.482.189 1.6.18 7.14.389 7.483-.189.078-.132.132-.458-.301-.778-.483-.356-1.233-.646-1.846-.836 1.637-1.384 2.393-3.302 2.393-4.771 0 0 1.563 2.537 2.103 2.472.251-.03.581-1.39-.438-4.673" />
                 </svg>
               </span>
               <div class="contact__body">
@@ -541,7 +589,7 @@ function handlePaymentSuccess() {
             <article class="contact__card" v-reveal="90">
               <span class="contact__icon contact__icon--qq" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2.2c-3.1 0-5.6 2.3-5.6 5.3 0 1.1.3 2.1.9 3-.9.6-1.5 1.5-1.5 2.6 0 .7.3 1.3.8 1.8-.3.9-.4 1.9-.2 2.9.1.5.5.8 1 .7.8-.2 1.5-.7 2.1-1.3.5.1 1 .2 1.5.2h3.9c.5 0 1-.1 1.5-.2.6.6 1.3 1.1 2.1 1.3.5.1.9-.2 1-.7.2-1 .1-2-.2-2.9.5-.5.8-1.1.8-1.8 0-1.1-.6-2-1.5-2.6.6-.9.9-1.9.9-3 0-3-2.5-5.3-5.6-5.3zM9.6 9.3c.5 0 .9.4.9.9s-.4.9-.9.9-.9-.4-.9-.9.4-.9.9-.9zm4.8 0c.5 0 .9.4.9.9s-.4.9-.9.9-.9-.4-.9-.9.4-.9.9-.9z" />
+                  <path d="M21.395 15.035a40 40 0 0 0-.803-2.264l-1.079-2.695c.001-.032.014-.562.014-.836C19.526 4.632 17.351 0 12 0S4.474 4.632 4.474 9.241c0 .274.013.804.014.836l-1.08 2.695a39 39 0 0 0-.802 2.264c-1.021 3.283-.69 4.643-.438 4.673.54.065 2.103-2.472 2.103-2.472 0 1.469.756 3.387 2.394 4.771-.612.188-1.363.479-1.845.835-.434.32-.379.646-.301.778.343.578 5.883.369 7.482.189 1.6.18 7.14.389 7.483-.189.078-.132.132-.458-.301-.778-.483-.356-1.233-.646-1.846-.836 1.637-1.384 2.393-3.302 2.393-4.771 0 0 1.563 2.537 2.103 2.472.251-.03.581-1.39-.438-4.673" />
                 </svg>
               </span>
               <div class="contact__body">
@@ -555,18 +603,6 @@ function handlePaymentSuccess() {
                 </svg>
                 复制
               </button>
-            </article>
-
-            <article v-if="contactInfo" class="contact__card" v-reveal="180">
-              <span class="contact__icon contact__icon--wechat" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M9 3C4.9 3 1.6 5.9 1.6 9.4c0 2 1 3.8 2.7 5L3.3 16.8l2.8-1.4c.9.3 1.8.4 2.9.4h.6c-.3-.8-.4-1.6-.4-2.5 0-3.6 3.3-6.4 7.3-6.4h.6C16.1 5 12.9 3 9 3zm-2.4 5.1a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm4.8 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm11.4 3.1c-2.4 0-4.3 1.8-4.3 4.1 0 2.2 1.9 4.1 4.3 4.1.6 0 1.2-.1 1.7-.3l1.9 1-.6-1.6c1.1-.9 1.8-2.2 1.8-3.6 0-2.3-1.9-4.4-4.4-4.4zm-2 3.4a.8.8 0 1 1 0 1.6.8.8 0 0 1 0-1.6zm4 0a.8.8 0 1 1 0 1.6.8.8 0 0 1 0-1.6z" />
-                </svg>
-              </span>
-              <div class="contact__body">
-                <p class="contact__label">微信客服</p>
-                <p class="contact__value">{{ contactInfo }}</p>
-              </div>
             </article>
           </div>
         </div>
@@ -598,10 +634,6 @@ function handlePaymentSuccess() {
             <RouterLink to="/openai-api">OpenAI 接入</RouterLink>
             <RouterLink to="/login">控制台登录</RouterLink>
           </div>
-          <div v-if="contactInfo">
-            <h4>客服</h4>
-            <p class="footer__contact">{{ contactInfo }}</p>
-          </div>
         </div>
       </div>
       <p class="footer__legal">
@@ -618,6 +650,7 @@ function handlePaymentSuccess() {
       :product="selectedProduct"
       :payment-methods="sheetPaymentMethods"
       :submitting="submitting"
+      :support-qq="QQ_AFTERSALES"
       @close="sheetOpen = false"
       @submit="handleSubmit"
     />
@@ -663,17 +696,21 @@ function handlePaymentSuccess() {
   --sh-scrim: rgba(9, 9, 11, 0.55);
   --sh-shadow: 0 1px 2px rgba(9, 9, 11, 0.04), 0 1px 3px rgba(9, 9, 11, 0.04);
 
-  /* ---------- 深色段令牌 ----------
-     导航 / 首屏 / 跑马灯这一段永远是深色（不跟随明暗主题），
-     与下方浅色转化段靠 --sh-* 各管各的，两套互不干扰。 */
+  /* ---------- 极光令牌（主题感知） ----------
+     整页 .sh-aurora 用 --aurora-1..4 上色：浅色模式刻意压到低饱和，白底仍干净；
+     深色模式走高饱和，沿用原深色极光观感。由 .dark 选择器切换。 */
+  --aurora-1: rgba(255, 122, 69, 0.16);
+  --aurora-2: rgba(124, 92, 255, 0.14);
+  --aurora-3: rgba(34, 211, 238, 0.12);
+  --aurora-4: rgba(255, 77, 109, 0.1);
+
+  /* 历史 --dk-* 令牌保留作降级；英雄区 / 导航 / 跑马灯已切到 --sh-*（主题感知）。 */
   --dk-bg: #0b0d12;
   --dk-fg: #f6f7fb;
   --dk-fg-2: rgba(246, 247, 251, 0.64);
   --dk-fg-3: rgba(246, 247, 251, 0.4);
   --dk-border: rgba(255, 255, 255, 0.1);
   --dk-border-strong: rgba(255, 255, 255, 0.22);
-  /* 极光三色：暖橙（品牌）＋蓝紫＋青，比纯冷色更有温度。
-     取值刻意偏高——光斑本身是极低饱和的宽渐变，叠两层遮罩后实际观感会再降一档。 */
   --dk-glow-1: rgba(255, 122, 69, 0.52);
   --dk-glow-2: rgba(124, 92, 255, 0.48);
   --dk-glow-3: rgba(34, 211, 238, 0.4);
@@ -762,8 +799,8 @@ section[id],
   position: sticky;
   top: 0;
   z-index: 40;
-  border-bottom: 1px solid var(--dk-border);
-  background: color-mix(in srgb, var(--dk-bg) 76%, transparent);
+  border-bottom: 1px solid var(--sh-border);
+  background: color-mix(in srgb, var(--sh-bg) 76%, transparent);
   backdrop-filter: saturate(180%) blur(14px);
 }
 
@@ -786,21 +823,22 @@ section[id],
 }
 
 .nav__mark {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   display: grid;
   place-items: center;
-  border-radius: 7px;
-  background: linear-gradient(140deg, var(--dk-accent), var(--dk-accent-2));
+  border-radius: 8px;
+  background: linear-gradient(140deg, var(--sh-accent), color-mix(in srgb, var(--sh-accent) 70%, #ff4d6d));
   color: #fff;
   font-size: 14px;
   font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 6px 16px -8px color-mix(in srgb, var(--sh-accent) 70%, transparent);
 }
 
 .nav__name {
   font-size: 15px;
   font-weight: 600;
-  color: var(--dk-fg);
+  color: var(--sh-text);
   letter-spacing: -0.01em;
 }
 
@@ -811,13 +849,17 @@ section[id],
 }
 
 .nav__links a {
-  color: var(--dk-fg-2);
+  color: var(--sh-text-2);
   text-decoration: none;
-  transition: color 160ms ease-out;
+  padding: 7px 12px;
+  border-radius: 9px;
+  font-weight: 500;
+  transition: color 160ms ease-out, background 160ms ease-out;
 }
 
 .nav__links a:hover {
-  color: var(--dk-fg);
+  color: var(--sh-text);
+  background: color-mix(in srgb, var(--sh-text) 8%, transparent);
 }
 
 .nav__actions {
@@ -828,28 +870,30 @@ section[id],
 
 .nav__ghost {
   font-size: 14px;
-  color: var(--dk-fg-2);
+  color: var(--sh-text-2);
   text-decoration: none;
   transition: color 160ms ease-out;
 }
 
 .nav__ghost:hover {
-  color: var(--dk-fg);
+  color: var(--sh-text);
 }
 
 .nav__cta {
-  padding: 8px 15px;
-  border-radius: 8px;
-  background: linear-gradient(100deg, var(--dk-accent), var(--dk-accent-2));
+  padding: 9px 18px;
+  border-radius: 10px;
+  background: linear-gradient(100deg, var(--sh-accent), color-mix(in srgb, var(--sh-accent) 70%, #ff4d6d));
   color: #fff;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   text-decoration: none;
-  transition: filter 160ms ease-out;
+  box-shadow: 0 8px 22px -10px color-mix(in srgb, var(--sh-accent) 70%, transparent);
+  transition: filter 160ms ease-out, transform 160ms ease-out;
 }
 
 .nav__cta:hover {
   filter: brightness(1.08);
+  transform: translateY(-1px);
 }
 
 /* ---------- hero：深色沉浸首屏 ----------
@@ -859,57 +903,69 @@ section[id],
   position: relative;
   overflow: hidden;
   isolation: isolate;
-  background: var(--dk-bg);
-  color: var(--dk-fg);
+  background: transparent;
+  color: var(--sh-text);
   padding: 88px 0 96px;
 }
 
-/* 1) 极光层：三团光斑极缓呼吸。这是整段唯一的「彩色」来源，其余一律中性灰阶。 */
-.hero__glow {
+/* ============================================================
+   整页极光（固定层，跟随明暗主题）
+   提升到 .sales-home 顶层、position:fixed 铺满视口，作为全站唯一的
+   「动态背景」——英雄区 / 套餐 / FAQ / 页脚都共用它，不再有上深下浅硬切。
+   颜色用 --aurora-1..4：浅色低饱和（白底仍干净），深色高饱和（沿用原 dk-glow）。 */
+.sh-aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.sh-aurora__glow {
   position: absolute;
   border-radius: 50%;
   pointer-events: none;
   will-change: opacity, transform;
 }
 
-.hero__glow--a {
+.sh-aurora__glow--a {
   top: -22%;
   left: -12%;
   width: 58vw;
   height: 58vw;
-  background: radial-gradient(circle at 50% 50%, var(--dk-glow-1) 0%, transparent 66%);
-  animation: dk-glow-a 34s ease-in-out infinite alternate;
+  background: radial-gradient(circle at 50% 50%, var(--aurora-1) 0%, transparent 66%);
+  animation: sh-aurora-a 34s ease-in-out infinite alternate;
 }
 
-.hero__glow--b {
+.sh-aurora__glow--b {
   top: -14%;
   right: -14%;
   width: 54vw;
   height: 54vw;
-  background: radial-gradient(circle at 50% 50%, var(--dk-glow-2) 0%, transparent 66%);
-  animation: dk-glow-b 44s ease-in-out infinite alternate;
+  background: radial-gradient(circle at 50% 50%, var(--aurora-2) 0%, transparent 66%);
+  animation: sh-aurora-b 44s ease-in-out infinite alternate;
 }
 
-.hero__glow--c {
+.sh-aurora__glow--c {
   bottom: -30%;
   left: 24%;
   width: 48vw;
   height: 48vw;
-  background: radial-gradient(circle at 50% 50%, var(--dk-glow-3) 0%, transparent 68%);
-  animation: dk-glow-c 38s ease-in-out infinite alternate;
+  background: radial-gradient(circle at 50% 50%, var(--aurora-3) 0%, transparent 68%);
+  animation: sh-aurora-c 38s ease-in-out infinite alternate;
 }
 
 /* 第四团暖粉：补在右侧中段，把「冷→暖」的过渡补齐，避免整屏只剩蓝紫 */
-.hero__glow--d {
+.sh-aurora__glow--d {
   top: 22%;
   right: 2%;
   width: 34vw;
   height: 34vw;
-  background: radial-gradient(circle at 50% 50%, var(--dk-glow-4) 0%, transparent 70%);
-  animation: dk-glow-d 41s ease-in-out infinite alternate;
+  background: radial-gradient(circle at 50% 50%, var(--aurora-4) 0%, transparent 70%);
+  animation: sh-aurora-d 41s ease-in-out infinite alternate;
 }
 
-@keyframes dk-glow-a {
+@keyframes sh-aurora-a {
   from {
     opacity: 0.6;
     transform: translate3d(0, 0, 0) scale(1);
@@ -920,7 +976,7 @@ section[id],
   }
 }
 
-@keyframes dk-glow-b {
+@keyframes sh-aurora-b {
   from {
     opacity: 0.5;
     transform: translate3d(0, 0, 0) scale(1.05);
@@ -931,7 +987,7 @@ section[id],
   }
 }
 
-@keyframes dk-glow-c {
+@keyframes sh-aurora-c {
   from {
     opacity: 0.36;
     transform: translate3d(0, 2%, 0) scale(1.02);
@@ -942,7 +998,7 @@ section[id],
   }
 }
 
-@keyframes dk-glow-d {
+@keyframes sh-aurora-d {
   from {
     opacity: 0.42;
     transform: translate3d(0, 0, 0) scale(1.04);
@@ -953,37 +1009,36 @@ section[id],
   }
 }
 
-/* 2) 透镜层：一圈椭圆描边 + 三重 inset 阴影 + 上下渐隐，制造「往里看」的景深 */
-.hero__lens {
-  position: absolute;
-  inset: -14% -6% 8%;
-  border-radius: 48% / 42%;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow:
-    inset 7rem 0 12rem -9rem rgba(255, 255, 255, 0.18),
-    inset -7rem 0 12rem -9rem rgba(255, 255, 255, 0.18),
-    inset 0 -5rem 10rem -8rem rgba(255, 255, 255, 0.12);
-  /* 上下都要完全淡出：椭圆下弧如果只淡到一半，会在促销条上方留一道突兀的白线 */
-  -webkit-mask-image: linear-gradient(transparent 4%, #000 22% 68%, transparent 86%);
-  mask-image: linear-gradient(transparent 4%, #000 22% 68%, transparent 86%);
-  pointer-events: none;
-}
-
-/* 3) 颗粒层：一张 180×180 的静态 SVG 噪声平铺，去掉数字塑料感。
-   它是静态图片，没有运行时开销——整套视觉里性价比最高的一层。 */
-.hero__grain {
+/* 颗粒层：静态 SVG 噪声平铺，去掉数字塑料感，铺满整页 */
+.sh-aurora__grain {
   position: absolute;
   inset: 0;
-  opacity: 0.16;
+  opacity: 0.14;
   mix-blend-mode: overlay;
   pointer-events: none;
   background-repeat: repeat;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
 }
 
+/* 2) 透镜层（仅英雄区）：一圈椭圆描边 + 三重 inset 阴影 + 上下渐隐，制造「往里看」的景深 */
+.hero__lens {
+  position: absolute;
+  inset: -14% -6% 8%;
+  border-radius: 48% / 42%;
+  border: 1px solid var(--sh-border);
+  box-shadow:
+    inset 7rem 0 12rem -9rem rgba(255, 255, 255, 0.14),
+    inset -7rem 0 12rem -9rem rgba(255, 255, 255, 0.14),
+    inset 0 -5rem 10rem -8rem rgba(255, 255, 255, 0.1);
+  /* 上下都要完全淡出：椭圆下弧如果只淡到一半，会在促销条上方留一道突兀的白线 */
+  -webkit-mask-image: linear-gradient(transparent 4%, #000 22% 68%, transparent 86%);
+  mask-image: linear-gradient(transparent 4%, #000 22% 68%, transparent 86%);
+  pointer-events: none;
+}
+
 /* 系统开启「减弱动态效果」时退化为静态光斑 */
 @media (prefers-reduced-motion: reduce) {
-  .hero__glow {
+  .sh-aurora__glow {
     animation: none;
     opacity: 0.7;
   }
@@ -1013,10 +1068,10 @@ section[id],
   gap: 8px;
   padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid var(--dk-border);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--sh-border);
+  background: color-mix(in srgb, var(--sh-text) 6%, transparent);
   font-size: 13px;
-  color: var(--dk-fg-2);
+  color: var(--sh-text-2);
 }
 
 .hero__eyebrow-dot {
@@ -1034,7 +1089,7 @@ section[id],
   font-weight: 600;
   letter-spacing: -0.045em;
   text-wrap: balance;
-  color: var(--dk-fg);
+  color: var(--sh-text);
 }
 
 .hero__title-line {
@@ -1045,16 +1100,17 @@ section[id],
   font-size: 0.78em;
   font-weight: 500;
   letter-spacing: -0.035em;
-  color: var(--dk-fg-2);
+  color: var(--sh-text-2);
 }
 
-/* 第二行做渐变文字：纯白 → 暖橙 → 纯白，把视觉重心压在这一句上 */
+/* 第二行做渐变文字：主题文字色 → 品牌橙 → 主题文字色，把视觉重心压在这一句上
+   （浅色模式深→橙→深，深色模式亮→橙→亮，跟随明暗主题） */
 .hero__title-line--emphasis {
   margin-top: 0.08em;
   font-size: 1.04em;
   font-weight: 700;
   letter-spacing: -0.025em;
-  background: linear-gradient(104deg, #ffffff 6%, #ffb08a 54%, #ffffff 96%);
+  background: linear-gradient(104deg, var(--sh-text) 6%, var(--sh-accent) 54%, var(--sh-text) 96%);
   -webkit-text-fill-color: transparent;
   background-clip: text;
   -webkit-background-clip: text;
@@ -1065,7 +1121,7 @@ section[id],
   max-width: 520px;
   font-size: 15px;
   line-height: 1.75;
-  color: var(--dk-fg-2);
+  color: var(--sh-text-2);
 }
 
 .hero__actions {
@@ -1077,13 +1133,13 @@ section[id],
 }
 
 .sh-btn--dark-ghost {
-  border: 1px solid var(--dk-border-strong);
-  color: var(--dk-fg);
+  border: 1px solid var(--sh-border-strong);
+  color: var(--sh-text);
   background: transparent;
 }
 
 .sh-btn--dark-ghost:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: color-mix(in srgb, var(--sh-text) 8%, transparent);
 }
 
 /* 促销条容器：跟在两栏内容下方，整幅居中，抢到最大视觉宽度 */
@@ -1145,7 +1201,7 @@ section[id],
   gap: 8px;
   font-size: 12.5px;
   line-height: 1.3;
-  color: var(--dk-fg-2);
+  color: var(--sh-text-2);
 }
 
 .hero__feature-icon {
@@ -1155,10 +1211,10 @@ section[id],
   display: grid;
   place-items: center;
   border-radius: 50%;
-  border: 1px solid var(--dk-border);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--sh-border);
+  background: color-mix(in srgb, var(--sh-text) 7%, transparent);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
-  color: var(--dk-fg);
+  color: var(--sh-text);
 }
 
 .hero__feature-icon svg {
@@ -1168,8 +1224,8 @@ section[id],
 
 /* ---------- 跑马灯：深色段与浅色段之间的过渡带 ---------- */
 .marquee {
-  background: var(--dk-bg);
-  border-top: 1px solid var(--dk-border);
+  background: transparent;
+  border-top: 1px solid var(--sh-border);
   overflow: hidden;
   padding: 20px 0;
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 8% 92%, transparent);
@@ -1191,7 +1247,7 @@ section[id],
   gap: 40px;
   padding-right: 40px;
   font-size: 14px;
-  color: rgba(246, 247, 251, 0.52);
+  color: var(--sh-text-3);
   white-space: nowrap;
 }
 
@@ -1199,7 +1255,7 @@ section[id],
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: var(--dk-border-strong);
+  background: var(--sh-border-strong);
 }
 
 @keyframes dk-marquee {
@@ -1328,29 +1384,48 @@ section[id],
   padding: 96px 0;
 }
 
-/* 品类锚点导航：胶囊 chip，点击滚到对应分组 */
-.plans__nav {
+/* 「查看更多服务」折叠区：首页默认只暴露 GPT 代充，其余品类点此展开 */
+.plans__more {
+  margin-top: 36px;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.plans__more-btn {
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
-  margin-bottom: 40px;
-}
-
-.plans__nav-item {
-  padding: 7px 16px;
+  padding: 11px 22px;
   border-radius: 999px;
-  border: 1px solid var(--sh-border);
-  background: var(--sh-surface-2);
-  color: var(--sh-text-2);
-  font-size: 13px;
+  border: 1px solid var(--sh-border-strong);
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  font-size: 14px;
   font-weight: 500;
-  text-decoration: none;
-  transition: color 160ms ease-out, border-color 160ms ease-out;
+  cursor: pointer;
+  transition: border-color 160ms ease-out, color 160ms ease-out, background 160ms ease-out;
 }
 
-.plans__nav-item:hover {
-  color: var(--sh-text);
-  border-color: var(--sh-border-strong);
+.plans__more-btn:hover {
+  border-color: var(--sh-accent);
+  color: var(--sh-accent-text);
+  background: var(--sh-accent-soft);
+}
+
+.plans__more-chev {
+  transition: transform 220ms ease-out;
+}
+
+.plans__more-chev.is-open {
+  transform: rotate(180deg);
+}
+
+.plans__more-body {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 分组之间留出比卡片间距更大的呼吸，避免所有商品糊成一片 */
@@ -1381,8 +1456,11 @@ section[id],
 
 .plans__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  /* 1120px 容器下自然排 4 列，移动端退化为 1-2 列 */
+  grid-template-columns: repeat(auto-fit, minmax(228px, 1fr));
   gap: 20px;
+  /* 给推荐位的「最受欢迎」浮标留出上方空间，避免被分组标题遮挡 */
+  padding-top: 12px;
 }
 
 .sh-skeleton {
@@ -1532,18 +1610,35 @@ section[id],
   text-align: right;
 }
 
-/* ---------- faq ---------- */
+/* ---------- faq（紧凑卡片，减少占地） ---------- */
 .faq {
   padding: 96px 0;
   border-top: 1px solid var(--sh-border);
 }
 
 .faq__list {
-  border-top: 1px solid var(--sh-border);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+@media (min-width: 768px) {
+  .faq__list {
+    grid-template-columns: 1fr 1fr;
+    column-gap: 20px;
+  }
 }
 
 .faq__item {
-  border-bottom: 1px solid var(--sh-border);
+  border: 1px solid var(--sh-border);
+  border-radius: 12px;
+  background: var(--sh-surface);
+  transition: border-color 180ms ease-out, background 180ms ease-out;
+}
+
+.faq__item--open {
+  border-color: color-mix(in srgb, var(--sh-accent) 45%, var(--sh-border));
+  background: var(--sh-accent-soft);
 }
 
 .faq__q {
@@ -1551,13 +1646,14 @@ section[id],
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 20px 0;
+  gap: 14px;
+  padding: 15px 16px;
   background: transparent;
   border: none;
   color: var(--sh-text);
-  font-size: 16px;
+  font-size: 14.5px;
   font-weight: 500;
+  line-height: 1.45;
   text-align: left;
   cursor: pointer;
 }
@@ -1570,12 +1666,13 @@ section[id],
 
 .faq__item--open .faq__q svg {
   transform: rotate(180deg);
+  color: var(--sh-accent-text);
 }
 
 .faq__a {
-  padding: 0 0 22px;
-  font-size: 14px;
-  line-height: 1.8;
+  padding: 0 16px 16px;
+  font-size: 13.5px;
+  line-height: 1.7;
   color: var(--sh-text-2);
 }
 
@@ -1601,7 +1698,7 @@ section[id],
   color: var(--sh-text);
 }
 
-/* ---------- 联系我们（QQ 群 + 售后 QQ + 微信客服，带一键复制） ---------- */
+/* ---------- 联系我们（QQ 交流群 + 售后 QQ，带一键复制） ---------- */
 .contact {
   padding: 72px 0;
   border-top: 1px solid var(--sh-border);
@@ -1610,7 +1707,7 @@ section[id],
 .contact__grid {
   margin-top: 36px;
   display: grid;
-  /* auto-fit：后台未配置微信客服时只剩 2 张 QQ 卡，也不会留下空的第 3 列 */
+  /* 两张固定的 QQ 卡：宽屏 auto-fit 铺两列，窄屏自动堆叠 */
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 16px;
 }
@@ -1641,14 +1738,9 @@ section[id],
   color: #fff;
 }
 
-/* QQ 品牌色（腾讯蓝）；微信用微信绿，区分两种入口 */
+/* QQ 品牌色（腾讯蓝） */
 .contact__icon--qq {
   background: linear-gradient(150deg, #2ba3f5, #1a8fe3);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
-}
-
-.contact__icon--wechat {
-  background: linear-gradient(150deg, #2dd36f, #1aad5a);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
@@ -1761,10 +1853,6 @@ section[id],
   color: var(--sh-text);
 }
 
-.footer__contact {
-  white-space: pre-wrap;
-}
-
 .footer__legal {
   max-width: 1120px;
   margin: 40px auto 0;
@@ -1869,20 +1957,10 @@ section[id],
     font-size: 24px;
   }
 
-  /* 品类导航横向滚动，避免竖排堆叠占满首屏 */
-  .plans__nav {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-    margin-bottom: 28px;
-  }
-
-  .plans__nav::-webkit-scrollbar {
-    display: none;
-  }
-
-  .plans__nav-item {
-    flex: 0 0 auto;
+  /* 移动端「查看更多服务」按钮拉满宽度，居中文字 */
+  .plans__more-btn {
+    width: 100%;
+    justify-content: center;
   }
 
   .plans__group + .plans__group {
@@ -1935,9 +2013,37 @@ section[id],
   }
 }
 
+/* ============================================================
+   整页内容层：压在固定极光之上，确保极光是「背景」而非遮挡内容。 */
+.sales-home > main,
+.sales-home > footer {
+  position: relative;
+  z-index: 1;
+}
+
+/* 卡片玻璃化：半透明 + 背景模糊，让整页极光透出来，呼应英雄区设计感。
+   82% 不透明度保留足够可读性；边框/阴影沿用既有 --sh-* 令牌。 */
+.step,
+.compare__card,
+.faq__item,
+.contact__card,
+.banner,
+.plans__more-btn,
+.guide-wrap {
+  background: color-mix(in srgb, var(--sh-surface) 82%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+}
+
+/* 减弱动态效果：规范做法——同时关掉动画与过渡，而非只处理 transition */
 @media (prefers-reduced-motion: reduce) {
-  * {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 </style>
@@ -1963,6 +2069,12 @@ section[id],
   --sh-grid: rgba(255, 255, 255, 0.045);
   --sh-scrim: rgba(0, 0, 0, 0.6);
   --sh-shadow: none;
+
+  /* 深色极光：高饱和，沿用原深色观感 */
+  --aurora-1: rgba(255, 122, 69, 0.52);
+  --aurora-2: rgba(124, 92, 255, 0.48);
+  --aurora-3: rgba(34, 211, 238, 0.4);
+  --aurora-4: rgba(255, 77, 109, 0.34);
 }
 
 /* 锚点平滑滚动（导航「套餐 / 流程 / 常见问题」）。放在非 scoped 块里才能作用到 html。 */

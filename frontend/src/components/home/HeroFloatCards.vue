@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { formatCNY, type PublicProduct } from '@/api/publicShop'
-import { resolveShopAssetUrl } from '@/api/shop'
+import BrandLogo from '@/components/home/BrandLogo.vue'
 
 /**
  * 首屏右侧的悬浮商品预览卡。
@@ -14,29 +15,21 @@ import { resolveShopAssetUrl } from '@/api/shop'
 const props = defineProps<{ products: PublicProduct[] }>()
 const emit = defineEmits<{ select: [product: PublicProduct] }>()
 
-function imageOf(product: PublicProduct) {
-  return resolveShopAssetUrl(product.image_url)
-}
-
-function items() {
-  return props.products.slice(0, 3)
-}
+// 只取前三张做错位排布；用 computed 避免每次重渲染都重新分配数组
+const cards = computed(() => props.products.slice(0, 3))
 </script>
 
 <template>
   <div class="floats">
     <button
-      v-for="(product, index) in items()"
+      v-for="(product, index) in cards"
       :key="product.id"
       type="button"
       class="floats__card"
       :class="`floats__card--${index}`"
       @click="emit('select', product)"
     >
-      <span class="floats__media">
-        <img v-if="imageOf(product)" :src="imageOf(product)" :alt="product.name" loading="lazy">
-        <span v-else class="floats__media-fallback" aria-hidden="true">3</span>
-      </span>
+      <BrandLogo :product="product" :size="56" />
       <span class="floats__body">
         <span class="floats__name">{{ product.name }}</span>
         <span class="floats__row">
@@ -65,25 +58,27 @@ function items() {
   gap: 12px;
   padding: 12px;
   border-radius: 16px;
-  border: 1px solid var(--dk-border, rgba(255, 255, 255, 0.1));
-  color: var(--dk-fg, #f6f7fb);
+  border: 1px solid var(--sh-border, rgba(0, 0, 0, 0.1));
+  color: var(--sh-text, #0a0a0a);
   text-align: left;
   cursor: pointer;
-  /* 玻璃质感：高处一抹径向高光 + 极淡渐变底 + 顶部内高光 + 大范围落地投影 */
+  /* 玻璃质感：主题感知的玻璃表面 + 抹高光（浅色/深色都成立），整页极光透出 */
   background:
-    radial-gradient(120% 90% at 24% 6%, rgba(255, 255, 255, 0.2), transparent 48%),
-    linear-gradient(158deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.026));
+    radial-gradient(120% 90% at 24% 6%, color-mix(in srgb, var(--sh-surface) 92%, transparent), transparent 46%),
+    color-mix(in srgb, var(--sh-surface) 74%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  backdrop-filter: blur(14px) saturate(130%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    0 26px 60px -26px rgba(0, 0, 0, 0.78);
+    inset 0 1px 0 color-mix(in srgb, var(--sh-text) 12%, transparent),
+    0 26px 60px -30px rgba(0, 0, 0, 0.45);
   transform: rotate(var(--float-rot));
   will-change: transform;
   animation: float-bob 9s ease-in-out infinite;
-  transition: border-color 200ms ease-out;
+  transition: border-color 200ms ease-out, background 200ms ease-out;
 }
 
 .floats__card:hover {
-  border-color: var(--dk-border-strong, rgba(255, 255, 255, 0.22));
+  border-color: var(--sh-border-strong, rgba(0, 0, 0, 0.22));
 }
 
 .floats__card--0 {
@@ -126,32 +121,6 @@ function items() {
   }
 }
 
-.floats__media {
-  flex: none;
-  width: 56px;
-  height: 56px;
-  overflow: hidden;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.floats__media img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.floats__media-fallback {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 100%;
-  font-size: 18px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.5);
-}
-
 .floats__body {
   min-width: 0;
   display: grid;
@@ -165,7 +134,7 @@ function items() {
   overflow: hidden;
   font-size: 13px;
   line-height: 1.35;
-  color: rgba(246, 247, 251, 0.82);
+  color: var(--sh-text-2, rgba(10, 10, 10, 0.64));
 }
 
 .floats__row {
@@ -184,8 +153,8 @@ function items() {
 .floats__badge {
   padding: 2px 7px;
   border-radius: 6px;
-  background: rgba(255, 107, 53, 0.18);
-  color: #ffb08a;
+  background: color-mix(in srgb, var(--sh-accent, #d85a28) 16%, transparent);
+  color: var(--sh-accent-text, var(--sh-accent, #c04a1a));
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;

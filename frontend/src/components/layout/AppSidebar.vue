@@ -35,9 +35,12 @@
     <nav ref="sidebarNavRef" class="sidebar-nav scrollbar-hide">
       <!-- Admin View: Admin menu first, then personal menu -->
       <template v-if="isAdmin">
-        <!-- Admin Section -->
-        <div class="sidebar-section">
-          <template v-for="item in adminNavItems" :key="item.path">
+        <!-- Admin Section (按功能分组，每个图标包进品牌色块) -->
+        <div v-for="group in adminNavGroups" :key="group.title" class="sidebar-section">
+          <div class="sidebar-section-title" :class="{ 'sidebar-section-title-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
+            <span class="sidebar-section-title-text" :class="{ 'sidebar-section-title-text-collapsed': sidebarCollapsed }">{{ group.title }}</span>
+          </div>
+          <template v-for="item in group.items" :key="item.path">
             <!-- Collapsible group (has children) -->
             <template v-if="item.children?.length">
               <button
@@ -50,7 +53,9 @@
                 :title="sidebarCollapsed ? item.label : undefined"
                 @click="handleGroupClick(item)"
               >
-                <component :is="item.icon" class="h-5 w-5 flex-shrink-0" />
+                <span class="sidebar-link__icon">
+                  <component :is="item.icon" class="h-5 w-5 flex-shrink-0" />
+                </span>
                 <span
                   class="sidebar-label sidebar-label-flex"
                   :class="{ 'sidebar-label-collapsed': sidebarCollapsed }"
@@ -73,7 +78,9 @@
                   :class="{ 'sidebar-link-active': route.path === child.path }"
                   @click="handleMenuItemClick(child.path)"
                 >
-                  <component :is="child.icon" class="h-4 w-4 flex-shrink-0" />
+                  <span class="sidebar-link__icon sidebar-link__icon--sm">
+                    <component :is="child.icon" class="h-5 w-5 flex-shrink-0" />
+                  </span>
                   <span>{{ child.label }}</span>
                 </router-link>
               </div>
@@ -96,8 +103,10 @@
               "
               @click="handleMenuItemClick(item.path)"
             >
-              <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
-              <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" />
+              <span class="sidebar-link__icon">
+                <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
+                <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" />
+              </span>
               <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ item.label }}</span>
             </router-link>
           </template>
@@ -121,8 +130,10 @@
             :data-tour="item.path === '/keys' ? 'sidebar-my-keys' : undefined"
             @click="handleMenuItemClick(item.path)"
           >
-            <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
-            <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" />
+            <span class="sidebar-link__icon">
+              <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
+              <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" />
+            </span>
             <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ item.label }}</span>
           </router-link>
         </div>
@@ -141,8 +152,10 @@
             :data-tour="item.path === '/keys' ? 'sidebar-my-keys' : undefined"
             @click="handleMenuItemClick(item.path)"
           >
-            <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
-            <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" />
+            <span class="sidebar-link__icon">
+              <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
+              <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" />
+            </span>
             <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ item.label }}</span>
           </router-link>
         </div>
@@ -158,8 +171,10 @@
         :class="{ 'sidebar-link-collapsed': sidebarCollapsed }"
         :title="sidebarCollapsed ? (isDark ? t('nav.lightMode') : t('nav.darkMode')) : undefined"
       >
-        <SunIcon v-if="isDark" class="h-5 w-5 flex-shrink-0 text-amber-500" />
-        <MoonIcon v-else class="h-5 w-5 flex-shrink-0" />
+        <span class="sidebar-link__icon">
+          <SunIcon v-if="isDark" class="h-5 w-5 flex-shrink-0 text-amber-500" />
+          <MoonIcon v-else class="h-5 w-5 flex-shrink-0" />
+        </span>
         <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{
           isDark ? t('nav.lightMode') : t('nav.darkMode')
         }}</span>
@@ -172,8 +187,10 @@
         :class="{ 'sidebar-link-collapsed': sidebarCollapsed }"
         :title="sidebarCollapsed ? t('nav.expand') : t('nav.collapse')"
       >
-        <ChevronDoubleLeftIcon v-if="!sidebarCollapsed" class="h-5 w-5 flex-shrink-0" />
-        <ChevronDoubleRightIcon v-else class="h-5 w-5 flex-shrink-0" />
+        <span class="sidebar-link__icon">
+          <ChevronDoubleLeftIcon v-if="!sidebarCollapsed" class="h-5 w-5 flex-shrink-0" />
+          <ChevronDoubleRightIcon v-else class="h-5 w-5 flex-shrink-0" />
+        </span>
         <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ t('nav.collapse') }}</span>
       </button>
     </div>
@@ -843,6 +860,52 @@ const adminNavItems = computed((): NavItem[] => {
   return visible
 })
 
+// 主控后台菜单分组：把扁平的 adminNavItems 按路径归入带标题的区块，
+// 提升「功能展示」的层级与设计语言。路径 / 路由 / 功能一律不变。
+const ADMIN_GROUP_MAP: Record<string, string> = {
+  '/admin/dashboard': '概览',
+  '/admin/ops': '概览',
+  '/admin/users': '用户与组织',
+  '/admin/groups': '用户与组织',
+  '/admin/accounts': '用户与组织',
+  '/admin/channels': '渠道',
+  '/admin/channels/pricing': '渠道',
+  '/admin/channels/monitor': '渠道',
+  '/admin/shop': '商城与财务',
+  '/admin/orders/plans': '商城与财务',
+  '/admin/subscriptions': '商城与财务',
+  '/admin/finance': '商城与财务',
+  '/admin/redeem': '商城与财务',
+  '/admin/promo-codes': '商城与财务',
+  '/admin/announcements': '运维与安全',
+  '/admin/proxies': '运维与安全',
+  '/admin/security-audit': '运维与安全',
+  '/admin/risk-control': '运维与安全',
+  '/admin/prompt-audit': '运维与安全',
+  '/admin/usage': '运维与安全',
+  '/admin/audit-logs': '运维与安全',
+  '/admin/orders': '订单',
+  '/admin/orders/dashboard': '订单',
+  '/admin/tools': '系统',
+  '/admin/settings': '系统'
+}
+const ADMIN_GROUP_ORDER = ['概览', '用户与组织', '渠道', '商城与财务', '运维与安全', '订单', '系统']
+
+const adminNavGroups = computed(() => {
+  const buckets = new Map<string, NavItem[]>()
+  for (const item of adminNavItems.value) {
+    const title = ADMIN_GROUP_MAP[item.path] ?? '其它'
+    if (!buckets.has(title)) buckets.set(title, [])
+    buckets.get(title)!.push(item)
+  }
+  const groups: { title: string; items: NavItem[] }[] = []
+  for (const title of ADMIN_GROUP_ORDER) {
+    if (buckets.has(title)) groups.push({ title, items: buckets.get(title)! })
+  }
+  if (buckets.has('其它')) groups.push({ title: '其它', items: buckets.get('其它')! })
+  return groups
+})
+
 function toggleSidebar() {
   appStore.toggleSidebar()
 }
@@ -1109,5 +1172,59 @@ onBeforeUnmount(() => {
   display: block;
   width: 1.25rem;
   height: 1.25rem;
+}
+
+/* ============ 图标色块（图7：更强的侧栏设计语言） ============ */
+/* 每个导航图标包进圆角色块：默认中性底，hover/激活/featured 填充品牌色。
+   色块尺寸固定，标签收起时色块仍居中显示，形成干净的图标轨道。 */
+.sidebar-link__icon {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--ui-surface-muted);
+  color: var(--ui-muted);
+  transition: background 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.sidebar-link:hover .sidebar-link__icon {
+  background: color-mix(in srgb, var(--ui-brand) 12%, var(--ui-surface-muted));
+  color: var(--ui-ink);
+}
+
+.sidebar-link__icon--sm {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 8px;
+}
+
+.sidebar-link__icon :deep(svg) {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.sidebar-link__icon--sm :deep(svg) {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* 激活态：色块填充品牌橙，白字 */
+.app-sidebar-redesign .sidebar-link-active .sidebar-link__icon {
+  background: var(--ui-brand);
+  color: #fff;
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--ui-brand) 30%, transparent);
+}
+
+/* featured（api / company / shop）：色块用各自强调色 */
+.app-sidebar-redesign .sidebar-link-featured .sidebar-link__icon {
+  background: color-mix(in srgb, var(--sidebar-feature-accent) 16%, var(--ui-surface));
+  color: var(--sidebar-feature-fg);
+}
+
+.app-sidebar-redesign .sidebar-link-featured.sidebar-link-active .sidebar-link__icon {
+  background: var(--sidebar-feature-accent);
+  color: #fff;
 }
 </style>
