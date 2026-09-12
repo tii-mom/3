@@ -11,6 +11,8 @@ const props = defineProps<{
   /** 可用支付方式，来自后台配置并按商品金额过滤 */
   paymentMethods?: GuestPaymentOption[]
   submitting?: boolean
+  /** 售后 QQ 号，用于「暂无可用支付方式」时的联系入口 */
+  supportQQ?: string
 }>()
 
 const authStore = useAuthStore()
@@ -146,7 +148,7 @@ function submit() {
             class="sheet__input"
             :class="{ 'sheet__input--error': contactError }"
             type="text"
-            inputmode="email"
+            inputmode="text"
             autocomplete="email"
             placeholder="手机号或邮箱，用于查单和售后"
             @blur="touched = true"
@@ -158,7 +160,9 @@ function submit() {
         <div class="sheet__field">
           <span class="sheet__label">支付方式</span>
           <div v-if="noMethodAvailable" class="sheet__no-method">
-            当前商品暂无可用的支付方式，请联系客服处理
+            <p>
+              当前商品暂无可用的支付方式。<template v-if="supportQQ">可加 QQ 客服 {{ supportQQ }} 协助处理。</template><template v-else>请联系客服处理。</template>
+            </p>
           </div>
           <div v-else class="sheet__methods">
             <button

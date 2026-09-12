@@ -28,8 +28,7 @@ const props = withDefaults(defineProps<{
   contact?: string
   submitted?: boolean
   hint?: string
-  theme?: 'dark' | 'light'
-}>(), { theme: 'light', submitted: false })
+}>(), { submitted: false })
 
 const emit = defineEmits<{ submitted: [] }>()
 
@@ -65,6 +64,8 @@ const title = computed(() => {
 
 async function submit() {
   if (!canSubmit.value || submitting.value) return
+  // 已提交过资料时属于「覆盖重提」，加一次二次确认，避免误触覆盖已提交凭证
+  if (props.submitted && !window.confirm('该订单已提交过资料，确认用新内容覆盖吗？')) return
   submitting.value = true
   try {
     const body = requirement.value.needsSession
@@ -100,7 +101,7 @@ async function submit() {
 </script>
 
 <template>
-  <div class="delivery" :class="{ 'delivery--dark': theme === 'dark' }">
+  <div class="delivery">
     <div v-if="submitted" class="delivery__done">
       <p class="delivery__done-title">资料已提交</p>
       <p class="delivery__done-body">
@@ -116,7 +117,7 @@ async function submit() {
         {{ guideOpen ? '收起获取教程' : '怎么拿到登录凭证？' }}
       </button>
       <div v-if="guideOpen" class="delivery__guide">
-        <SessionGuide :theme="theme === 'dark' ? 'dark' : 'auto'" />
+        <SessionGuide />
       </div>
 
       <label class="delivery__field">
@@ -276,47 +277,6 @@ async function submit() {
   cursor: not-allowed;
 }
 
-.delivery--dark .delivery__title {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.delivery--dark .delivery__toggle {
-  color: #e88a5c;
-}
-
-.delivery--dark .delivery__guide {
-  border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.delivery--dark .delivery__field span {
-  color: rgba(255, 255, 255, 0.62);
-}
-
-.delivery--dark .delivery__field input,
-.delivery--dark .delivery__field textarea,
-.delivery--dark .delivery__field select {
-  border-color: rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.04);
-  color: #fff;
-}
-
-.delivery--dark .delivery__hint {
-  color: rgba(255, 255, 255, 0.45);
-}
-
-.delivery--dark .delivery__hint--ok {
-  color: #5dcaa5;
-}
-
-.delivery--dark .delivery__hint--warn {
-  color: #e8a33c;
-}
-
-.delivery--dark .delivery__submit:disabled {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.35);
-}
 </style>
 
 <style>

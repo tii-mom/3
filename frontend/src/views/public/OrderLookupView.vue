@@ -20,6 +20,13 @@ const loading = ref(false)
 const searched = ref(false)
 const order = ref<GuestOrderLookup | null>(null)
 
+/** 安全格式化时间：空值/非法值兜底为「—」，避免渲染 Invalid Date */
+function formatDateTime(value?: string | null): string {
+  if (!value) return '—'
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('zh-CN')
+}
+
 const statusLabel = computed(() => {
   const labels: Record<string, string> = {
     pending: '待支付',
@@ -131,11 +138,11 @@ async function search() {
           </div>
           <div>
             <dt>下单时间</dt>
-            <dd>{{ new Date(order.created_at).toLocaleString('zh-CN') }}</dd>
+            <dd>{{ formatDateTime(order.created_at) }}</dd>
           </div>
           <div v-if="order.paid_at">
             <dt>支付时间</dt>
-            <dd>{{ new Date(order.paid_at).toLocaleString('zh-CN') }}</dd>
+            <dd>{{ formatDateTime(order.paid_at) }}</dd>
           </div>
           <div v-if="order.rental_duration">
             <dt>租期</dt>

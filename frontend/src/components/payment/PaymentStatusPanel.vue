@@ -20,9 +20,9 @@
                 <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.orderNo') }}</span>
                 <span class="font-medium text-gray-900 dark:text-white">{{ paidOrder.out_trade_no }}</span>
               </div>
-              <div class="flex justify-between">
+              <div v-if="creditedAmountText" class="flex justify-between">
                 <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.amount') }}</span>
-                <span class="font-medium text-gray-900 dark:text-white">{{ creditedAmountSymbol }}{{ paidOrder.amount.toFixed(2) }}</span>
+                <span class="font-medium text-gray-900 dark:text-white">{{ creditedAmountText }}</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.payAmount') }}</span>
@@ -162,7 +162,15 @@ const remainingSeconds = ref(0)
 const cancelling = ref(false)
 const paidOrder = ref<PaymentOrder | null>(null)
 const paymentCurrency = computed(() => normalizePaymentCurrency(props.currency))
-const creditedAmountSymbol = currencySymbol('USD')
+// 金额行的货币符号跟随订单币种（不再硬编码 USD → 修复 CNY 订单显示 $ 的问题）；
+// 金额缺失/非法时返回空串，模板会自动隐藏该行，避免 toFixed 抛错。
+const creditedAmountText = computed(() => {
+  const raw = paidOrder.value?.amount
+  if (raw == null) return ''
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return ''
+  return `${currencySymbol(paidOrder.value?.currency || props.currency)}${n.toFixed(2)}`
+})
 const localeCode = computed(() => {
   const raw = i18n.locale as unknown
   if (typeof raw === 'string') return raw
@@ -347,6 +355,9 @@ startCountdown(seconds)
 pollTimer = setInterval(pollStatus, 3000)
 renderQR()
 
-watch(() => qrUrl.value, () => renderQR())
+watch(() => props.qrCode, (value) => {
+  qrUrl.value = value || ''
+  renderQR()
+})
 onUnmounted(() => cleanup())
 </script>

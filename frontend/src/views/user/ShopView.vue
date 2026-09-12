@@ -79,8 +79,8 @@
         </div>
       </section>
 
-      <div v-if="loading" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <div v-for="i in 6" :key="i" class="h-72 animate-pulse rounded-2xl bg-gray-100 dark:bg-dark-800"></div>
+      <div v-if="loading" class="shop-grid">
+        <div v-for="i in 8" :key="i" class="h-80 animate-pulse rounded-2xl bg-gray-100 dark:bg-dark-800"></div>
       </div>
 
       <div v-else-if="products.length === 0" class="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center shadow-sm dark:border-dark-600 dark:bg-dark-900">
@@ -93,76 +93,27 @@
         <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">切换到「全部」查看其它商品。</p>
       </div>
 
-      <div v-else class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-        <article
+      <div v-else class="shop-grid">
+        <div
           v-for="product in visibleProducts"
           :id="`shop-product-${product.id}`"
           :key="product.id"
-          class="group relative overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl dark:bg-dark-900"
-          :class="product.highlight ? 'border-orange-300 ring-1 ring-orange-200 dark:border-orange-500/40 dark:ring-orange-500/20' : 'border-gray-200 dark:border-dark-700'"
+          class="shop-grid__item"
         >
-          <div class="relative h-44 overflow-hidden">
-            <img
-              v-if="shopImage(product.image_url)"
-              :src="shopImage(product.image_url)"
-              :alt="product.name"
-              class="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-            >
-            <div v-else class="shop-placeholder" aria-hidden="true">
-              <span class="shop-placeholder__glyph">3</span>
-            </div>
-            <div class="absolute left-4 top-4 flex flex-wrap gap-2">
-              <span class="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-gray-900 shadow-sm dark:bg-dark-950/80 dark:text-white">
-                {{ fulfillmentLabel(product.fulfillment_mode) }}
-              </span>
-              <span v-if="product.badge_text" class="rounded-full bg-orange-500 px-3 py-1 text-xs font-semibold text-white shadow-sm">
-                {{ product.badge_text }}
-              </span>
-            </div>
-            <span v-if="isSoldOut(product)" class="absolute inset-0 flex items-center justify-center bg-slate-950/55 text-sm font-semibold text-white">暂时缺货</span>
-          </div>
-          <div class="space-y-4 p-5">
-            <div>
-              <h3 class="line-clamp-1 text-lg font-bold text-gray-950 dark:text-white">{{ product.name }}</h3>
-              <p v-if="product.spec_label" class="mt-1 text-xs font-medium text-orange-600 dark:text-orange-300">{{ product.spec_label }}</p>
-              <p class="mt-2 line-clamp-2 min-h-[2.5rem] text-sm leading-5 text-gray-500 dark:text-gray-400">{{ product.description || '付款后等待管理员发货。' }}</p>
-              <p v-if="product.delivery_form_hint" class="mt-1 text-xs text-gray-400 dark:text-gray-500">{{ product.delivery_form_hint }}</p>
-              <div class="mt-2 flex flex-wrap gap-3 text-xs text-gray-400 dark:text-gray-500">
-                <span v-if="product.stock_quantity !== null && product.stock_quantity !== undefined">
-                  {{ product.stock_quantity > 0 ? (product.stock_quantity <= 5 ? `仅剩 ${product.stock_quantity} 件` : `库存 ${product.stock_quantity}`) : '已售罄' }}
-                </span>
-                <span v-if="product.sold_count > 0">已售 {{ product.sold_count }} 份</span>
-              </div>
-            </div>
-            <div class="flex items-end justify-between gap-3">
-              <div>
-                <div class="text-2xl font-black text-gray-950 dark:text-white">¥{{ formatMoney(product.price_cny_minor) }}</div>
-                <div v-if="product.original_price_cny_minor > product.price_cny_minor" class="text-xs text-gray-400 line-through">¥{{ formatMoney(product.original_price_cny_minor) }}</div>
-              </div>
-              <div v-if="product.commission_bps > 0" class="flex items-center gap-2 rounded-2xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
-                <div class="text-right">
-                  推广奖励<br><b>{{ (product.commission_bps / 100).toFixed(0) }}%</b>
-                </div>
-                <button
-                  type="button"
-                  class="rounded-xl bg-white px-2.5 py-1.5 text-xs font-bold text-emerald-700 shadow-sm transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-400/15 dark:text-emerald-100 dark:hover:bg-emerald-400/25"
-                  :disabled="!inviteDetail?.aff_code"
-                  @click.stop="copyProductPromotionLink(product)"
-                >
-                  复制链接
-                </button>
-              </div>
-            </div>
-            <button
-              class="w-full justify-center rounded-2xl py-3"
-              :class="product.highlight ? 'btn-primary' : 'btn-secondary'"
-              :disabled="creatingProductID === product.id || !availablePaymentType(product) || isSoldOut(product)"
-              @click="buy(product)"
-            >
-              {{ isSoldOut(product) ? '暂时缺货' : !availablePaymentType(product) ? '支付暂未开启' : creatingProductID === product.id ? '正在创建订单...' : '立即购买' }}
-            </button>
-          </div>
-        </article>
+          <PlanCard
+            :product="product"
+            :show-commission="!!inviteDetail?.aff_code"
+            @select="onPlanSelect"
+          />
+          <button
+            v-if="product.commission_bps > 0 && inviteDetail?.aff_code"
+            type="button"
+            class="shop-copy-btn"
+            @click.stop="copyProductPromotionLink(product)"
+          >
+            复制推广链接 · 返 {{ (product.commission_bps / 100).toFixed(0) }}%
+          </button>
+        </div>
       </div>
 
       <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-900">
@@ -277,7 +228,9 @@
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { resolveShopAssetUrl, shopAPI, type ShopBanner, type ShopOrder, type ShopProduct } from '@/api/shop'
-import { FULFILLMENT_LABELS, type FulfillmentMode } from '@/api/publicShop'
+import { type FulfillmentMode, type PublicProduct } from '@/api/publicShop'
+import { SHOP_CATEGORIES, type ShopCategory } from '@/constants/shop'
+import PlanCard from '@/components/home/PlanCard.vue'
 import { paymentAPI } from '@/api/payment'
 import userAPI from '@/api/user'
 import { useAppStore } from '@/stores'
@@ -315,19 +268,18 @@ const payDialog = reactive({
   payUrl: '',
 })
 
-// 商品分组与官网首页保持一致：按交付模式划分
-const catalogTab = ref<'all' | FulfillmentMode>('all')
+// 商品分组与官网首页保持一致：按品类（category）划分
+const catalogTab = ref<'all' | ShopCategory>('all')
 const catalogTabs = computed(() => {
-  const modes = new Set(products.value.map(item => item.fulfillment_mode || 'manual'))
-  const list: { value: 'all' | FulfillmentMode; label: string }[] = [{ value: 'all', label: '全部' }]
-  const order: FulfillmentMode[] = ['session_topup', 'account_delivery', 'rental', 'manual']
-  order.forEach(mode => {
-    if (modes.has(mode)) list.push({ value: mode, label: FULFILLMENT_LABELS[mode] })
+  const cats = new Set<ShopCategory>(products.value.map(item => (item.category || 'other') as ShopCategory))
+  const list: { value: 'all' | ShopCategory; label: string }[] = [{ value: 'all', label: '全部' }]
+  SHOP_CATEGORIES.forEach(cat => {
+    if (cats.has(cat.value)) list.push({ value: cat.value, label: cat.label })
   })
   return list
 })
 const visibleProducts = computed(() =>
-  catalogTab.value === 'all' ? products.value : products.value.filter(item => (item.fulfillment_mode || 'manual') === catalogTab.value)
+  catalogTab.value === 'all' ? products.value : products.value.filter(item => (item.category || 'other') === catalogTab.value)
 )
 
 // 订单交付资料提交
@@ -393,14 +345,6 @@ function formatMoney(minor: number): string {
 
 function shopImage(url?: string | null): string {
   return resolveShopAssetUrl(url)
-}
-
-function fulfillmentLabel(mode?: string): string {
-  return FULFILLMENT_LABELS[(mode || 'manual') as FulfillmentMode] || '商品'
-}
-
-function isSoldOut(product: ShopProduct): boolean {
-  return product.stock_quantity !== null && product.stock_quantity !== undefined && product.stock_quantity <= 0
 }
 
 function paymentLabel(method: string): string {
@@ -511,9 +455,11 @@ async function loadOrders() {
 async function loadData() {
   loading.value = true
   try {
-    const [bannerRes, productRes] = await Promise.all([shopAPI.listBanners(), shopAPI.listProducts(), loadCheckoutMethods(), loadOrders()])
+    // 商品/轮播是页面渲染数据；支付方式与订单列表是独立副作用加载，拆开更清晰
+    const [bannerRes, productRes] = await Promise.all([shopAPI.listBanners(), shopAPI.listProducts()])
     banners.value = bannerRes.data || []
     products.value = productRes.data || []
+    await Promise.all([loadCheckoutMethods(), loadOrders()])
   } catch (error: any) {
     appStore.showToast('error', error?.message || '商城加载失败', 3000)
   } finally {
@@ -522,11 +468,23 @@ async function loadData() {
   }
 }
 
+/** PlanCard 的 select 事件回传 PublicProduct（首页/商城共用卡片的类型），
+ *  而 buy() 需要 ShopProduct；运行时 product 本就来自商城列表，做一次收窄转换。 */
+function onPlanSelect(product: PublicProduct) {
+  buy(product as unknown as ShopProduct)
+}
+
 async function buy(product: ShopProduct) {
+  // 防重入：下单是异步的，快速连点会并发创建多笔订单（creatingProductID 非空即视为进行中）
+  if (creatingProductID.value !== null) return
   const method = availablePaymentType(product)
   if (!method) {
     appStore.showToast('warning', '当前商品暂无可用支付方式，请联系管理员开启支付渠道', 3000)
     return
+  }
+  // 选了某个支付渠道但该渠道不适用于本商品金额时，之前是静默回退；这里显式提示，避免用户困惑
+  if (paymentType.value && method !== paymentType.value) {
+    appStore.showToast('warning', '所选支付方式不适用于该商品，已自动切换为可用方式', 3000)
   }
   creatingProductID.value = product.id
   const visibleMethod = normalizeVisibleMethod(method) || method
@@ -539,7 +497,11 @@ async function buy(product: ShopProduct) {
       return_url: `${window.location.origin}/payment/result`,
       is_mobile: forceQRCode ? false : isMobileDevice(),
     })
-    const payment = res.data.payment
+    const payment = res.data?.payment
+    if (!payment) {
+      appStore.showToast('error', '下单未返回支付信息，请稍后重试', 3000)
+      return
+    }
     const stripeMethod = visibleMethod === 'stripe'
       ? ''
       : visibleMethod === 'wxpay' ? 'wechat_pay' : 'alipay'
@@ -660,39 +622,47 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 无商品图时的占位：跟随明暗主题，避免深色模式出现刺眼亮块 */
-.shop-placeholder {
+/* 商品网格：与官网首页 #plans 同一套 4 列自适配栅格（228px 起） */
+.shop-grid {
   display: grid;
-  place-items: center;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(228px, 1fr));
+}
+
+.shop-grid__item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 卡片下方的推广复制入口：保留商城登录态的返佣能力，
+   不在 PlanCard 内，避免污染首页的免登录卡片。 */
+.shop-copy-btn {
   width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, #f4f4f5 0%, #e8e8ea 100%);
+  border-radius: 9px;
+  border: 1px solid rgba(9, 9, 11, 0.12);
+  background: #fff;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #56565f;
+  cursor: pointer;
+  transition: background 160ms ease-out, border-color 160ms ease-out;
 }
 
-
-.shop-placeholder__glyph {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: rgba(9, 9, 11, 0.06);
-  color: rgba(9, 9, 11, 0.34);
-  font-size: 20px;
-  font-weight: 700;
-}
-</style>
-
-<style>
-/* 深色覆盖放在**非 scoped** 块中：Vue 的 scoped-CSS 编译器会把
-   `:global(.dark) X` 编译成只有 `.dark`，X 被丢弃，导致生产构建里
-   深色规则整体失效。与 SettingsView 的处理方式保持一致。 */
-.dark .shop-placeholder {
-  background: linear-gradient(135deg, #16171b 0%, #0f1013 100%);
+.shop-copy-btn:hover {
+  background: #f6f6f7;
+  border-color: rgba(9, 9, 11, 0.2);
 }
 
-.dark .shop-placeholder__glyph {
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.34);
+.dark .shop-copy-btn {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: #18181b;
+  color: #a1a1aa;
+}
+
+.dark .shop-copy-btn:hover {
+  background: #232429;
+  border-color: rgba(255, 255, 255, 0.22);
 }
 </style>

@@ -178,6 +178,12 @@ export function useGuestCheckout() {
         })
       }
 
+      // 下单接口异常时可能不返回 payment，提前兜底，避免后续取 decision.paymentState 抛错
+      if (!payment) {
+        appStore.showToast('error', '下单未返回支付信息，请稍后重试', 3000)
+        return false
+      }
+
       const decision = decidePaymentLaunch(payment, {
         visibleMethod: option.value,
         orderType: 'shop' as OrderType,

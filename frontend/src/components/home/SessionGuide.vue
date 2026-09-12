@@ -5,12 +5,7 @@ import { useClipboard } from '@/composables/useClipboard'
 const { copyToClipboard } = useClipboard()
 const copied = ref(false)
 
-/**
- * theme: auto（默认）跟随全局明暗主题；dark 用于少数固定深色表面。
- * 销售侧页面已全面支持明暗双主题，因此默认 auto 即可正确渲染。
- */
-const props = withDefaults(defineProps<{ theme?: 'auto' | 'dark' | 'light' }>(), { theme: 'auto' })
-
+// 明暗主题完全由祖先 .dark 驱动（见文件末尾非 scoped 的 .dark .guide 覆盖），不再需要 theme 参数。
 const SESSION_URL = 'https://chatgpt.com/api/auth/session'
 
 async function copyUrl() {
@@ -23,7 +18,7 @@ async function copyUrl() {
 </script>
 
 <template>
-  <div class="guide" :class="{ 'guide--dark': props.theme === 'dark' }">
+  <div class="guide">
     <ol class="guide__steps">
       <li>
         <span class="guide__index">1</span>
@@ -82,16 +77,6 @@ async function copyUrl() {
   gap: 20px;
 }
 
-
-.guide--dark {
-  --sg-title: rgba(255, 255, 255, 0.92);
-  --sg-desc: rgba(255, 255, 255, 0.5);
-  --sg-line: rgba(255, 255, 255, 0.12);
-  --sg-soft: rgba(255, 255, 255, 0.03);
-  --sg-accent-text: #f0916a;
-  --sg-accent-soft: rgba(224, 99, 47, 0.14);
-  --sg-accent-line: rgba(224, 99, 47, 0.38);
-}
 
 .guide__steps {
   display: flex;
