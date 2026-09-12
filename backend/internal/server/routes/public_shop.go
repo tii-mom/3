@@ -13,6 +13,7 @@ import (
 func RegisterPublicShopRoutes(v1 *gin.RouterGroup, publicShopHandler *handler.PublicShopHandler) {
 	public := v1.Group("/public/shop")
 	{
+		public.GET("/categories", publicShopHandler.ListCategories)
 		public.GET("/products", publicShopHandler.ListProducts)
 		public.GET("/banners", publicShopHandler.ListBanners)
 		public.GET("/payment-methods", publicShopHandler.ListPaymentMethods)

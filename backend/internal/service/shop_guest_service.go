@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -57,34 +57,85 @@ type GuestOrderLookup struct {
 }
 
 type guestOrderLimiter struct {
-	mu      sync.Mutex
-	records map[string][]time.Time
+	db          *sql.DB
+	cleanupTick uint64
 }
 
-func newGuestOrderLimiter() *guestOrderLimiter {
-	return &guestOrderLimiter{records: map[string][]time.Time{}}
+func newGuestOrderLimiter(db *sql.DB) *guestOrderLimiter {
+	return &guestOrderLimiter{db: db}
 }
 
-func (l *guestOrderLimiter) allow(key string, limit int) bool {
-	now := time.Now()
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	kept := l.records[key][:0]
-	for _, ts := range l.records[key] {
-		if now.Sub(ts) < guestLimitWindow {
-			kept = append(kept, ts)
-		}
+// allow 判断 key 在当前窗口内是否仍有配额。
+//
+// 实现要点（迁移 209 的 shop_guest_order_windows 表）：
+//   - 固定窗口计数落库，bucket_key 主键提供行级锁，多副本并发时由 PostgreSQL
+//     串行化同一 key 的读改写，不再各自计数、不再因重启清零；
+//   - **只有放行时才计数**，被拒绝的请求不会把窗口往后延（与旧实现语义一致）；
+//   - 出错时 fail-open：限流不是下单链路的核心依赖，真出问题也应该由后续
+//     创建订单的写入失败来暴露，而不是让限流层变成单点故障。
+func (l *guestOrderLimiter) allow(ctx context.Context, key string, limit int) bool {
+	if l == nil || l.db == nil || limit <= 0 {
+		return true
 	}
-	allowed := len(kept) < limit
+	windowStart := time.Now().UTC().Truncate(guestLimitWindow)
+
+	tx, err := l.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return true
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// 先保证行存在：首次访问是纯插入，之后走 ON CONFLICT DO NOTHING。
+	// 并发时这里会等对方事务结束再落空，随后 SELECT ... FOR UPDATE 拿到锁。
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO shop_guest_order_windows (bucket_key, window_start, hits, updated_at)
+		VALUES ($1, $2, 0, NOW())
+		ON CONFLICT (bucket_key) DO NOTHING`, key, windowStart); err != nil {
+		return true
+	}
+
+	var storedStart time.Time
+	var hits int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT window_start, hits FROM shop_guest_order_windows
+		WHERE bucket_key = $1
+		FOR UPDATE`, key).Scan(&storedStart, &hits); err != nil {
+		return true
+	}
+
+	// 窗口翻篇（或首次写入）即重置计数；时间比较用 Equal，与返回值的时区无关
+	if !storedStart.Equal(windowStart) {
+		hits = 0
+	}
+	allowed := hits < limit
+	nextHits := hits
 	if allowed {
-		kept = append(kept, now)
+		nextHits = hits + 1
 	}
-	if len(kept) == 0 {
-		delete(l.records, key)
-	} else {
-		l.records[key] = kept
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE shop_guest_order_windows
+		SET window_start = $2, hits = $3, updated_at = NOW()
+		WHERE bucket_key = $1`, key, windowStart, nextHits); err != nil {
+		return true
 	}
+	if err := tx.Commit(); err != nil {
+		return true
+	}
+
+	l.cleanupExpired(ctx)
 	return allowed
+}
+
+// cleanupExpired 概率性清理过期窗口行。
+// 表本身很小（每个 IP / 联系方式一行），但闲置 key 会长期累积，
+// 按 1/64 的概率顺带清理，既不用定时任务也不会每次都扫全表。
+func (l *guestOrderLimiter) cleanupExpired(ctx context.Context) {
+	if atomic.AddUint64(&l.cleanupTick, 1)%64 != 0 {
+		return
+	}
+	_, _ = l.db.ExecContext(ctx,
+		`DELETE FROM shop_guest_order_windows WHERE window_start < $1`,
+		time.Now().UTC().Add(-time.Hour))
 }
 
 // CreateGuestOrderAndPayment 免登录下单：校验联系信息 → 创建游客订单 → 拉起支付。
@@ -110,10 +161,10 @@ func (s *ShopService) CreateGuestOrderAndPayment(
 		return nil, err
 	}
 	if s.guestLimiter != nil {
-		if clientIP != "" && !s.guestLimiter.allow("ip:"+clientIP, guestLimitPerIP) {
+		if clientIP != "" && !s.guestLimiter.allow(ctx, "ip:"+clientIP, guestLimitPerIP) {
 			return nil, infraerrors.TooManyRequests("GUEST_ORDER_RATE_LIMITED", "too many orders from this network, please try again later")
 		}
-		if !s.guestLimiter.allow("contact:"+contact, guestLimitPerContact) {
+		if !s.guestLimiter.allow(ctx, "contact:"+contact, guestLimitPerContact) {
 			return nil, infraerrors.TooManyRequests("GUEST_ORDER_RATE_LIMITED", "too many orders for this contact, please try again later")
 		}
 	}

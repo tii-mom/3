@@ -32,6 +32,17 @@ func (h *PublicShopHandler) ListProducts(c *gin.Context) {
 	response.Success(c, items)
 }
 
+// ListCategories 官网首页的分组导航数据源（只返回后台启用中的品类）。
+// 首页分组、标签、顺序全部以后台商城配置为准，前端不再硬编码品类枚举。
+func (h *PublicShopHandler) ListCategories(c *gin.Context) {
+	items, err := h.shopService.ListPublicCategories(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, items)
+}
+
 // ListPaymentMethods 公开支付渠道与金额区间，供官网首页免登录下单使用。
 // 与登录态 /payment/checkout-info 同源，但只返回渠道名称与限额，不暴露价格档位等其他配置。
 func (h *PublicShopHandler) ListPaymentMethods(c *gin.Context) {

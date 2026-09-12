@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -31,31 +32,51 @@ const (
 	ShopFulfillmentRental          = "rental"           // 租号：按时长租赁，后台人工发账号
 )
 
-// 商品品类（迁移 207）。与交付模式正交：品类表达「卖什么」，交付模式表达「怎么交付」。
+// 商品品类种子 slug（迁移 207 引入，迁移 208 起集合改由 shop_categories 表定义）。
+// 后台可自行新增品类，因此这里只保留「兜底 slug」与文档意义，不再作为校验白名单。
 const (
 	ShopCategoryGPTTopup   = "gpt_topup"   // GPT / ChatGPT 代充值
 	ShopCategoryGPTAccount = "gpt_account" // GPT / ChatGPT 成品号
 	ShopCategoryXPremium   = "x_premium"   // X（Twitter）蓝 V / Premium
 	ShopCategoryGemini     = "gemini"      // Gemini 会员
 	ShopCategoryCodex      = "codex"       // Codex 相关
-	ShopCategoryOther      = "other"       // 其他
+	ShopCategoryOther      = "other"       // 其他（未分类商品的兜底值）
 )
 
-func isKnownCategory(category string) bool {
-	switch category {
-	case ShopCategoryGPTTopup, ShopCategoryGPTAccount, ShopCategoryXPremium,
-		ShopCategoryGemini, ShopCategoryCodex, ShopCategoryOther:
-		return true
-	}
-	return false
+// shopCategorySlugPattern 品类标识格式：小写字母开头，仅含小写字母/数字/下划线，最长 32。
+// slug 会进入前端 DOM id（cat-<slug>）与锚点 URL，必须限制字符集。
+// 品类是否「存在」由 shop_categories 表判定（迁移 208 起），不再由代码枚举。
+var shopCategorySlugPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,31}$`)
+
+func isValidCategorySlug(slug string) bool {
+	return shopCategorySlugPattern.MatchString(slug)
 }
 
-// shopProductColumns 统一商品 SELECT 列，避免各处 SQL 与扫描顺序不一致。
-const shopProductColumns = `id, name, description, image_url, product_type, price_cny_minor, original_price_cny_minor,
-       grant_usd_amount::text, stock_quantity, sold_count, commission_bps, status, sort_order,
-       fulfillment_mode, delivery_form_hint, badge_text, spec_label, highlight,
-       category, gallery_json,
-       created_at, updated_at`
+// shopProductColumnList 统一商品 SELECT 列，避免各处 SQL 与扫描顺序不一致。
+// 顺序必须与 scanShopProduct 的 Scan 顺序严格一致。
+var shopProductColumnList = []string{
+	"id", "name", "description", "image_url", "product_type", "price_cny_minor",
+	"original_price_cny_minor", "grant_usd_amount::text", "stock_quantity", "sold_count",
+	"commission_bps", "status", "sort_order", "fulfillment_mode", "delivery_form_hint",
+	"badge_text", "spec_label", "highlight", "category", "gallery_json",
+	"created_at", "updated_at",
+}
+
+// shopProductColumnsWith 生成带表别名的列清单（公开列表要 JOIN 品类表，必须消歧义）。
+// alias 为空时等价于旧的无别名写法。
+func shopProductColumnsWith(alias string) string {
+	parts := make([]string, 0, len(shopProductColumnList))
+	for _, col := range shopProductColumnList {
+		if alias == "" {
+			parts = append(parts, col)
+			continue
+		}
+		parts = append(parts, alias+"."+col)
+	}
+	return strings.Join(parts, ", ")
+}
+
+var shopProductColumns = shopProductColumnsWith("")
 
 // 系统游客账号邮箱（迁移 206 插入），用于承载免登录订单。
 const shopGuestUserEmail = "guest@internal.3api.invalid"
@@ -76,7 +97,7 @@ type ShopService struct {
 }
 
 func NewShopService(db *sql.DB) *ShopService {
-	return &ShopService{db: db, guestLimiter: newGuestOrderLimiter()}
+	return &ShopService{db: db, guestLimiter: newGuestOrderLimiter(db)}
 }
 
 func (s *ShopService) SetPaymentService(paymentService *PaymentService) {
@@ -201,15 +222,18 @@ func (s *ShopService) AdminListProducts(ctx context.Context) ([]ShopProduct, err
 }
 
 func (s *ShopService) listProducts(ctx context.Context, admin bool) ([]ShopProduct, error) {
-	where := `tenant_id = 1 AND deleted_at IS NULL`
+	where := `p.tenant_id = 1 AND p.deleted_at IS NULL`
 	if !admin {
-		where += ` AND status = 'published'`
+		// 公开列表只出「已发布」且品类未被后台停用的商品。
+		// LEFT JOIN + COALESCE：品类已被删除或 slug 不存在时仍视为可见，避免脏数据让商品凭空消失。
+		where += ` AND p.status = 'published' AND COALESCE(c.enabled, TRUE)`
 	}
 	rows, err := s.db.QueryContext(ctx, `
-SELECT `+shopProductColumns+`
-FROM shop_products
+SELECT `+shopProductColumnsWith("p")+`
+FROM shop_products p
+LEFT JOIN shop_categories c ON c.tenant_id = p.tenant_id AND c.slug = p.category
 WHERE `+where+`
-ORDER BY sort_order ASC, id DESC`)
+ORDER BY p.sort_order ASC, p.id DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -270,6 +294,9 @@ func (s *ShopService) CreateProduct(ctx context.Context, in UpsertShopProductInp
 	if err := validateShopProductInput(in); err != nil {
 		return nil, err
 	}
+	if err := s.ensureCategoryExists(ctx, in.Category); err != nil {
+		return nil, err
+	}
 	var item ShopProduct
 	row := s.db.QueryRowContext(ctx, `
 INSERT INTO shop_products (tenant_id, name, description, image_url, product_type, price_cny_minor,
@@ -294,6 +321,9 @@ func (s *ShopService) UpdateProduct(ctx context.Context, id int64, in UpsertShop
 	}
 	in = normalizeShopProductInput(in)
 	if err := validateShopProductInput(in); err != nil {
+		return nil, err
+	}
+	if err := s.ensureCategoryExists(ctx, in.Category); err != nil {
 		return nil, err
 	}
 	var item ShopProduct
@@ -799,7 +829,9 @@ func normalizeShopProductInput(in UpsertShopProductInput) UpsertShopProductInput
 	in.BadgeText = strings.TrimSpace(in.BadgeText)
 	in.SpecLabel = strings.TrimSpace(in.SpecLabel)
 	in.Category = strings.TrimSpace(in.Category)
-	if !isKnownCategory(in.Category) {
+	// 品类集合由 shop_categories 表定义（迁移 208），这里只做「空值兜底」，
+	// 具体是否存在交由 Create/Update 查库校验，否则后台新建的品类会被静默改成 other。
+	if in.Category == "" {
 		in.Category = ShopCategoryOther
 	}
 	in.Gallery = normalizeGallery(in.Gallery)

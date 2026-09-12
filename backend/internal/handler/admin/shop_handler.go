@@ -227,3 +227,83 @@ func (r shopBannerRequest) toServiceInput() service.UpsertShopBannerInput {
 		SortOrder:  r.SortOrder,
 	}
 }
+
+// ---------------------------------------------------------------------------
+// 品类管理（迁移 208）：后台可自行新增 / 修改 / 停用 / 删除品类
+// ---------------------------------------------------------------------------
+
+type shopCategoryRequest struct {
+	Slug      string `json:"slug"`
+	Label     string `json:"label"`
+	Blurb     string `json:"blurb"`
+	SortOrder int    `json:"sort_order"`
+	// 用指针区分「未传」与「显式传 false」：新建时不传默认启用。
+	Enabled *bool `json:"enabled"`
+}
+
+func (r shopCategoryRequest) toServiceInput() service.UpsertShopCategoryInput {
+	enabled := true
+	if r.Enabled != nil {
+		enabled = *r.Enabled
+	}
+	return service.UpsertShopCategoryInput{
+		Slug:      r.Slug,
+		Label:     r.Label,
+		Blurb:     r.Blurb,
+		SortOrder: r.SortOrder,
+		Enabled:   enabled,
+	}
+}
+
+func (h *ShopHandler) ListCategories(c *gin.Context) {
+	items, err := h.shopService.AdminListCategories(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, items)
+}
+
+func (h *ShopHandler) CreateCategory(c *gin.Context) {
+	var req shopCategoryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	item, err := h.shopService.CreateCategory(c.Request.Context(), req.toServiceInput())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, item)
+}
+
+func (h *ShopHandler) UpdateCategory(c *gin.Context) {
+	id, ok := parseAdminShopIDParam(c)
+	if !ok {
+		return
+	}
+	var req shopCategoryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	item, err := h.shopService.UpdateCategory(c.Request.Context(), id, req.toServiceInput())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, item)
+}
+
+func (h *ShopHandler) DeleteCategory(c *gin.Context) {
+	id, ok := parseAdminShopIDParam(c)
+	if !ok {
+		return
+	}
+	if err := h.shopService.DeleteCategory(c.Request.Context(), id); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"message": "category deleted"})
+}
