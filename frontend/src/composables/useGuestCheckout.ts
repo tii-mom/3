@@ -10,7 +10,7 @@ import {
   type PublicProduct
 } from '@/api/publicShop'
 import { shopAPI } from '@/api/shop'
-import { decidePaymentLaunch } from '@/components/payment/paymentFlow'
+import { decidePaymentLaunch, getVisibleMethods, normalizeVisibleMethod } from '@/components/payment/paymentFlow'
 import { getPaymentPopupFeatures } from '@/components/payment/providerConfig'
 import type { OrderType } from '@/types/payment'
 
@@ -18,12 +18,10 @@ import type { OrderType } from '@/types/payment'
  * 首页免登录下单：选套餐 → 填联系方式 → 拉起支付。
  * 与登录态无关，支付成功后跳转查单页补交交付资料（Session / 收货邮箱）。
  *
- * 支付渠道与控制台商城同源（GET /public/shop/payment-methods），后台开关与单笔限额即时生效；
- * 首页只启用适合免登录冲动消费的即时到账渠道，其余渠道引导到控制台商城使用。
+ * 支付渠道与「控制台商城」完全同源（GET /public/shop/payment-methods，底层同一个
+ * GetAvailableMethodLimits），后台开关、单笔限额、渠道策略即时生效；
+ * 拉起支付的决策也复用同一套 decidePaymentLaunch，保证首页与控制台行为一致。
  */
-
-/** 免登录场景支持的即时到账渠道 */
-const GUEST_METHOD_WHITELIST = ['alipay', 'wxpay', 'easypay']
 
 const PAYMENT_LABELS: Record<string, string> = {
   alipay: '支付宝',
@@ -50,6 +48,21 @@ function isWechatBrowser(): boolean {
   return /MicroMessenger/i.test(window.navigator.userAgent)
 }
 
+/**
+ * 支付完成后回跳的地址。
+ *
+ * 后端 CanonicalizeReturnURL 强制要求 path 必须等于 `/payment/result`
+ * （见 payment_resume_service.go 的 paymentResultReturnPath），
+ * 传 /shop 或 /order 会被拒绝并报「return_url must target the canonical internal payment result page」。
+ * 所以这里必须指向结果页，由结果页再按订单类型分流（游客 → 查单页补交资料）。
+ */
+const CANONICAL_PAYMENT_RETURN_PATH = '/payment/result'
+
+function buildReturnURL(): string | undefined {
+  if (typeof window === 'undefined') return undefined
+  return window.location.origin + CANONICAL_PAYMENT_RETURN_PATH
+}
+
 export function useGuestCheckout() {
   const appStore = useAppStore()
   const authStore = useAuthStore()
@@ -74,22 +87,20 @@ export function useGuestCheckout() {
   const alipayForceQRCode = ref(false)
   const methodsLoaded = ref(false)
 
-  /** 首页可用支付方式（免登录渠道白名单 ∩ 后台已开启） */
+  /**
+   * 首页可用支付方式 = 控制台同一份可见渠道集合（后台已开启的 alipay / wxpay / stripe / airwallex）。
+   * 故意不再用前端硬编码白名单：否则后台只开了 stripe 时首页会显示「暂无可用支付方式」，
+   * 与控制台行为不一致。
+   */
   const guestPaymentMethods = computed<GuestPaymentOption[]>(() =>
-    GUEST_METHOD_WHITELIST
-      .filter((value) => {
-        const limit = paymentMethodLimits.value[value]
-        return !!limit && limit.available !== false
-      })
-      .map((value) => {
-        const limit = paymentMethodLimits.value[value]
-        return {
-          value,
-          label: limit.display_name || PAYMENT_LABELS[value] || value,
-          single_min: Number(limit.single_min) || 0,
-          single_max: Number(limit.single_max) || 0
-        }
-      })
+    Object.entries(getVisibleMethods(paymentMethodLimits.value))
+      .filter(([, limit]) => limit && limit.available !== false)
+      .map(([value, limit]) => ({
+        value,
+        label: limit.display_name || PAYMENT_LABELS[value] || value,
+        single_min: Number(limit.single_min) || 0,
+        single_max: Number(limit.single_max) || 0
+      }))
   )
 
   async function loadPaymentMethods(): Promise<void> {
@@ -139,25 +150,29 @@ export function useGuestCheckout() {
       appStore.showToast('warning', '当前商品暂无可用支付方式，请联系客服处理', 3500)
       return false
     }
+    // 与控制台商城同一套归一化与二维码策略
+    const visibleMethod = normalizeVisibleMethod(option.value) || option.value
+    const forceQRCode = !!(alipayForceQRCode.value && visibleMethod === 'alipay')
+    const orderType: OrderType = 'shop'
     submitting.value = true
     try {
       let payment
       if (isLoggedIn.value) {
         const response = await shopAPI.createOrder({
           product_id: product.id,
-          payment_type: option.value,
-          return_url: typeof window !== 'undefined' ? window.location.origin + '/shop' : undefined,
-          is_mobile: isMobileDevice()
+          payment_type: visibleMethod,
+          return_url: buildReturnURL(),
+          is_mobile: forceQRCode ? false : isMobileDevice()
         })
         payment = response.data.payment
         pendingContext = null
       } else {
         const response = await publicShopAPI.createOrder({
           product_id: product.id,
-          payment_type: option.value,
+          payment_type: visibleMethod,
           contact: trimmedContact,
-          return_url: typeof window !== 'undefined' ? window.location.origin + '/order' : undefined,
-          is_mobile: isMobileDevice()
+          return_url: buildReturnURL(),
+          is_mobile: forceQRCode ? false : isMobileDevice()
         })
         const result = response.data
         payment = result.payment
@@ -184,15 +199,42 @@ export function useGuestCheckout() {
         return false
       }
 
+      // stripe / airwallex 需要跳转到站内支付页，路由 URL 由前端构造
+      // （与 ShopView 保持一致；不传的话决策会落到 unhandled，用户看到「支付方式暂不可用」）
+      const stripeMethod = visibleMethod === 'stripe'
+        ? ''
+        : visibleMethod === 'wxpay' ? 'wechat_pay' : 'alipay'
+      const stripeRouteUrl = payment.client_secret && visibleMethod !== 'airwallex'
+        ? router.resolve({
+          path: '/payment/stripe',
+          query: {
+            order_id: String(payment.order_id),
+            client_secret: payment.client_secret,
+            method: stripeMethod || undefined,
+            resume_token: payment.resume_token || undefined
+          }
+        }).href
+        : ''
+      const airwallexRouteUrl = payment.client_secret && payment.intent_id
+        ? router.resolve({
+          path: '/payment/airwallex',
+          query: {
+            order_id: String(payment.order_id),
+            out_trade_no: payment.out_trade_no || undefined,
+            resume_token: payment.resume_token || undefined
+          }
+        }).href
+        : ''
+
       const decision = decidePaymentLaunch(payment, {
-        visibleMethod: option.value,
-        orderType: 'shop' as OrderType,
+        visibleMethod,
+        orderType,
         isMobile: isMobileDevice(),
         isWechatBrowser: isWechatBrowser(),
-        forceQRCode: alipayForceQRCode.value && option.value === 'alipay',
-        stripePopupUrl: '',
-        stripeRouteUrl: '',
-        airwallexRouteUrl: ''
+        forceQRCode,
+        stripePopupUrl: stripeRouteUrl,
+        stripeRouteUrl,
+        airwallexRouteUrl
       })
 
       if (decision.kind === 'unhandled') {
@@ -215,6 +257,11 @@ export function useGuestCheckout() {
       payDialog.payUrl = decision.paymentState.payUrl
       payDialog.open = true
 
+      // 站内支付页直接跳转，不留抽屉（抽屉只会挡在后面）
+      if (decision.kind === 'stripe_route' || decision.kind === 'airwallex_route') {
+        window.location.href = decision.paymentState.payUrl
+        return true
+      }
       if (decision.kind === 'stripe_popup' || decision.kind === 'redirect_waiting') {
         const win = window.open(decision.paymentState.payUrl, 'paymentPopup', getPaymentPopupFeatures())
         if (!win || win.closed) {

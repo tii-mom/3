@@ -1,7 +1,6 @@
 import type {
   CreateOrderRequest,
   CreateOrderResult,
-  MethodLimit,
   OrderType,
   WechatJSAPIPayload,
   WechatOAuthInfo,
@@ -95,8 +94,13 @@ export function normalizeVisibleMethod(method: string): VisiblePaymentMethod | '
   return normalized ?? ''
 }
 
-export function getVisibleMethods(methods: Record<string, MethodLimit>): Record<string, MethodLimit> {
-  const visible: Record<string, MethodLimit> = {}
+/**
+ * 按「可见渠道」归并原始渠道键（alipay_direct → alipay 等），同键优先保留规范键。
+ * 泛型是为了让调用方保留自己的字段形状：控制台用 MethodLimit，官网首页用精简的
+ * PublicPaymentMethod，两边共用同一份归并规则、不互相污染类型。
+ */
+export function getVisibleMethods<T>(methods: Record<string, T>): Record<string, T> {
+  const visible: Record<string, T> = {}
 
   Object.entries(methods || {}).forEach(([type, limit]) => {
     const normalized = normalizeVisibleMethod(type) || type.trim()
