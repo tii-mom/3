@@ -26,6 +26,7 @@ export interface ShopCategoryMeta {
 export const SHOP_CATEGORIES: ShopCategoryMeta[] = [
   { value: 'gpt_topup', label: 'GPT 官方充值', blurb: '给已有账号续费升级' },
   { value: 'gpt_account', label: 'GPT 成品号', blurb: '开好即用的独享账号' },
+  { value: 'gpt_rental', label: 'GPT 租号', blurb: '按月租赁，短期试用' },
   { value: 'gpt_usage', label: 'GPT 使用服务', blurb: 'Codex / API 额度等增值服务' },
   { value: 'x_premium', label: 'X 会员', blurb: 'X Premium 订阅开通' },
   { value: 'gemini', label: 'Gemini', blurb: 'Gemini Advanced 订阅' },
@@ -102,6 +103,12 @@ export const SHOP_CATEGORY_BENEFITS: Record<string, string[]> = {
     '绑定你自己的邮箱，可改密',
     '支持网页 / App / API 多端登录',
     '非人为封号 30 天质保',
+  ],
+  gpt_rental: [
+    '按月租赁的独享 ChatGPT 账号',
+    '租期内独享，不与他人共用',
+    '到期可续租，无需重新配置',
+    '非人为中断 30 天质保',
   ],
   gpt_usage: [
     'Codex / API 额度补充',

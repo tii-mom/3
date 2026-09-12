@@ -237,7 +237,7 @@ const MARQUEE: string[] = [
   '成品号独享交付',
   'X 蓝V 认证',
   'Gemini Advanced 会员',
-  '支付宝 / 微信支付',
+  '支付宝安全支付',
   '支付后凭订单号查进度',
   '非人为中断 30 天质保',
   '全程不需要账号密码'
@@ -486,7 +486,7 @@ function handlePaymentSuccess() {
           <header class="section__head" v-reveal>
             <span class="section__no">01 — 选择套餐</span>
             <h2 class="section__title">按你要的服务挑一个</h2>
-            <p class="section__desc">价格以支付前页面显示为准，支持支付宝与微信支付 · 共 {{ products.length }} 个套餐</p>
+            <p class="section__desc">价格以支付前页面显示为准，支持支付宝支付 · 共 {{ products.length }} 个套餐</p>
           </header>
 
           <div v-if="loading" class="plans__grid">
@@ -563,7 +563,7 @@ function handlePaymentSuccess() {
             <article class="step" v-reveal="90">
               <span class="step__num">02</span>
               <h3>留联系方式并支付</h3>
-              <p>填写手机号或邮箱用于查单与售后，选择支付宝或微信完成支付</p>
+              <p>填写手机号或邮箱用于查单与售后，跳转支付宝完成支付</p>
             </article>
             <article class="step" v-reveal="180">
               <span class="step__num">03</span>
@@ -699,9 +699,9 @@ function handlePaymentSuccess() {
         <div class="footer__cols">
           <div>
             <h4>服务</h4>
-            <a href="#plans">代充值</a>
-            <a href="#plans">成品号</a>
-            <a href="#plans">租号</a>
+            <a href="#plans" @click.prevent="goToCategory('gpt_topup')">代充值</a>
+            <a href="#plans" @click.prevent="goToCategory('gpt_account')">成品号</a>
+            <a href="#plans" @click.prevent="goToCategory('gpt_rental')">租号</a>
           </div>
           <div>
             <h4>帮助</h4>

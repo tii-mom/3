@@ -47,6 +47,14 @@ export interface BrandMeta {
    * 有值时优先于内联 SVG 字形渲染 —— OpenAI 结使用官方线稿图片。
    */
   image?: string
+  /**
+   * 强制使用品牌图片，**优先于后台商品图**。
+   *
+   * 用于「后台商品图不可信」的品类：GPT 系商品历史上被后台统一上传成同一张
+   * Codex 云朵占位图（7 个商品同图同字节），导致本该显示的 OpenAI 结被顶掉，
+   * 首页看起来「GPT 商品用的是 Codex 图标」。置 true 后品牌官方图标恒定生效。
+   */
+  preferBrandImage?: boolean
   glyph: BrandGlyph
 }
 
@@ -73,6 +81,8 @@ const BRANDS: Record<string, BrandMeta> = {
     tileLight: true,
     glyphColor: '#0a0a0a',
     image: publicAsset('logos/openai-knot.png'),
+    // 后台商品图不可信（历史遗留：所有 GPT 商品都是同一张 Codex 云朵图），品牌结恒定优先
+    preferBrandImage: true,
     glyph: {
       mode: 'fill',
       paths: [OPENAI_KNOT]
@@ -154,8 +164,9 @@ export function productBrandMeta(product: PublicProduct): BrandMeta {
     default:
       break
   }
-  // gpt 前缀覆盖后台自建品类（如 gpt_usage、gpt_api），避免新增品类掉进 generic
-  if (cat.startsWith('gpt') || cat === 'codex') {
+  // gpt 前缀覆盖后台自建品类（如 gpt_usage、gpt_api），避免新增品类掉进 generic；
+  // rental（租号交付）同样是 GPT 账号，沿用结图标。
+  if (cat.startsWith('gpt') || cat === 'codex' || cat === 'rental') {
     return BRANDS.chatgpt
   }
   return BRANDS.generic
@@ -164,4 +175,37 @@ export function productBrandMeta(product: PublicProduct): BrandMeta {
 /** 后台是否配了真实商品图（优先于品牌字形使用）。 */
 export function hasProductImage(product: PublicProduct): boolean {
   return !!product.image_url
+}
+
+/**
+ * 品牌图标的最终展示决策（纯函数，便于单元测试守卫）。
+ *
+ * 历史坑：GPT 系商品被后台整批上传成同一张 Codex 云朵占位图（image_url 不为空），
+ * 若单纯「有 image_url 就优先用后台图」，品牌结永远被 Codex 顶掉。因此引入
+ * `preferBrandImage`：该品牌恒定使用品牌官方图，即使后台配了 image_url 也忽略。
+ *
+ * 决策优先级：
+ *  1. preferBrandImage 品牌 → 永远用品牌图（忽略后台商品图）
+ *  2. 后台有真实商品图且品牌未强制优先 → 用后台商品图
+ *  3. 后台无商品图但品牌自带图（如 OpenAI 结）→ 用品牌图
+ *  4. 两者皆无 → 回退内联 SVG 字形
+ */
+export interface BrandDisplayDecision {
+  /** 是否渲染后台商品图（image_url）。preferBrandImage 品牌恒为 false。 */
+  useProductImage: boolean
+  /** 是否渲染品牌图（品牌强制优先，或后台无商品图但品牌自带图）。 */
+  useBrandImage: boolean
+  /** 是否渲染内联 SVG 字形（既无商品图也无品牌图时兜底）。 */
+  useGlyph: boolean
+  /** 命中的品牌元数据（供渲染取 image / label / gradient 等）。 */
+  meta: BrandMeta
+}
+
+export function resolveBrandDisplay(product: PublicProduct): BrandDisplayDecision {
+  const meta = productBrandMeta(product)
+  const hasBackend = hasProductImage(product)
+  const useProductImage = hasBackend && meta.preferBrandImage !== true
+  const useBrandImage = !!meta.image && !useProductImage
+  const useGlyph = !useProductImage && !useBrandImage
+  return { useProductImage, useBrandImage, useGlyph, meta }
 }

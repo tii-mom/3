@@ -7,7 +7,7 @@
 import { computed } from 'vue'
 import type { PublicProduct } from '@/api/publicShop'
 import { resolveShopAssetUrl } from '@/api/shop'
-import { hasProductImage, productBrandMeta } from '@/utils/productBrand'
+import { resolveBrandDisplay } from '@/utils/productBrand'
 
 const props = withDefaults(
   defineProps<{
@@ -20,11 +20,9 @@ const props = withDefaults(
 // 每个实例一个稳定唯一 id，给 SVG 渐变 def 用（避免同文档内多实例 id 冲突）。
 const gradId = `brand-grad-${Math.random().toString(36).slice(2, 9)}`
 
-const meta = computed(() => productBrandMeta(props.product))
+const decision = computed(() => resolveBrandDisplay(props.product))
+const meta = computed(() => decision.value.meta)
 const productImgUrl = computed(() => resolveShopAssetUrl(props.product.image_url))
-const showProductImg = computed(() => hasProductImage(props.product))
-// 后台没配商品图时，若该品牌自带图片 logo（如 OpenAI 结线稿），用图片而不是内联字形
-const showBrandImg = computed(() => !showProductImg.value && !!meta.value.image)
 const dim = computed(() => `${props.size}px`)
 
 // 多彩字形（如 Gemini 四角星）用渐变填充，否则用 currentColor / 显式 glyphColor 覆盖。
@@ -47,9 +45,9 @@ const strokeWidth = computed(() => meta.value.glyph.strokeWidth || 1.6)
     :class="{ 'brand-logo--light': meta.tileLight }"
     :style="{ width: dim, height: dim, background: meta.gradient, color: meta.glyphColor || undefined }"
   >
-    <img v-if="showProductImg" :src="productImgUrl" :alt="product.name" class="brand-logo__img" />
+    <img v-if="decision.useProductImage" :src="productImgUrl" :alt="product.name" class="brand-logo__img" />
     <img
-      v-else-if="showBrandImg"
+      v-else-if="decision.useBrandImage"
       :src="meta.image"
       :alt="meta.label"
       class="brand-logo__img brand-logo__img--brand"
@@ -113,11 +111,12 @@ const strokeWidth = computed(() => meta.value.glyph.strokeWidth || 1.6)
   object-fit: cover;
 }
 
-/* 品牌线稿图（OpenAI 结）：自带白底，缩到内容区留一点边距，线条不贴边更像官方图标 */
+/* 品牌线稿图（OpenAI 结）：图形本身的留白已烘焙进 PNG（内容约占画布 62%），
+   这里不再叠加 padding，否则 46px 方块里的图标会被压得过小。 */
 .brand-logo__img--brand {
   box-sizing: border-box;
   object-fit: contain;
-  padding: 7%;
+  padding: 0;
 }
 
 .brand-logo__glyph {

@@ -47,7 +47,7 @@
           {{ t('errors.pageNotFound') }}
         </h1>
         <p class="text-gray-500 dark:text-dark-400">
-          The page you are looking for doesn't exist or has been moved.
+          你访问的页面不存在或已被移动。请检查网址，或从下方返回套餐页继续。
         </p>
       </div>
 
@@ -55,23 +55,23 @@
       <div class="flex flex-col justify-center gap-3 sm:flex-row">
         <button @click="goBack" class="btn btn-secondary">
           <Icon name="arrowLeft" size="md" class="mr-2" />
-          Go Back
+          返回上一页
         </button>
-        <router-link to="/dashboard" class="btn btn-primary">
+        <router-link to="/" class="btn btn-primary">
           <Icon name="home" size="md" class="mr-2" />
-          Go to Dashboard
+          返回首页选套餐
         </router-link>
       </div>
 
       <!-- Help Link -->
       <p class="mt-8 text-sm text-gray-400 dark:text-dark-500">
-        Need help?
-        <a
-          href="#"
+        需要帮助？
+        <RouterLink
+          to="/#faq"
           class="text-primary-600 transition-colors hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300"
         >
-          Contact support
-        </a>
+          查看常见问题
+        </RouterLink>
       </p>
     </div>
   </div>

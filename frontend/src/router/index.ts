@@ -44,7 +44,8 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/HomeView.vue'),
     meta: {
       requiresAuth: false,
-      title: 'Home'
+      // 与 index.html / utils/seo.ts 的首页标题一致（updateRouteSeo 会最终覆盖为同一字符串）
+      title: 'ChatGPT Plus/Pro 代充值与成品号独享账号'
     }
   },
   {
@@ -858,6 +859,9 @@ const routes: RouteRecordRaw[] = [
     name: 'NotFound',
     component: () => import('@/views/NotFoundView.vue'),
     meta: {
+      // 必须公开：守卫默认 requiresAuth=true，漏掉这一行会让「网址打错」的访客
+      // 被弹到 /login（看起来像站点挂了），而不是看到 404 页。
+      requiresAuth: false,
       title: '404 Not Found'
     }
   }

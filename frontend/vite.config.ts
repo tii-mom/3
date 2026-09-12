@@ -54,7 +54,7 @@ function renderStructuredData(page: SeoPage | null): string {
     name: '3API',
     url: siteUrl,
     logo: OG_IMAGE,
-    description: '3API 提供 ChatGPT Plus / Pro 官方直充、独享成品号与租号服务，支付宝微信支付，支付后提交 Session 即可到账，全程人工质保。',
+    description: '3API 提供 ChatGPT Plus / Pro 官方直充、独享成品号与租号服务，支付宝支付，支付后提交 Session 即可到账，全程人工质保。',
   }
   const website = {
     '@context': 'https://schema.org',

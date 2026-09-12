@@ -188,7 +188,7 @@ function submit() {
 
         <label class="sheet__agree">
           <input v-model="agreed" type="checkbox">
-          <span>我已阅读并同意<a href="/terms" target="_blank">服务条款</a>与<a href="/privacy" target="_blank">隐私政策</a></span>
+          <span>我已阅读并同意<a href="/legal/terms" target="_blank" rel="noopener">服务条款</a>与<a href="/legal/privacy" target="_blank" rel="noopener">隐私政策</a></span>
         </label>
 
         <button type="button" class="sheet__submit" :disabled="!canSubmit" @click="submit">

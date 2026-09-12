@@ -2,8 +2,11 @@ import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import seoPages from '@/content/seo-pages.json'
 
 const SITE_URL = 'https://3api.shop'
-const DEFAULT_TITLE = '3API - AI API 中转站与多模型统一接入'
-const DEFAULT_DESCRIPTION = '3API 为国内开发者提供 OpenAI、Claude、Gemini 等模型的统一 API 接入，适配 Claude Code、Codex、Cursor、Agent 和应用开发场景。'
+// 首页 meta 与 frontend/index.html 源文件保持一致（销售业务定位）。
+// 运行时 updateRouteSeo 会覆盖 document.title，这里若写成旧的「AI API 中转站」文案，
+// 会把预渲染好的正确标题盖掉（浏览器标签/分享卡片全错）。
+const DEFAULT_TITLE = '3API - ChatGPT Plus/Pro 代充值与成品号独享账号'
+const DEFAULT_DESCRIPTION = '3API 提供 ChatGPT Plus / Pro 官方直充、独享成品号与租号服务，支付宝支付，支付后提交 Session 即可到账，全程人工质保。'
 
 type SeoPage = (typeof seoPages)[keyof typeof seoPages]
 
