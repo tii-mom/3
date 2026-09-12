@@ -49,6 +49,16 @@ export interface PublicBanner {
   sort_order: number
 }
 
+/** 后台配置的商城品类（首页分组导航的数据源）。 */
+export interface PublicCategory {
+  id: number
+  slug: string
+  label: string
+  blurb: string
+  sort_order: number
+  enabled: boolean
+}
+
 export interface GuestOrderResult {
   shop_order_id: number
   order_no: string
@@ -93,6 +103,10 @@ export interface PublicPaymentMethodsResult {
 }
 
 export const publicShopAPI = {
+  /** 首页分组导航的品类（后台启用中的，已按 sort_order 排好） */
+  listCategories() {
+    return apiClient.get<PublicCategory[]>('/public/shop/categories')
+  },
   listProducts() {
     return apiClient.get<PublicProduct[]>('/public/shop/products')
   },

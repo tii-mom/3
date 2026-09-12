@@ -228,7 +228,7 @@
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { resolveShopAssetUrl, shopAPI, type ShopBanner, type ShopOrder, type ShopProduct } from '@/api/shop'
-import { type FulfillmentMode, type PublicProduct } from '@/api/publicShop'
+import { type FulfillmentMode, publicShopAPI, type PublicCategory, type PublicProduct } from '@/api/publicShop'
 import { SHOP_CATEGORIES, type ShopCategory } from '@/constants/shop'
 import PlanCard from '@/components/home/PlanCard.vue'
 import { paymentAPI } from '@/api/payment'
@@ -268,13 +268,25 @@ const payDialog = reactive({
   payUrl: '',
 })
 
-// 商品分组与官网首页保持一致：按品类（category）划分
+// 商品分组与官网首页保持一致：按品类（category）划分，品类数据源同为后台配置
 const catalogTab = ref<'all' | ShopCategory>('all')
+const categories = ref<PublicCategory[]>([])
 const catalogTabs = computed(() => {
-  const cats = new Set<ShopCategory>(products.value.map(item => (item.category || 'other') as ShopCategory))
+  const present = new Set(products.value.map(item => (item.category || 'other') as ShopCategory))
+  const meta = categories.value.length
+    ? categories.value.map(item => ({ value: item.slug as ShopCategory, label: item.label }))
+    : SHOP_CATEGORIES.map(item => ({ value: item.value, label: item.label }))
+
   const list: { value: 'all' | ShopCategory; label: string }[] = [{ value: 'all', label: '全部' }]
-  SHOP_CATEGORIES.forEach(cat => {
-    if (cats.has(cat.value)) list.push({ value: cat.value, label: cat.label })
+  meta.forEach(cat => {
+    if (present.has(cat.value)) list.push(cat)
+  })
+
+  // 兜底：商品挂在一个已从后台删除的品类上时补一个 tab，
+  // 否则这些商品只能在「全部」里看到，点分类反而找不到
+  const known = new Set(list.map(item => item.value))
+  present.forEach(slug => {
+    if (slug !== 'other' && !known.has(slug)) list.push({ value: slug, label: slug })
   })
   return list
 })
@@ -456,9 +468,18 @@ async function loadData() {
   loading.value = true
   try {
     // 商品/轮播是页面渲染数据；支付方式与订单列表是独立副作用加载，拆开更清晰
-    const [bannerRes, productRes] = await Promise.all([shopAPI.listBanners(), shopAPI.listProducts()])
+    const [bannerRes, productRes, categoryRes] = await Promise.all([
+      shopAPI.listBanners(),
+      shopAPI.listProducts(),
+      publicShopAPI.listCategories().catch(() => null)
+    ])
     banners.value = bannerRes.data || []
     products.value = productRes.data || []
+    categories.value = categoryRes?.data || []
+    // 当前选中的品类若已从后台下线，回退到「全部」，避免停在空白分类上
+    if (catalogTab.value !== 'all' && !catalogTabs.value.some(item => item.value === catalogTab.value)) {
+      catalogTab.value = 'all'
+    }
     await Promise.all([loadCheckoutMethods(), loadOrders()])
   } catch (error: any) {
     appStore.showToast('error', error?.message || '商城加载失败', 3000)

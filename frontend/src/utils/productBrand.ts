@@ -6,10 +6,9 @@
  * 直接消除「图标不高级、突兀」的问题。若后台给商品配了 image_url，调用方优先用图。
  *
  * 字形统一用**准确品牌符号**：
- * - ChatGPT → OpenAI 官方「结」形标志（fill）
+ * - GPT 系（代充 / 成品号 / 使用服务 / Codex，含后台自建 gpt_*）→ 官方 OpenAI 结线稿图片
  * - Gemini  → 官方四角星 spark，自带多彩渐变（凹边星，非直线星）
  * - X       → X 官方 logo
- * - Codex   → 代码括号（OpenAI 产品，用可区分的等宽符号而非重复 OpenAI 结）
  * 单色品牌用「品牌色方块 + 白色字形」，多彩品牌（Gemini）用「浅色方块 + 多彩字形」。
  */
 import type { PublicProduct } from '@/api/publicShop'
@@ -43,6 +42,11 @@ export interface BrandMeta {
   glyphColor?: string
   /** 浅色底方块（如 Gemini）：需要一层内描边才能在白色卡片上看出边界 */
   tileLight?: boolean
+  /**
+   * 图片型 logo（相对 public/ 的路径）。
+   * 有值时优先于内联 SVG 字形渲染 —— OpenAI 结使用官方线稿图片。
+   */
+  image?: string
   glyph: BrandGlyph
 }
 
@@ -54,14 +58,21 @@ const OPENAI_KNOT =
 const GEMINI_SPARK =
   'M12 0C12 6.627 6.627 12 0 12c6.627 0 12 5.373 12 12 0-6.627 5.373-12 12-12-6.627 0-12-5.373-12-12z'
 
+/**
+ * public/ 下静态资源的实际 URL。
+ * 用 BASE_URL 而不是硬编码 '/'，这样部署到子路径时也不会 404。
+ */
+const publicAsset = (path: string) => `${import.meta.env.BASE_URL}${path}`.replace(/\/{2,}/g, '/')
+
 const BRANDS: Record<string, BrandMeta> = {
   chatgpt: {
     key: 'chatgpt',
     label: 'ChatGPT',
-    // 白底（用户要求：不要用绿色）；OpenAI 官方结在白底即用近黑字形
+    // 白底（用户要求：不要用绿色）；配官方 OpenAI 结线稿图片
     gradient: 'linear-gradient(140deg, #ffffff 0%, #f4f5f7 100%)',
     tileLight: true,
     glyphColor: '#0a0a0a',
+    image: publicAsset('logos/openai-knot.png'),
     glyph: {
       mode: 'fill',
       paths: [OPENAI_KNOT]
@@ -127,22 +138,27 @@ const BRANDS: Record<string, BrandMeta> = {
   }
 }
 
-/** 按品类解析品牌元信息。gpt_topup / gpt_account 归 ChatGPT，其余按品类取对应品牌。 */
+/**
+ * 品类 → 品牌。
+ *
+ * GPT 系（代充 / 成品号 / 使用服务 / Codex，以及后台新建的 gpt_* 品类）
+ * 统一使用 OpenAI 结图标；其余按品类取对应品牌，未知品类兜底 generic。
+ */
 export function productBrandMeta(product: PublicProduct): BrandMeta {
   const cat = normalizeShopCategory(product.category) as ShopCategory
   switch (cat) {
-    case 'gpt_topup':
-    case 'gpt_account':
-      return BRANDS.chatgpt
     case 'x_premium':
       return BRANDS.x
     case 'gemini':
       return BRANDS.gemini
-    case 'codex':
-      return BRANDS.codex
     default:
-      return BRANDS.generic
+      break
   }
+  // gpt 前缀覆盖后台自建品类（如 gpt_usage、gpt_api），避免新增品类掉进 generic
+  if (cat.startsWith('gpt') || cat === 'codex') {
+    return BRANDS.chatgpt
+  }
+  return BRANDS.generic
 }
 
 /** 后台是否配了真实商品图（优先于品牌字形使用）。 */

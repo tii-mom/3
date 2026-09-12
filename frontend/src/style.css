@@ -170,7 +170,11 @@
   }
 
   /* ============ 输入框样式 ============ */
-  .input {
+  /* .input-field 是历史别名：商城管理、工具箱管理的弹窗一直在用它，
+     但样式表里只定义了 .input，导致这些弹窗的输入框渲染成没有边框的纯文本。
+     两个名字指向同一套样式，避免再出现「写了类名但没样式」。 */
+  .input,
+  .input-field {
     @apply min-h-10 w-full rounded-md px-3 py-2 text-sm;
     @apply bg-white dark:bg-dark-800;
     @apply border border-gray-200 dark:border-dark-600;

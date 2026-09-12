@@ -8,6 +8,9 @@ export type ShopProductType = 'virtual' | 'platform_usd_balance'
 export type ShopProductStatus = 'draft' | 'published' | 'archived'
 export type ShopFulfillmentMode = 'manual' | 'session_topup' | 'account_delivery' | 'rental'
 
+/** 素材用途：后端按用途套用不同的体积/尺寸上限（对齐首页展示位）。 */
+export type ShopAssetPurpose = 'product' | 'banner'
+
 export type { ShopCategory }
 export { SHOP_CATEGORIES }
 
@@ -83,6 +86,29 @@ export interface CreateShopOrderResult {
   payment: CreateOrderResult
 }
 
+/** 后台可管理的商城品类（迁移 208）。 */
+export interface AdminShopCategory {
+  id: number
+  slug: string
+  label: string
+  blurb: string
+  sort_order: number
+  enabled: boolean
+  /** 该品类下未删除商品数；>0 时后端拒绝删除 */
+  product_count: number
+  created_at?: string
+  updated_at?: string
+}
+
+export interface ShopCategoryPayload {
+  /** 仅创建时生效；更新时后端忽略（slug 不可变更） */
+  slug: string
+  label: string
+  blurb?: string
+  sort_order?: number
+  enabled?: boolean
+}
+
 export interface ShopProductPayload {
   name: string
   description?: string
@@ -155,6 +181,18 @@ export const shopAPI = {
 }
 
 export const adminShopAPI = {
+  listCategories() {
+    return apiClient.get<AdminShopCategory[]>('/admin/shop/categories')
+  },
+  createCategory(data: ShopCategoryPayload) {
+    return apiClient.post<AdminShopCategory>('/admin/shop/categories', data)
+  },
+  updateCategory(id: number, data: ShopCategoryPayload) {
+    return apiClient.put<AdminShopCategory>(`/admin/shop/categories/${id}`, data)
+  },
+  deleteCategory(id: number) {
+    return apiClient.delete(`/admin/shop/categories/${id}`)
+  },
   listProducts() {
     return apiClient.get<ShopProduct[]>('/admin/shop/products')
   },
@@ -188,9 +226,14 @@ export const adminShopAPI = {
   getOrderDelivery(id: number) {
     return apiClient.get<{ payload: string }>(`/admin/shop/orders/${id}/delivery`)
   },
-  uploadAsset(file: File) {
+  /**
+   * 上传商城素材。`purpose` 决定后端按哪档体积/尺寸上限校验（首页商品图 vs 轮播图），
+   * 与首页展示位一一对应。
+   */
+  uploadAsset(file: File, purpose: ShopAssetPurpose = 'product') {
     const formData = new FormData()
     formData.append('file', file)
+    formData.append('purpose', purpose)
     return apiClient.post<{ url: string }>('/admin/shop/assets', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })

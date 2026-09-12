@@ -5,10 +5,11 @@
       <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 class="text-xl font-bold text-gray-950 dark:text-white">商城管理</h1>
-          <p class="mt-1.5 text-sm text-gray-500 dark:text-gray-400">商品上架、轮播展示与订单发货；用户付款后在订单里填写发货信息，推广佣金进入算力公司钱包。</p>
+          <p class="mt-1.5 text-sm text-gray-500 dark:text-gray-400">商品上架、品类配置、轮播展示与订单发货；用户付款后在订单里填写发货信息，推广佣金进入算力公司钱包。</p>
         </div>
         <div class="flex flex-wrap gap-2">
           <button v-if="tab === 'products'" class="btn-primary rounded-lg px-4 py-2" @click="openProductDialog()">新增商品</button>
+          <button v-else-if="tab === 'categories'" class="btn-primary rounded-lg px-4 py-2" @click="openCategoryDialog()">新增品类</button>
           <button v-else-if="tab === 'banners'" class="btn-primary rounded-lg px-4 py-2" @click="openBannerDialog()">新增轮播</button>
         </div>
       </div>
@@ -38,8 +39,11 @@
                 <div class="flex items-center gap-3">
                   <img v-if="shopImage(product.image_url)" :src="shopImage(product.image_url)" class="h-12 w-12 rounded-lg object-cover" alt="">
                   <div v-else class="shop-thumb h-12 w-12 rounded-lg" aria-hidden="true">3</div>
-                  <div>
-                    <div class="font-semibold text-gray-950 dark:text-white">{{ product.name }}</div>
+                  <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="font-semibold text-gray-950 dark:text-white">{{ product.name }}</span>
+                      <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600 dark:bg-dark-800 dark:text-gray-300">{{ categoryLabel(product.category) }}</span>
+                    </div>
                     <div class="line-clamp-1 text-xs text-gray-500">{{ product.description }}</div>
                   </div>
                 </div>
@@ -68,6 +72,7 @@
                 <div class="min-w-0">
                   <div class="truncate font-semibold text-gray-950 dark:text-white">{{ product.name }}</div>
                   <div class="mt-0.5 line-clamp-2 text-xs text-gray-500">{{ product.description }}</div>
+                  <div class="mt-1 text-[11px] font-medium text-gray-500 dark:text-gray-400">{{ categoryLabel(product.category) }}</div>
                 </div>
                 <span :class="statusClass(product.status)" class="shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold">{{ statusLabel(product.status) }}</span>
               </div>
@@ -83,6 +88,78 @@
             </div>
           </div>
         </article>
+      </div>
+    </section>
+
+    <section v-else-if="tab === 'categories'" class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900">
+      <div class="border-b border-gray-100 px-5 py-4 dark:border-dark-700">
+        <h2 class="text-lg font-bold text-gray-950 dark:text-white">商品品类</h2>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          首页「选择套餐」的横版分类导航就按这里的顺序展示。关闭某个品类，它会连同该品类下的商品一起从首页隐藏（商品本身不会被删除）。
+        </p>
+      </div>
+
+      <div class="hidden overflow-x-auto lg:block">
+        <table class="min-w-full divide-y divide-gray-100 text-sm dark:divide-dark-700">
+          <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500 dark:bg-dark-800 dark:text-gray-400">
+            <tr>
+              <th class="px-5 py-3">品类</th>
+              <th class="px-5 py-3">标识</th>
+              <th class="px-5 py-3">商品数</th>
+              <th class="px-5 py-3">排序</th>
+              <th class="px-5 py-3">状态</th>
+              <th class="px-5 py-3 text-right">操作</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100 dark:divide-dark-700">
+            <tr v-for="category in adminCategories" :key="category.id">
+              <td class="px-5 py-4">
+                <div class="font-semibold text-gray-950 dark:text-white">{{ category.label }}</div>
+                <div class="line-clamp-1 text-xs text-gray-500">{{ category.blurb || '—' }}</div>
+              </td>
+              <td class="px-5 py-4"><code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600 dark:bg-dark-800 dark:text-gray-300">{{ category.slug }}</code></td>
+              <td class="px-5 py-4 tabular-nums">{{ category.product_count }}</td>
+              <td class="px-5 py-4 tabular-nums">{{ category.sort_order }}</td>
+              <td class="px-5 py-4">
+                <span :class="category.enabled ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' : 'bg-gray-100 text-gray-500 dark:bg-dark-800 dark:text-gray-300'" class="rounded-full px-2.5 py-1 text-xs font-semibold">
+                  {{ category.enabled ? '展示中' : '已隐藏' }}
+                </span>
+              </td>
+              <td class="px-5 py-4 text-right">
+                <button class="btn-secondary mr-2 rounded-lg px-3 py-1.5 text-xs" @click="openCategoryDialog(category)">编辑</button>
+                <button class="rounded-lg px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10" @click="removeCategory(category)">删除</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 移动端：表格列太窄，改为卡片列表 -->
+      <div class="divide-y divide-gray-100 dark:divide-dark-700 lg:hidden">
+        <article v-for="category in adminCategories" :key="category.id" class="p-4">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="truncate font-semibold text-gray-950 dark:text-white">{{ category.label }}</div>
+              <code class="mt-1 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600 dark:bg-dark-800 dark:text-gray-300">{{ category.slug }}</code>
+              <div class="mt-1 line-clamp-2 text-xs text-gray-500">{{ category.blurb || '—' }}</div>
+            </div>
+            <span :class="category.enabled ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' : 'bg-gray-100 text-gray-500 dark:bg-dark-800 dark:text-gray-300'" class="shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold">
+              {{ category.enabled ? '展示中' : '已隐藏' }}
+            </span>
+          </div>
+          <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+            <span>商品 {{ category.product_count }}</span>
+            <span>排序 {{ category.sort_order }}</span>
+          </div>
+          <div class="mt-3 flex gap-2">
+            <button class="btn-secondary rounded-lg px-3 py-1.5 text-xs" @click="openCategoryDialog(category)">编辑</button>
+            <button class="rounded-lg px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10" @click="removeCategory(category)">删除</button>
+          </div>
+        </article>
+      </div>
+
+      <div v-if="!adminCategories.length" class="px-5 py-14 text-center text-sm text-gray-500 dark:text-gray-400">
+        还没有品类，点右上角「新增品类」创建第一个。
       </div>
     </section>
 
@@ -249,14 +326,26 @@
             </div>
 
             <div class="mt-4 grid gap-4 md:grid-cols-2">
-              <label class="shop-field">
-                <span>商品品类</span>
+              <!-- 这里刻意不用 .shop-field：它的 `> span { display: block }` 会盖掉 Tailwind 的
+                   flex 工具类（两处都是单类选择器，组件样式在 utilities 之后加载），
+                   标题与「管理品类」会挤成一行。 -->
+              <div>
+                <div class="mb-1.5 flex items-center justify-between gap-2">
+                  <span class="text-sm font-bold text-gray-700 dark:text-gray-200">商品品类</span>
+                  <button
+                    type="button"
+                    class="text-xs font-semibold text-primary-600 hover:underline dark:text-primary-300"
+                    @click="goToCategoriesTab"
+                  >
+                    管理品类
+                  </button>
+                </div>
                 <select v-model="productForm.category" class="input-field w-full">
-                  <option v-for="option in SHOP_CATEGORIES" :key="option.value" :value="option.value">
-                    {{ option.label }}
+                  <option v-for="option in categorySelectOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}{{ option.count >= 0 ? `（${option.count}）` : '' }}
                   </option>
                 </select>
-              </label>
+              </div>
               <label class="shop-field">
                 <span>交付模式</span>
                 <select v-model="productForm.fulfillment_mode" class="input-field w-full">
@@ -278,9 +367,9 @@
                 <span>规格说明</span>
                 <input v-model="productForm.spec_label" type="text" class="input-field w-full" placeholder="如：独享 · 30 天质保">
               </label>
-              <label class="shop-field flex flex-row items-center gap-2 md:col-span-2">
+              <label class="flex cursor-pointer flex-row items-center gap-2 md:col-span-2">
                 <input v-model="productForm.highlight" type="checkbox" class="h-4 w-4 rounded border-gray-300">
-                <span>在官网首页高亮推荐</span>
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-200">在官网首页高亮推荐</span>
               </label>
             </div>
           </div>
@@ -299,7 +388,7 @@
               <span>或粘贴图片地址</span>
               <input v-model="productForm.image_url" class="input-field w-full" placeholder="https://...">
             </label>
-            <p class="mt-3 text-xs leading-5 text-gray-500 dark:text-gray-400">建议使用 16:9 或 4:3 图片，支持 JPG、PNG、WebP、GIF，最大 5MB。本地上传会自动保存到商城素材库。</p>
+            <p class="mt-3 text-xs leading-5 text-gray-500 dark:text-gray-400">首页把商品图当作 46px 的方形图标展示，所以本地上传会自动居中裁成正方形并压缩成 WebP（{{ PRODUCT_IMAGE_SIZE }}×{{ PRODUCT_IMAGE_SIZE }}）。支持 JPG、PNG、WebP、GIF，原图不超过 12MB。</p>
 
             <div class="mt-5 border-t border-gray-200 pt-4 dark:border-dark-700">
               <div class="flex items-center justify-between gap-2">
@@ -324,6 +413,58 @@
         <div class="mt-6 flex justify-end gap-3">
           <button type="button" class="btn-secondary rounded-2xl px-4 py-2.5" @click="productDialog.open = false">取消</button>
           <button class="btn-primary rounded-2xl px-4 py-2.5">保存</button>
+        </div>
+      </form>
+    </div>
+
+    <div v-if="categoryDialog.open" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/55 p-4 backdrop-blur-sm">
+      <form class="shop-modal max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-5 shadow-2xl dark:bg-dark-900" @submit.prevent="saveCategory">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="text-sm font-semibold text-primary-600 dark:text-primary-300">品类管理</p>
+            <h3 class="mt-1 text-xl font-bold text-gray-950 dark:text-white">{{ categoryDialog.id ? '编辑品类' : '新增品类' }}</h3>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">品类决定首页「选择套餐」的横版分类导航，也决定商品卡片的品牌图标与权益文案。</p>
+          </div>
+          <button type="button" class="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-dark-800 dark:hover:text-white" aria-label="关闭" @click="categoryDialog.open = false">✕</button>
+        </div>
+
+        <div class="mt-6 space-y-4">
+          <label class="shop-field">
+            <span>品类名称</span>
+            <input v-model="categoryForm.label" class="input-field w-full" placeholder="例如：GPT 官方充值" required>
+          </label>
+          <label class="shop-field">
+            <span>品类标识（slug）</span>
+            <input
+              v-model="categoryForm.slug"
+              class="input-field w-full disabled:cursor-not-allowed disabled:opacity-60"
+              :disabled="!!categoryDialog.id"
+              placeholder="例如：gpt_topup"
+              autocomplete="off"
+            >
+            <small class="mt-1 block text-xs font-normal leading-5 text-gray-500 dark:text-gray-400">
+              {{ categoryDialog.id ? '标识创建后不可修改，避免打乱已上架商品的归属。' : '小写字母开头，只能用小写字母、数字与下划线，如 gpt_topup / x_premium。' }}
+            </small>
+          </label>
+          <label class="shop-field">
+            <span>一句话说明</span>
+            <input v-model="categoryForm.blurb" class="input-field w-full" placeholder="展示在首页分组标题下，建议 20 字以内">
+          </label>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="shop-field">
+              <span>排序（越小越靠前）</span>
+              <input v-model.number="categoryForm.sort_order" type="number" class="input-field w-full">
+            </label>
+            <label class="flex cursor-pointer flex-row items-center gap-2 sm:pt-7">
+              <input v-model="categoryForm.enabled" type="checkbox" class="h-4 w-4 rounded border-gray-300">
+              <span class="text-sm font-medium text-gray-700 dark:text-gray-200">在首页展示该品类</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="mt-6 flex justify-end gap-3">
+          <button type="button" class="btn-secondary rounded-2xl px-4 py-2.5" @click="categoryDialog.open = false">取消</button>
+          <button class="btn-primary rounded-2xl px-4 py-2.5" :disabled="savingCategory">{{ savingCategory ? '保存中...' : '保存' }}</button>
         </div>
       </form>
     </div>
@@ -357,6 +498,7 @@
               {{ uploadingBannerImage ? '上传中...' : '本地上传图片' }}
             </button>
             <label class="shop-field mt-3"><span>或粘贴图片地址</span><input v-model="bannerForm.image_url" class="input-field w-full" placeholder="https://..."></label>
+            <p class="mt-3 text-xs leading-5 text-gray-500 dark:text-gray-400">轮播图铺满卡片宽度展示，本地上传会自动等比压缩到 {{ BANNER_IMAGE_MAX_WIDTH }}px 宽以内。支持 JPG、PNG、WebP、GIF。</p>
           </aside>
         </div>
         <div class="mt-6 flex justify-end gap-3">
@@ -407,28 +549,55 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { adminShopAPI, resolveShopAssetUrl, type ShopBanner, type ShopOrder, type ShopProduct, type ShopProductPayload } from '@/api/shop'
+import {
+  adminShopAPI,
+  resolveShopAssetUrl,
+  type AdminShopCategory,
+  type ShopAssetPurpose,
+  type ShopBanner,
+  type ShopCategoryPayload,
+  type ShopOrder,
+  type ShopProduct,
+  type ShopProductPayload
+} from '@/api/shop'
 import { SHOP_CATEGORIES } from '@/constants/shop'
+import { resizeImageForUpload } from '@/utils/imageResize'
 import { useAppStore } from '@/stores'
 import AppLayout from '@/components/layout/AppLayout.vue'
 
-type TabKey = 'products' | 'banners' | 'orders'
+type TabKey = 'products' | 'categories' | 'banners' | 'orders'
 
 const appStore = useAppStore()
 const tab = ref<TabKey>('products')
 const tabs: Array<{ key: TabKey; label: string }> = [
   { key: 'products', label: '商品管理' },
+  { key: 'categories', label: '品类管理' },
   { key: 'banners', label: '轮播管理' },
   { key: 'orders', label: '商城订单' },
 ]
 const products = ref<ShopProduct[]>([])
 const banners = ref<ShopBanner[]>([])
 const orders = ref<ShopOrder[]>([])
+const adminCategories = ref<AdminShopCategory[]>([])
 const fulfillingOrder = ref(false)
+const savingCategory = ref(false)
 const productFileInput = ref<HTMLInputElement | null>(null)
 const bannerFileInput = ref<HTMLInputElement | null>(null)
 const uploadingProductImage = ref(false)
 const uploadingBannerImage = ref(false)
+
+/**
+ * 图片处理规格，直接对齐首页展示位：
+ * - 商品图在首页只是 46px 方块（PlanCard → BrandLogo），裁成 512×512 足够 4x 屏；
+ * - 轮播图铺满卡片宽度（约 540px），等比压到 1600px 宽即可。
+ * 压缩后通常 30–150KB，后端上限只是为了兜住直连接口上传。
+ */
+const PRODUCT_IMAGE_SIZE = 512
+const PRODUCT_IMAGE_MAX_BYTES = 180 * 1024
+const BANNER_IMAGE_MAX_WIDTH = 1600
+const BANNER_IMAGE_MAX_BYTES = 600 * 1024
+/** 原图上限：只做「拒绝明显不合理」的兜底，真正的裁剪压缩交给 canvas */
+const RAW_IMAGE_MAX_BYTES = 12 * 1024 * 1024
 
 const productDialog = reactive({ open: false, id: 0 })
 const bannerDialog = reactive({ open: false, id: 0 })
@@ -470,6 +639,45 @@ const fulfillDialog = reactive({
   deliveryPayload: '',
   deliveryLoading: false,
 })
+const categoryDialog = reactive({ open: false, id: 0 })
+const categoryForm = reactive<ShopCategoryPayload>({
+  slug: '',
+  label: '',
+  blurb: '',
+  sort_order: 0,
+  enabled: true,
+})
+
+/**
+ * 商品表单的品类下拉数据源。
+ * 优先用后台已配置的品类（含每类商品数），接口还没回来时退化为内置兜底，
+ * 保证列表为空也能编辑已有商品、不会把品类选择框留空。
+ */
+const categoryOptions = computed(() => {
+  if (adminCategories.value.length) {
+    return adminCategories.value.map((item) => ({
+      value: item.slug,
+      label: item.label,
+      count: item.product_count,
+      enabled: item.enabled
+    }))
+  }
+  return SHOP_CATEGORIES.map((item) => ({ value: item.value, label: item.label, count: -1, enabled: true }))
+})
+
+/** 商品表单里选中的品类若已被后台删除，补一个选项，避免 select 显示为空 */
+const categorySelectOptions = computed(() => {
+  const options = categoryOptions.value
+  const current = productForm.category
+  if (current && !options.some((item) => item.value === current)) {
+    return [{ value: current, label: `${current}（已删除）`, count: -1, enabled: false }, ...options]
+  }
+  return options
+})
+
+function categoryLabel(slug: string) {
+  return adminCategories.value.find((item) => item.slug === slug)?.label || slug
+}
 
 /** 解密并展示用户提交的交付资料（Session 或收货信息） */
 async function loadOrderDelivery(orderId: number) {
@@ -515,6 +723,7 @@ const fulfilledOrdersCount = computed(() => orders.value.filter(order => order.f
 
 watch(tab, () => {
   if (tab.value === 'products') void loadProducts()
+  if (tab.value === 'categories') void loadCategories()
   if (tab.value === 'banners') void loadBanners()
   if (tab.value === 'orders') void loadOrders()
 })
@@ -554,6 +763,11 @@ function formatDate(value: string) {
 async function loadProducts() {
   const res = await adminShopAPI.listProducts()
   products.value = res.data || []
+}
+
+async function loadCategories() {
+  const res = await adminShopAPI.listCategories()
+  adminCategories.value = res.data || []
 }
 
 async function loadBanners() {
@@ -677,19 +891,38 @@ async function saveProduct() {
   }
 }
 
-async function uploadImage(file: File, target: 'product' | 'banner') {
+/**
+ * 上传前的图片处理：把图裁到首页实际需要的尺寸再上传。
+ * 后端没有图像处理能力，所以「符合展示规格」这件事在客户端一次做完。
+ */
+async function prepareShopImage(file: File, target: ShopAssetPurpose): Promise<File> {
+  if (file.type === 'image/gif') {
+    // GIF 走 canvas 会丢帧。体积本来就合规时原样上传，超出才退化为静态图
+    const cap = target === 'banner' ? BANNER_IMAGE_MAX_BYTES : PRODUCT_IMAGE_MAX_BYTES
+    if (file.size <= cap) return file
+  }
+  return resizeImageForUpload(
+    file,
+    target === 'product'
+      ? { square: PRODUCT_IMAGE_SIZE, maxBytes: PRODUCT_IMAGE_MAX_BYTES }
+      : { maxWidth: BANNER_IMAGE_MAX_WIDTH, maxBytes: BANNER_IMAGE_MAX_BYTES }
+  )
+}
+
+async function uploadImage(file: File, target: ShopAssetPurpose) {
   if (!file.type.startsWith('image/')) {
     appStore.showToast('warning', '请选择图片文件', 2500)
     return
   }
-  if (file.size > 5 * 1024 * 1024) {
-    appStore.showToast('warning', '图片不能超过 5MB', 2500)
+  if (file.size > RAW_IMAGE_MAX_BYTES) {
+    appStore.showToast('warning', '原图不能超过 12MB，请先压缩再上传', 3000)
     return
   }
   if (target === 'product') uploadingProductImage.value = true
   else uploadingBannerImage.value = true
   try {
-    const res = await adminShopAPI.uploadAsset(file)
+    const prepared = await prepareShopImage(file, target)
+    const res = await adminShopAPI.uploadAsset(prepared, target)
     if (target === 'product') productForm.image_url = res.data.url
     else bannerForm.image_url = res.data.url
     appStore.showToast('success', '图片已上传', 2200)
@@ -720,6 +953,88 @@ async function removeProduct(product: ShopProduct) {
   await adminShopAPI.deleteProduct(product.id)
   appStore.showToast('success', '商品已删除', 2500)
   await loadProducts()
+}
+
+/** 品类标识规则与后端 shopCategorySlugPattern 保持一致 */
+const CATEGORY_SLUG_PATTERN = /^[a-z][a-z0-9_]{0,31}$/
+
+/**
+ * 从商品弹窗跳到品类管理。
+ * 弹窗是全屏遮罩，不关掉就看不到下面的 tab，因此这里先关闭编辑态——
+ * 入口文案是「管理品类」，属于用户主动发起的跳转。
+ */
+function goToCategoriesTab() {
+  productDialog.open = false
+  tab.value = 'categories'
+}
+
+function openCategoryDialog(category?: AdminShopCategory) {
+  categoryDialog.open = true
+  categoryDialog.id = category?.id || 0
+  Object.assign(categoryForm, category ? {
+    slug: category.slug,
+    label: category.label,
+    blurb: category.blurb || '',
+    sort_order: category.sort_order,
+    enabled: category.enabled,
+  } : {
+    slug: '',
+    label: '',
+    blurb: '',
+    // 默认排到最后：新品类通常是在已有品类之外补充的
+    sort_order: adminCategories.value.length
+      ? Math.max(...adminCategories.value.map((item) => item.sort_order)) + 10
+      : 0,
+    enabled: true,
+  })
+}
+
+async function saveCategory() {
+  const slug = categoryForm.slug.trim()
+  const label = categoryForm.label.trim()
+  if (!categoryDialog.id && !CATEGORY_SLUG_PATTERN.test(slug)) {
+    appStore.showToast('warning', '标识需以小写字母开头，只能用小写字母、数字与下划线，最长 32 位', 3500)
+    return
+  }
+  if (!label) {
+    appStore.showToast('warning', '请填写品类名称', 2500)
+    return
+  }
+  savingCategory.value = true
+  try {
+    const payload: ShopCategoryPayload = {
+      slug,
+      label,
+      blurb: categoryForm.blurb?.trim() || '',
+      sort_order: Number(categoryForm.sort_order) || 0,
+      enabled: categoryForm.enabled !== false,
+    }
+    if (categoryDialog.id) await adminShopAPI.updateCategory(categoryDialog.id, payload)
+    else await adminShopAPI.createCategory(payload)
+    categoryDialog.open = false
+    appStore.showToast('success', '品类已保存', 2500)
+    // 品类名称会出现在商品列表的分类标签上，一起刷新
+    await Promise.all([loadCategories(), loadProducts()])
+  } catch (error: any) {
+    appStore.showToast('error', error?.message || '保存品类失败', 3000)
+  } finally {
+    savingCategory.value = false
+  }
+}
+
+async function removeCategory(category: AdminShopCategory) {
+  if (category.product_count > 0) {
+    appStore.showToast('warning', `该品类下还有 ${category.product_count} 个商品，请先改到其它品类再删除`, 3500)
+    return
+  }
+  if (!confirm(`确认删除品类「${category.label}」？`)) return
+  try {
+    await adminShopAPI.deleteCategory(category.id)
+    appStore.showToast('success', '品类已删除', 2500)
+    await loadCategories()
+  } catch (error: any) {
+    appStore.showToast('error', error?.message || '删除品类失败', 3000)
+  }
 }
 
 function openBannerDialog(banner?: ShopBanner) {
@@ -765,7 +1080,7 @@ async function removeBanner(banner: ShopBanner) {
 }
 
 onMounted(async () => {
-  await Promise.all([loadProducts(), loadBanners(), loadOrders()])
+  await Promise.all([loadProducts(), loadCategories(), loadBanners(), loadOrders()])
 })
 </script>
 

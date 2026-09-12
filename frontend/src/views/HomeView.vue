@@ -1,8 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import FAQ_ITEMS from '@/content/home-faq.json'
-import { formatCNY, publicShopAPI, type PublicBanner, type PublicProduct } from '@/api/publicShop'
-import { SHOP_CATEGORIES, normalizeShopCategory, type ShopCategory } from '@/constants/shop'
+import {
+  formatCNY,
+  publicShopAPI,
+  type PublicBanner,
+  type PublicCategory,
+  type PublicProduct
+} from '@/api/publicShop'
+import { SHOP_CATEGORIES, normalizeShopCategory } from '@/constants/shop'
 import userAPI from '@/api/user'
 import { resolveShopAssetUrl } from '@/api/shop'
 import { planHeroPromo } from '@/utils/heroPromo'
@@ -38,10 +44,15 @@ const sheetOpen = ref(false)
 const selectedProduct = ref<PublicProduct | null>(null)
 const openFaq = ref<number | null>(0)
 
+/** 后台配置的品类（首页横版分类导航的数据源，见 /public/shop/categories）。 */
+const categories = ref<PublicCategory[]>([])
+
 /**
- * 商品按品类分组（而不是按交付模式 tab）。
- * 品类回答「卖什么」（GPT 代充 / 成品号 / X 蓝V / Gemini ...），所有分组都直接渲染到 DOM，
- * 不像 tab 那样只渲染当前激活的一组——既方便横向比价，也让爬虫能抓到全部商品。
+ * 商品按品类分组。
+ *
+ * 品类集合与顺序**以后台配置为准**（不再是前端硬编码枚举）；后台停用的品类不会出现在列表里，
+ * 其商品也已被后端过滤。所有分组都用 v-show 保留在 DOM 中（爬虫仍能抓到全部商品），
+ * 只是同时只显示一个，避免「全部展开」把页面拉得很长。
  */
 function compareProducts(a: PublicProduct, b: PublicProduct) {
   if (a.highlight !== b.highlight) return a.highlight ? -1 : 1
@@ -49,31 +60,110 @@ function compareProducts(a: PublicProduct, b: PublicProduct) {
   return a.id - b.id
 }
 
+/** 品类元信息：接口优先，接口未就绪时退化为内置兜底，保证首屏不出现空导航。 */
+const categoryMetaList = computed(() => {
+  if (categories.value.length) {
+    return categories.value.map((item) => ({
+      value: item.slug,
+      label: item.label,
+      blurb: item.blurb
+    }))
+  }
+  return SHOP_CATEGORIES.map((item) => ({ value: item.value, label: item.label, blurb: item.blurb }))
+})
+
 const categoryGroups = computed(() => {
-  const buckets = new Map<ShopCategory, PublicProduct[]>()
+  const buckets = new Map<string, PublicProduct[]>()
   for (const product of products.value) {
     const key = normalizeShopCategory(product.category)
     const bucket = buckets.get(key)
     if (bucket) bucket.push(product)
     else buckets.set(key, [product])
   }
-  // 按 SHOP_CATEGORIES 的固定顺序输出，空品类不渲染
-  return SHOP_CATEGORIES.filter((meta) => (buckets.get(meta.value)?.length ?? 0) > 0).map((meta) => ({
+
+  const groups = categoryMetaList.value.map((meta) => ({
     value: meta.value,
     label: meta.label,
     blurb: meta.blurb,
     items: (buckets.get(meta.value) || []).slice().sort(compareProducts)
   }))
+
+  // 兜底：商品挂在一个已从后台删除的品类上时，补一个「其他服务」分组，
+  // 否则这些商品在首页会凭空消失（后端 LEFT JOIN 保证了它们仍然返回）。
+  const known = new Set(groups.map((group) => group.value))
+  const orphans: PublicProduct[] = []
+  for (const [key, items] of buckets) {
+    if (!known.has(key)) orphans.push(...items)
+  }
+  if (orphans.length) {
+    const otherIndex = groups.findIndex((group) => group.value === 'other')
+    if (otherIndex >= 0) {
+      groups[otherIndex].items = groups[otherIndex].items.concat(orphans).sort(compareProducts)
+    } else {
+      groups.push({
+        value: 'other',
+        label: '其他服务',
+        blurb: '其余增值服务',
+        items: orphans.sort(compareProducts)
+      })
+    }
+  }
+
+  return groups
 })
 
 /**
- * 首页默认只展示 GPT 代充一组（信息有限、高级、精致）；其余品类收进
- * 「查看更多服务」折叠区，点击才展开。primaryGroup = GPT 代充（若存在）。
+ * 只渲染「有商品」的分类：空分类不占导航位、不出空面板，
+ * 后台新建但还没上架商品的品类不会在首页留下一个点不开的空 tab。
  */
-const PRIMARY_CATEGORY: ShopCategory = 'gpt_topup'
-const showAllCategories = ref(false)
-const primaryGroup = computed(() => categoryGroups.value.find((g) => g.value === PRIMARY_CATEGORY) || null)
-const otherGroups = computed(() => categoryGroups.value.filter((g) => g.value !== PRIMARY_CATEGORY))
+const visibleCategoryGroups = computed(() => categoryGroups.value.filter((group) => group.items.length > 0))
+
+/** 当前激活的分类 tab。 */
+const activeCategory = ref('')
+
+/** 默认激活后台排序最靠前、且有商品的分类（避免一进页面就是空分类）。 */
+function syncActiveCategory() {
+  const groups = visibleCategoryGroups.value
+  if (!groups.length) {
+    activeCategory.value = ''
+    return
+  }
+  if (groups.some((group) => group.value === activeCategory.value)) return
+  activeCategory.value = groups[0].value
+}
+
+/** 切换分类（同时更新地址栏 hash，便于分享和刷新后保持位置）。 */
+function selectCategory(value: string, options: { scroll?: boolean } = {}) {
+  if (!visibleCategoryGroups.value.some((group) => group.value === value)) return
+  activeCategory.value = value
+  if (typeof history !== 'undefined' && history.replaceState) {
+    history.replaceState(null, '', `#cat-${value}`)
+  }
+  if (options.scroll) {
+    void nextTick(() => {
+      document.getElementById('plans')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
+}
+
+/** 跳到某个分类（首屏「查看套餐」入口用），分类不存在时退化为滚动到套餐区。 */
+function goToCategory(value: string) {
+  if (visibleCategoryGroups.value.some((group) => group.value === value)) {
+    selectCategory(value, { scroll: true })
+    return
+  }
+  document.getElementById('plans')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+/** 从地址栏 hash（#cat-xxx）恢复上次浏览的分类。 */
+function restoreCategoryFromHash() {
+  const match = /^#cat-([a-z0-9_]+)$/i.exec(window.location.hash)
+  if (!match) return false
+  const slug = match[1]
+  if (!visibleCategoryGroups.value.some((group) => group.value === slug)) return false
+  activeCategory.value = slug
+  return true
+}
 
 /** 按展示顺序（推荐位 → sort_order → id）排好的商品，首屏所有选品都从这里取 */
 const orderedProducts = computed(() => products.value.slice().sort(compareProducts))
@@ -113,14 +203,17 @@ const heroPromo = computed(() => {
   }
 })
 
-/** 首屏促销条：点击直接进入购买环节 */
+/**
+ * 首屏促销条：有主推商品时直接下单；没有主推商品时（徽标为「查看套餐」）
+ * 切到 GPT 官方充值分类，一次列出**该品类下的全部套餐**——而不是替用户随机挑一个。
+ */
 function onPromoAction() {
-  const target = heroPromoPlan.value.product || heroProducts.value[0]
+  const target = heroPromoPlan.value.product
   if (target) {
     openSheet(target)
     return
   }
-  document.getElementById('plans')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  goToCategory('gpt_topup')
 }
 
 const HERO_FEATURES = [
@@ -207,11 +300,13 @@ onMounted(async () => {
   // 支付渠道与控制台商城同源，后台开关与限额即时生效
   void loadPaymentMethods()
   try {
-    const [productRes, bannerRes] = await Promise.all([
+    const [productRes, bannerRes, categoryRes] = await Promise.all([
       publicShopAPI.listProducts(),
-      publicShopAPI.listBanners().catch(() => null)
+      publicShopAPI.listBanners().catch(() => null),
+      publicShopAPI.listCategories().catch(() => null)
     ])
     products.value = productRes.data || []
+    categories.value = categoryRes?.data || []
     const list = bannerRes?.data || []
     banners.value = list.filter((item) => item.enabled)
   } catch {
@@ -219,6 +314,8 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+  // 分类导航：优先恢复地址栏 hash（#cat-xxx），否则选中第一个有商品的分类
+  if (!restoreCategoryFromHash()) syncActiveCategory()
   // 推广奖励只在登录后展示
   if (isLoggedIn.value) {
     try {
@@ -307,7 +404,7 @@ function handlePaymentSuccess() {
               官方渠道代充值，1-3 分钟到账，30 天质保。成品号与租号即买即用，全程不需要账号密码。
             </p>
             <div class="hero__actions">
-              <a class="sh-btn sh-btn--primary" href="#plans">选择套餐</a>
+              <a class="sh-btn sh-btn--primary" href="#plans" @click.prevent="goToCategory('gpt_topup')">选择套餐</a>
               <a class="sh-btn sh-btn--dark-ghost" href="#workflow">查看充值流程</a>
             </div>
             <ul class="hero__features">
@@ -396,16 +493,42 @@ function handlePaymentSuccess() {
             <div v-for="i in 3" :key="i" class="sh-skeleton" />
           </div>
 
-          <template v-else-if="categoryGroups.length">
-            <!-- 默认仅展示 GPT 代充；其余品类收进「查看更多服务」折叠区 -->
-            <section v-if="primaryGroup" :id="`cat-${primaryGroup.value}`" class="plans__group">
+          <template v-else-if="visibleCategoryGroups.length">
+            <!-- 横版分类导航：分类与顺序一律来自后台商城设置（/public/shop/categories）。
+                 不用「查看更多」折叠，避免展开把页面拉长；点 tab 原地换内容。 -->
+            <div class="plans__cats" role="tablist" aria-label="商品分类" v-reveal>
+              <button
+                v-for="group in visibleCategoryGroups"
+                :key="group.value"
+                type="button"
+                role="tab"
+                class="plans__cat"
+                :class="{ 'is-active': group.value === activeCategory }"
+                :aria-selected="group.value === activeCategory"
+                :aria-controls="`cat-${group.value}`"
+                @click="selectCategory(group.value)"
+              >
+                <span class="plans__cat-label">{{ group.label }}</span>
+                <span class="plans__cat-count">{{ group.items.length }}</span>
+              </button>
+            </div>
+
+            <!-- 全部分类都保留在 DOM（爬虫仍能抓到所有商品），同时只显示当前分类 -->
+            <section
+              v-for="group in visibleCategoryGroups"
+              v-show="group.value === activeCategory"
+              :id="`cat-${group.value}`"
+              :key="group.value"
+              class="plans__group"
+              role="tabpanel"
+            >
               <header class="plans__group-head">
-                <h3 class="plans__group-title">{{ primaryGroup.label }}</h3>
-                <p v-if="primaryGroup.blurb" class="plans__group-blurb">{{ primaryGroup.blurb }}</p>
+                <h3 class="plans__group-title">{{ group.label }}</h3>
+                <p v-if="group.blurb" class="plans__group-blurb">{{ group.blurb }}</p>
               </header>
               <div class="plans__grid">
                 <PlanCard
-                  v-for="product in primaryGroup.items"
+                  v-for="product in group.items"
                   :key="product.id"
                   :product="product"
                   :show-commission="isLoggedIn"
@@ -414,48 +537,6 @@ function handlePaymentSuccess() {
                 />
               </div>
             </section>
-
-            <div v-if="otherGroups.length" class="plans__more">
-              <button
-                type="button"
-                class="plans__more-btn"
-                :aria-expanded="showAllCategories"
-                @click="showAllCategories = !showAllCategories"
-              >
-                <span>{{ showAllCategories ? '收起其他服务' : '查看更多服务' }}</span>
-                <svg
-                  class="plans__more-chev"
-                  :class="{ 'is-open': showAllCategories }"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                >
-                  <path d="M4 6.5l4 4 4-4" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-              </button>
-
-              <div v-if="showAllCategories" class="plans__more-body">
-                <section v-for="group in otherGroups" :id="`cat-${group.value}`" :key="group.value" class="plans__group">
-                  <header class="plans__group-head">
-                    <h3 class="plans__group-title">{{ group.label }}</h3>
-                    <p v-if="group.blurb" class="plans__group-blurb">{{ group.blurb }}</p>
-                  </header>
-                  <div class="plans__grid">
-                    <PlanCard
-                      v-for="product in group.items"
-                      :key="product.id"
-                      :product="product"
-                      :show-commission="isLoggedIn"
-                      :aff-code="affCode"
-                      @select="openSheet"
-                    />
-                  </div>
-                </section>
-              </div>
-            </div>
           </template>
 
           <div v-else class="empty">
@@ -1384,57 +1465,61 @@ section[id],
   padding: 96px 0;
 }
 
-/* 「查看更多服务」折叠区：首页默认只暴露 GPT 代充，其余品类点此展开 */
-.plans__more {
-  margin-top: 36px;
+/* 横版分类导航：取代旧的「查看更多服务」折叠区，点 tab 原地换内容、不拉长页面 */
+.plans__cats {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 24px;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 40px;
 }
 
-.plans__more-btn {
+.plans__cat {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 11px 22px;
+  padding: 10px 18px;
   border-radius: 999px;
   border: 1px solid var(--sh-border-strong);
   background: var(--sh-surface);
-  color: var(--sh-text);
+  color: var(--sh-text-2);
   font-size: 14px;
   font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
   transition: border-color 160ms ease-out, color 160ms ease-out, background 160ms ease-out;
 }
 
-.plans__more-btn:hover {
+.plans__cat:hover {
+  border-color: var(--sh-accent);
+  color: var(--sh-accent-text);
+}
+
+.plans__cat.is-active {
   border-color: var(--sh-accent);
   color: var(--sh-accent-text);
   background: var(--sh-accent-soft);
 }
 
-.plans__more-chev {
-  transition: transform 220ms ease-out;
+.plans__cat-count {
+  min-width: 18px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--sh-surface-2);
+  color: var(--sh-text-3);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
 }
 
-.plans__more-chev.is-open {
-  transform: rotate(180deg);
+.plans__cat.is-active .plans__cat-count {
+  background: var(--sh-accent);
+  color: #fff;
 }
 
-.plans__more-body {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-/* 分组之间留出比卡片间距更大的呼吸，避免所有商品糊成一片 */
+/* 分组之间由 tab 切换，同一时刻只显示一个，无需额外的上下留白 */
 .plans__group {
   scroll-margin-top: 88px;
-}
-
-.plans__group + .plans__group {
-  margin-top: 56px;
 }
 
 .plans__group-head {
@@ -1957,14 +2042,22 @@ section[id],
     font-size: 24px;
   }
 
-  /* 移动端「查看更多服务」按钮拉满宽度，居中文字 */
-  .plans__more-btn {
-    width: 100%;
-    justify-content: center;
+  /* 移动端分类导航改为单行横向滚动，保持「横版」手感且不换行堆高 */
+  .plans__cats {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-bottom: 28px;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
 
-  .plans__group + .plans__group {
-    margin-top: 44px;
+  .plans__cats::-webkit-scrollbar {
+    display: none;
+  }
+
+  .plans__cat {
+    flex: 0 0 auto;
   }
 
   .plans__grid {
