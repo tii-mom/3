@@ -26,7 +26,6 @@ const emit = defineEmits<{
 
 const contact = ref('')
 const paymentType = ref('')
-const agreed = ref(false)
 const touched = ref(false)
 
 /** 主图 + 图廊；切换商品时回到第一张 */
@@ -59,7 +58,6 @@ const contactError = computed(() => {
 const canSubmit = computed(() =>
   !noMethodAvailable.value &&
   (isLoggedIn.value || (contact.value.trim() !== '' && !contactError.value)) &&
-  agreed.value &&
   !props.submitting
 )
 
@@ -76,7 +74,6 @@ const deliveryNotice = computed(() => {
 watch(() => props.open, (open) => {
   if (open) {
     contact.value = ''
-    agreed.value = false
     touched.value = false
     paymentType.value = methods.value[0]?.value || ''
   }
@@ -185,11 +182,6 @@ function submit() {
           </svg>
           <p>{{ deliveryNotice }}</p>
         </div>
-
-        <label class="sheet__agree">
-          <input v-model="agreed" type="checkbox">
-          <span>我已阅读并同意<a href="/legal/terms" target="_blank" rel="noopener">服务条款</a>与<a href="/legal/privacy" target="_blank" rel="noopener">隐私政策</a></span>
-        </label>
 
         <button type="button" class="sheet__submit" :disabled="!canSubmit" @click="submit">
           {{ submitting ? '正在创建订单…' : `去支付 ¥${formatCNY(product.price_cny_minor)}` }}
@@ -456,25 +448,6 @@ function submit() {
   color: #96650f;
 }
 
-
-.sheet__agree {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--sh-text-2, #56565f);
-  cursor: pointer;
-}
-
-.sheet__agree input {
-  margin-top: 2px;
-  accent-color: var(--sh-accent, #d85a28);
-}
-
-.sheet__agree a {
-  color: var(--sh-accent-text, #b34b1f);
-  text-decoration: none;
-}
 
 .sheet__submit {
   height: 48px;

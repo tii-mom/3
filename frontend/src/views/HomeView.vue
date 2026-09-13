@@ -715,10 +715,27 @@ function handlePaymentSuccess() {
             <RouterLink to="/openai-api">OpenAI 接入</RouterLink>
             <RouterLink to="/login">控制台登录</RouterLink>
           </div>
+          <div>
+            <h4>条款</h4>
+            <RouterLink to="/legal/terms">服务条款</RouterLink>
+            <RouterLink to="/legal/privacy">隐私政策</RouterLink>
+            <RouterLink to="/legal/usage-policy">使用政策</RouterLink>
+          </div>
         </div>
       </div>
       <p class="footer__legal">
         本站为独立第三方服务平台，非 OpenAI 或 ChatGPT 官方网站，与相关官方主体不存在授权、代理或合作关系。
+      </p>
+      <p class="footer__legal-links">
+        <RouterLink to="/legal/terms">服务条款</RouterLink>
+        <span aria-hidden="true">·</span>
+        <RouterLink to="/legal/privacy">隐私政策</RouterLink>
+        <span aria-hidden="true">·</span>
+        <RouterLink to="/legal/usage-policy">使用政策</RouterLink>
+        <span aria-hidden="true">·</span>
+        <RouterLink to="/legal/supported-regions">支持的国家和地区</RouterLink>
+        <span aria-hidden="true">·</span>
+        <RouterLink to="/legal/service-specific-terms">服务特定条款</RouterLink>
       </p>
     </footer>
 
@@ -1945,6 +1962,30 @@ section[id],
   font-size: 12px;
   line-height: 1.8;
   color: var(--sh-text-3);
+}
+
+/* 条款入口固定在页脚最底部：购买界面不放条款，避免打断下单 */
+.footer__legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  max-width: 1120px;
+  margin: 12px auto 0;
+  padding: 0 24px 8px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--sh-text-3);
+}
+
+.footer__legal-links a {
+  color: var(--sh-text-3);
+  text-decoration: none;
+}
+
+.footer__legal-links a:hover {
+  color: var(--sh-text);
+  text-decoration: underline;
 }
 
 /* ---------- mobile ---------- */

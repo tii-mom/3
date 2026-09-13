@@ -97,8 +97,16 @@ import type { LoginAgreementDocument, PublicSettings } from '@/types'
 import { PRODUCT_NAME } from '@/constants/brand'
 import zhAdminCompliance from '../../../../docs/legal/admin-compliance.zh.md?raw'
 import enAdminCompliance from '../../../../docs/legal/admin-compliance.en.md?raw'
+import zhTerms from '../../../../docs/legal/terms.zh.md?raw'
+import enTerms from '../../../../docs/legal/terms.en.md?raw'
 import zhPrivacy from '../../../../docs/legal/privacy.zh.md?raw'
 import enPrivacy from '../../../../docs/legal/privacy.en.md?raw'
+import zhUsagePolicy from '../../../../docs/legal/usage-policy.zh.md?raw'
+import enUsagePolicy from '../../../../docs/legal/usage-policy.en.md?raw'
+import zhSupportedRegions from '../../../../docs/legal/supported-regions.zh.md?raw'
+import enSupportedRegions from '../../../../docs/legal/supported-regions.en.md?raw'
+import zhServiceSpecificTerms from '../../../../docs/legal/service-specific-terms.zh.md?raw'
+import enServiceSpecificTerms from '../../../../docs/legal/service-specific-terms.en.md?raw'
 
 type LegalDocumentIcon = 'document' | 'shield' | 'globe' | 'cog'
 
@@ -107,6 +115,23 @@ interface BundledLegalDocument {
   title: string
   typeLabel: string
   content: string
+}
+
+/** 内置文档登记表：新增一篇只需在此加一行 + 补两篇 Markdown + 两个 i18n 键 */
+interface BundledEntry {
+  titleKey: string
+  typeKey: string
+  zh: string
+  en: string
+}
+
+const BUNDLED_DOCUMENTS: Record<string, BundledEntry> = {
+  terms: { titleKey: 'legal.terms', typeKey: 'legal.termsType', zh: zhTerms, en: enTerms },
+  privacy: { titleKey: 'legal.privacy', typeKey: 'legal.privacyType', zh: zhPrivacy, en: enPrivacy },
+  'usage-policy': { titleKey: 'legal.usagePolicy', typeKey: 'legal.usagePolicyType', zh: zhUsagePolicy, en: enUsagePolicy },
+  'supported-regions': { titleKey: 'legal.supportedRegions', typeKey: 'legal.supportedRegionsType', zh: zhSupportedRegions, en: enSupportedRegions },
+  'service-specific-terms': { titleKey: 'legal.serviceSpecificTerms', typeKey: 'legal.serviceSpecificTermsType', zh: zhServiceSpecificTerms, en: enServiceSpecificTerms },
+  'admin-compliance': { titleKey: 'adminCompliance.title', typeKey: 'legal.adminCompliance', zh: zhAdminCompliance, en: enAdminCompliance },
 }
 
 const route = useRoute()
@@ -128,24 +153,16 @@ const siteLogo = computed(() => sanitizeUrl(settings.value?.site_logo || '', {
   allowDataUrl: true,
 }))
 
-/** 解析随代码发布的法务文档（admin-compliance / privacy）；命中即视为「有正文」，无需后端配置 */
+/** 解析随代码发布的内置法务文档；命中即视为「有正文」，无需后端配置 */
 const bundledDocument = computed<BundledLegalDocument | null>(() => {
-  const isZh = getLocale() === 'zh'
-  switch (documentId.value) {
-    case 'admin-compliance':
-      return {
-        title: t('adminCompliance.title'),
-        typeLabel: t('legal.adminCompliance'),
-        content: isZh ? zhAdminCompliance : enAdminCompliance,
-      }
-    case 'privacy':
-      return {
-        title: t('legal.privacy'),
-        typeLabel: t('legal.privacyType'),
-        content: isZh ? zhPrivacy : enPrivacy,
-      }
-    default:
-      return null
+  const entry = BUNDLED_DOCUMENTS[documentId.value]
+  if (!entry) {
+    return null
+  }
+  return {
+    title: t(entry.titleKey),
+    typeLabel: t(entry.typeKey),
+    content: getLocale() === 'zh' ? entry.zh : entry.en,
   }
 })
 
