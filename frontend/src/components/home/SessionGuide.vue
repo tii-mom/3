@@ -145,6 +145,8 @@ async function copyUrl() {
 .guide__copy {
   flex-shrink: 0;
   padding: 4px 10px;
+  /* 触屏可点下限：原 28px 高属于误触区，抬到 40px */
+  min-height: 40px;
   border-radius: 6px;
   border: 1px solid var(--sg-accent-line);
   background: transparent;

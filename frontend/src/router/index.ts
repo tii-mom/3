@@ -260,7 +260,8 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/public/LegalDocumentView.vue'),
     meta: {
       requiresAuth: false,
-      title: 'Legal Document'
+      title: 'Legal Document',
+      titleKey: 'legal.documentTitle'
     }
   },
 

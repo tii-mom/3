@@ -126,6 +126,7 @@ export default {
     empty: '暂无正文内容',
     loginAgreement: '登录条款',
     adminCompliance: '部署与运营合规承诺',
+    documentTitle: '法务文档',
     terms: '服务条款',
     termsType: '服务规则',
     privacy: '隐私政策',

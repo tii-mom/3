@@ -48,12 +48,19 @@ export function updateRouteSeo(route: RouteLocationNormalizedLoaded) {
   const page = getSeoPage(route.meta.seoKey)
   const isHome = route.path === '/'
   const shouldIndex = isHome || Boolean(page)
-  const title = page?.title || (isHome ? DEFAULT_TITLE : String(route.meta.title || '3API'))
+  // 首页与 SEO 落地页的标题由本函数负责；其余路由（控制台、登录、法务、404…）的标题
+  // 已由 router guard 的 resolveRouteDocumentTitle 统一设置（支持 titleKey 本地化）。
+  // 这里若再用 route.meta.title 覆盖，会把「登录 - 3API」盖成英文静态 "Login"，
+  // 也会让 tab / 分享卡片标题丢失本地化。
+  const seoTitle = page?.title || (isHome ? DEFAULT_TITLE : '')
+  if (seoTitle) {
+    document.title = seoTitle
+  }
+  const title = seoTitle || document.title || '3API'
   const description = page?.description || (isHome ? DEFAULT_DESCRIPTION : '3API 用户与管理控制台')
   const canonicalPath = page?.path || (isHome ? '/' : route.path)
   const canonical = new URL(canonicalPath, SITE_URL).toString()
 
-  document.title = title
   upsertMeta('meta[name="description"]', { name: 'description', content: description })
   upsertMeta('meta[name="robots"]', {
     name: 'robots',
@@ -64,7 +71,9 @@ export function updateRouteSeo(route: RouteLocationNormalizedLoaded) {
   upsertMeta('meta[property="og:type"]', { property: 'og:type', content: 'website' })
   upsertMeta('meta[property="og:url"]', { property: 'og:url', content: canonical })
   upsertMeta('meta[property="og:site_name"]', { property: 'og:site_name', content: '3API' })
-  upsertMeta('meta[name="twitter:card"]', { name: 'twitter:card', content: 'summary' })
+  // 与预渲染 index.html / SEO 快照保持一致：大图卡片。写成 summary 会把服务端
+  // 已渲染好的 summary_large_image 降级，分享时缩略图变小。
+  upsertMeta('meta[name="twitter:card"]', { name: 'twitter:card', content: 'summary_large_image' })
   upsertLink('canonical', canonical)
 
   removeStructuredData()

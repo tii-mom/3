@@ -126,6 +126,7 @@ export default {
     empty: 'No content',
     loginAgreement: 'Login Agreement',
     adminCompliance: 'Deployment and Operation Compliance Commitment',
+    documentTitle: 'Legal',
     terms: 'Terms of Service',
     termsType: 'Service Rules',
     privacy: 'Privacy Policy',

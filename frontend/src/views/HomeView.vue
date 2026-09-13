@@ -2169,6 +2169,44 @@ section[id],
   backdrop-filter: blur(14px) saturate(140%);
 }
 
+/* 触屏可点区域下限：移动端把误触区抬到 ≥44px（WCAG 2.5.8 最低 24×24）。
+   只作用于窄屏，桌面端保持原有紧凑排版，不改观感。 */
+@media (max-width: 768px) {
+  .nav__brand,
+  .nav__ghost,
+  .nav__cta {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .nav__ghost {
+    padding: 0 6px;
+  }
+
+  /* 页脚链接由 20px 行高抬到 44px 行高，单指可点 */
+  .footer__cols a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    margin-top: 0;
+  }
+
+  .footer__legal-links {
+    gap: 0 12px;
+  }
+
+  .footer__legal-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .contact__copy {
+    height: 40px;
+  }
+}
+
 /* 减弱动态效果：规范做法——同时关掉动画与过渡，而非只处理 transition */
 @media (prefers-reduced-motion: reduce) {
   *,
