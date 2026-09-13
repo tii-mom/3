@@ -126,6 +126,8 @@ export default {
     empty: 'No content',
     loginAgreement: 'Login Agreement',
     adminCompliance: 'Deployment and Operation Compliance Commitment',
+    privacy: 'Privacy Policy',
+    privacyType: 'Personal Data Protection',
     loginAgreementPrompt: {
       checkboxPrefix: 'I have read and agree to ',
       documentSeparator: ', ',

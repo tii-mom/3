@@ -126,6 +126,8 @@ export default {
     empty: '暂无正文内容',
     loginAgreement: '登录条款',
     adminCompliance: '部署与运营合规承诺',
+    privacy: '隐私政策',
+    privacyType: '个人信息保护',
     loginAgreementPrompt: {
       checkboxPrefix: '我已阅读并同意',
       documentSeparator: '、',

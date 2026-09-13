@@ -17,9 +17,6 @@ defineEmits<{ select: [product: PublicProduct] }>()
 const featured = computed(() => props.product.highlight)
 const soldOut = computed(() => props.product.stock_quantity !== null && props.product.stock_quantity !== undefined && props.product.stock_quantity <= 0)
 const hasDiscount = computed(() => props.product.original_price_cny_minor > props.product.price_cny_minor)
-const discountPct = computed(() =>
-  hasDiscount.value ? Math.round(((props.product.original_price_cny_minor - props.product.price_cny_minor) / props.product.original_price_cny_minor) * 100) : 0
-)
 const saveAmount = computed(() => Math.round((props.product.original_price_cny_minor - props.product.price_cny_minor) / 100))
 
 const categoryLabel = computed(() => shopCategoryLabel(props.product.category))
@@ -41,9 +38,9 @@ const priceUnit = computed(() => {
 const commissionPercent = computed(() => Math.round((props.product.commission_bps || 0) / 100))
 const showCommission = computed(() => !!props.showCommission && (props.product.commission_bps || 0) > 0)
 
-/** 角标优先级：有折扣显示「省 X%」，否则显示后台填的角标文字 */
+/** 角标优先级：有折扣显示「立省 ¥X」（按金额，不按百分比，避免误导），否则显示后台填的角标文字 */
 const badgeText = computed(() => {
-  if (hasDiscount.value) return `省 ${discountPct.value}%`
+  if (hasDiscount.value) return `立省 ¥${saveAmount.value}`
   return props.product.badge_text || ''
 })
 </script>
@@ -67,7 +64,6 @@ const badgeText = computed(() => {
     <p v-if="product.description" class="tier-card__desc">{{ product.description }}</p>
 
     <div class="tier-card__price">
-      <span v-if="hasDiscount" class="tier-card__origin">¥{{ formatCNY(product.original_price_cny_minor) }}</span>
       <div class="tier-card__price-now">
         <span class="tier-card__currency">¥</span>
         <span class="tier-card__amount">{{ formatCNY(product.price_cny_minor) }}</span>
@@ -95,7 +91,6 @@ const badgeText = computed(() => {
     </div>
 
     <div class="tier-card__save">
-      <span v-if="hasDiscount" class="tier-card__save-amt">立省 ¥{{ saveAmount }} · {{ discountPct }}%</span>
       <span v-if="product.sold_count > 0" class="tier-card__sold">已售 {{ product.sold_count }} 份</span>
     </div>
 
@@ -243,12 +238,6 @@ const badgeText = computed(() => {
   gap: 2px;
 }
 
-.tier-card__origin {
-  font-size: 13px;
-  color: var(--tc-text-3);
-  text-decoration: line-through;
-}
-
 .tier-card__price-now {
   display: flex;
   align-items: baseline;
@@ -368,10 +357,6 @@ const badgeText = computed(() => {
   align-items: baseline;
   font-size: 11px;
   min-height: 14px;
-}
-
-.tier-card__save-amt {
-  color: var(--tc-save);
 }
 
 .tier-card__sold {

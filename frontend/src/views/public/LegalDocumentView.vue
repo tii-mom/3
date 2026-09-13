@@ -97,8 +97,17 @@ import type { LoginAgreementDocument, PublicSettings } from '@/types'
 import { PRODUCT_NAME } from '@/constants/brand'
 import zhAdminCompliance from '../../../../docs/legal/admin-compliance.zh.md?raw'
 import enAdminCompliance from '../../../../docs/legal/admin-compliance.en.md?raw'
+import zhPrivacy from '../../../../docs/legal/privacy.zh.md?raw'
+import enPrivacy from '../../../../docs/legal/privacy.en.md?raw'
 
 type LegalDocumentIcon = 'document' | 'shield' | 'globe' | 'cog'
+
+/** 随代码版本发布的法务文档：不依赖后端 login_agreement_documents，保证路由永远有正文 */
+interface BundledLegalDocument {
+  title: string
+  typeLabel: string
+  content: string
+}
 
 const route = useRoute()
 const { t } = useI18n()
@@ -112,26 +121,48 @@ marked.setOptions({
 })
 
 const documentId = computed(() => String(route.params.documentId || ''))
-const isAdminComplianceDocument = computed(() => documentId.value === 'admin-compliance')
 const documents = computed(() => settings.value?.login_agreement_documents ?? [])
 const siteName = computed(() => settings.value?.site_name || PRODUCT_NAME)
 const siteLogo = computed(() => sanitizeUrl(settings.value?.site_logo || '', {
   allowRelative: true,
   allowDataUrl: true,
 }))
+
+/** 解析随代码发布的法务文档（admin-compliance / privacy）；命中即视为「有正文」，无需后端配置 */
+const bundledDocument = computed<BundledLegalDocument | null>(() => {
+  const isZh = getLocale() === 'zh'
+  switch (documentId.value) {
+    case 'admin-compliance':
+      return {
+        title: t('adminCompliance.title'),
+        typeLabel: t('legal.adminCompliance'),
+        content: isZh ? zhAdminCompliance : enAdminCompliance,
+      }
+    case 'privacy':
+      return {
+        title: t('legal.privacy'),
+        typeLabel: t('legal.privacyType'),
+        content: isZh ? zhPrivacy : enPrivacy,
+      }
+    default:
+      return null
+  }
+})
+
 const updatedAt = computed(() =>
-  isAdminComplianceDocument.value ? '' : settings.value?.login_agreement_updated_at || ''
+  bundledDocument.value ? '' : settings.value?.login_agreement_updated_at || ''
 )
 const documentTypeLabel = computed(() =>
-  isAdminComplianceDocument.value ? t('legal.adminCompliance') : t('legal.loginAgreement')
+  bundledDocument.value ? bundledDocument.value.typeLabel : t('legal.loginAgreement')
 )
 
 const currentDocument = computed<LoginAgreementDocument | null>(() => {
-  if (isAdminComplianceDocument.value) {
+  const bundled = bundledDocument.value
+  if (bundled) {
     return {
-      id: 'admin-compliance',
-      title: t('adminCompliance.title'),
-      content_md: getLocale() === 'zh' ? zhAdminCompliance : enAdminCompliance
+      id: documentId.value,
+      title: bundled.title,
+      content_md: bundled.content
     }
   }
   const id = documentId.value
@@ -154,7 +185,7 @@ const renderedHtml = computed(() => {
 
 const documentIcon = computed<LegalDocumentIcon>(() => {
   const title = currentDocument.value?.title || ''
-  if (title.includes('政策') || title.includes('隐私')) {
+  if (title.includes('政策') || title.includes('隐私') || /privacy/i.test(title)) {
     return 'shield'
   }
   if (title.includes('国家') || title.includes('地区')) {
