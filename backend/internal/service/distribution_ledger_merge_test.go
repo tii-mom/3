@@ -13,6 +13,7 @@ import (
 // 佣金明细必须同时覆盖两张表：
 //   - shop_commission_records  商城订单佣金（当前唯一在写入的来源）
 //   - distribution_commissions 历史充值返佣（已停止写入，仅留痕）
+//
 // 只读后者会导致「充值返佣下线后，明细永远为空」。
 func TestDistributionLedgerMergesShopAndLegacyCommissions(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))

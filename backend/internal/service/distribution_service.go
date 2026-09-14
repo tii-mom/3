@@ -27,7 +27,7 @@ var (
 	ErrReversalInvalid         = infraerrors.BadRequest("DISTRIBUTION_REVERSAL_INVALID", "invalid distribution reversal request")
 )
 
-// promotionMaxDepth 是「推广计划」实际结算的层级深度。
+// 「推广计划」结算深度说明
 //
 // 历史沿革：该程序（code 仍为 compute_company）原本是 5 层多级分销，按团队业绩
 // 分 T0~T3 逐层拨出，合计 10%~40%；其后一度收敛为「单层 + 三档阶梯（5%/8%/10%）」。
@@ -38,7 +38,6 @@ var (
 //
 // distribution_relations 表仍保留 0~5 层的完整数据（历史佣金与账本要能追溯），
 // 但业务结算一律只看 depth = 1。
-const promotionMaxDepth = 1
 
 type DistributionService struct {
 	db        *sql.DB
@@ -1689,13 +1688,6 @@ func ensureDistributionMemberTx(ctx context.Context, tx *sql.Tx, programID, user
 	}
 	_, err := tx.ExecContext(ctx, `INSERT INTO distribution_cash_wallets (program_id, tenant_id, user_id) VALUES ($1, 1, $2) ON CONFLICT DO NOTHING`, programID, userID)
 	return err
-}
-
-func creditDistributionWalletTx(ctx context.Context, tx *sql.Tx, programID, userID, amount int64, action, sourceType string, sourceID int64) error {
-	if _, err := tx.ExecContext(ctx, `INSERT INTO distribution_cash_wallets (program_id, tenant_id, user_id, frozen_cny_minor, lifetime_earned_cny_minor) VALUES ($1, 1, $2, $3, $3) ON CONFLICT (program_id, user_id) DO UPDATE SET frozen_cny_minor = distribution_cash_wallets.frozen_cny_minor + EXCLUDED.frozen_cny_minor, lifetime_earned_cny_minor = distribution_cash_wallets.lifetime_earned_cny_minor + EXCLUDED.lifetime_earned_cny_minor, updated_at = NOW()`, programID, userID, amount); err != nil {
-		return err
-	}
-	return insertDistributionWalletLedger(ctx, tx, programID, userID, action, amount, sourceType, strconv.FormatInt(sourceID, 10), fmt.Sprintf("distribution:%d:commission:%d", programID, sourceID))
 }
 
 func reverseDistributionCommissionTx(ctx context.Context, tx *sql.Tx, programID, operatorUserID, commissionID, userID, amount int64, status, reason string) error {
