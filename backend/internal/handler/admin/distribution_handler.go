@@ -68,43 +68,16 @@ func (h *DistributionHandler) ListConversions(c *gin.Context) {
 	response.Paginated(c, items, total, page, pageSize)
 }
 
-func (h *DistributionHandler) ListTierAssignments(c *gin.Context) {
+// ListMembers 列出「正在做推广的人」（直接邀请过至少 1 人的用户）及其业绩与收益。
+// 推广计划已无档位，因此不再提供任何人工调档接口。
+func (h *DistributionHandler) ListMembers(c *gin.Context) {
 	page, pageSize := response.ParsePagination(c)
-	items, total, err := h.service.AdminListTierAssignments(c.Request.Context(), c.Query("search"), page, pageSize)
+	items, total, err := h.service.AdminListMembers(c.Request.Context(), c.Query("search"), page, pageSize)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
 	response.Paginated(c, items, total, page, pageSize)
-}
-
-type tierOverrideRequest struct {
-	TierOverride *int   `json:"tier_override"`
-	Reason       string `json:"reason"`
-}
-
-func (h *DistributionHandler) SetTierOverride(c *gin.Context) {
-	subject, ok := middleware.GetAuthSubjectFromContext(c)
-	if !ok {
-		response.Unauthorized(c, "Admin not authenticated")
-		return
-	}
-	userID, err := strconv.ParseInt(c.Param("user_id"), 10, 64)
-	if err != nil || userID <= 0 {
-		response.BadRequest(c, "Invalid user id")
-		return
-	}
-	var request tierOverrideRequest
-	if err := c.ShouldBindJSON(&request); err != nil {
-		response.BadRequest(c, "Invalid request: "+err.Error())
-		return
-	}
-	item, err := h.service.AdminSetTierOverride(c.Request.Context(), subject.UserID, userID, request.TierOverride, request.Reason)
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-	response.Success(c, item)
 }
 
 type distributionReversalRequest struct {

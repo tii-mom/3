@@ -125,7 +125,7 @@ const routes: RouteRecordRaw[] = [
     path: '/compute-company',
     name: 'ComputeCompanyPublic',
     component: () => import('@/views/public/SeoLandingView.vue'),
-    meta: { requiresAuth: false, title: 'AI 算力渠道合作', seoKey: 'compute-company' }
+    meta: { requiresAuth: false, title: '3API 推广计划', seoKey: 'compute-company' }
   },
   {
     path: '/login',
@@ -351,7 +351,7 @@ const routes: RouteRecordRaw[] = [
     path: '/affiliate',
     name: 'Affiliate',
     redirect: '/distribution',
-    meta: { requiresAuth: true, requiresAdmin: false, title: 'Compute Company', titleKey: 'finance.distribution.title' }
+    meta: { requiresAuth: true, requiresAdmin: false, title: 'Referral Program', titleKey: 'finance.distribution.title' }
   },
   {
     path: '/vouchers',
@@ -363,7 +363,7 @@ const routes: RouteRecordRaw[] = [
     path: '/distribution',
     name: 'Distribution',
     component: () => import('@/views/user/DistributionView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: false, title: 'Compute Company', titleKey: 'finance.distribution.title' }
+    meta: { requiresAuth: true, requiresAdmin: false, title: 'Referral Program', titleKey: 'finance.distribution.title' }
   },
   {
     path: '/available-channels',

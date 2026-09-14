@@ -66,6 +66,10 @@ export interface ShopOrder {
   snapshot_image_url: string
   snapshot_product_type: ShopProductType
   snapshot_price_cny_minor: number
+  /** 本单用人民币返点余额抵扣的金额（分） */
+  wallet_applied_cny_minor: number
+  /** 本单还需外部支付（微信/支付宝）的金额（分）；恒等于 价格 - 抵扣 */
+  payable_cny_minor: number
   snapshot_grant_usd_amount: string
   snapshot_commission_bps: number
   fulfillment_note: string
@@ -83,7 +87,25 @@ export interface ShopOrder {
 
 export interface CreateShopOrderResult {
   shop_order_id: number
-  payment: CreateOrderResult
+  /** 全额返点余额抵扣时没有外部支付单，此时 payment 缺失 */
+  payment?: CreateOrderResult
+  /** 本单抵扣的返点余额（分） */
+  wallet_applied_cny_minor: number
+  /** 本单还需外部支付的金额（分），为 0 表示全额抵扣 */
+  payable_cny_minor: number
+  /** 为 true 时订单已直接进入交付，前端不要再拉起支付渠道 */
+  fully_paid_by_wallet: boolean
+}
+
+/**
+ * 「我的返点余额」快照。人民币返点与 API 美金额度是两个独立的资金账户：
+ * 这里只反映推广返点，和 user_credit_accounts 的平台额度无关。
+ */
+export interface ShopWalletBalance {
+  /** 推广计划是否启用；未启用时前端不应展示抵扣入口 */
+  enabled: boolean
+  available_cny_minor: number
+  frozen_cny_minor: number
 }
 
 /** 后台可管理的商城品类（迁移 208）。 */
@@ -164,7 +186,18 @@ export const shopAPI = {
   listProducts() {
     return apiClient.get<ShopProduct[]>('/shop/products')
   },
-  createOrder(data: { product_id: number; payment_type: string; return_url?: string; is_mobile?: boolean }) {
+  /** 可用于商城抵扣的人民币返点余额（与 API 美金额度无关） */
+  walletBalance() {
+    return apiClient.get<ShopWalletBalance>('/shop/wallet-balance')
+  },
+  createOrder(data: {
+    product_id: number
+    payment_type: string
+    return_url?: string
+    is_mobile?: boolean
+    /** true 时先扣人民币返点余额，差额再走微信/支付宝 */
+    use_wallet?: boolean
+  }) {
     return apiClient.post<CreateShopOrderResult>('/shop/orders', data)
   },
   myOrders(params?: { page?: number; page_size?: number }) {

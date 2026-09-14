@@ -32,7 +32,7 @@
           <div class="relative max-w-2xl">
             <p class="mb-3 inline-flex rounded-full border border-orange-200/30 bg-orange-300/15 px-3 py-1 text-sm font-semibold text-orange-100 shadow-sm">3API 商城</p>
             <h1 class="text-2xl font-bold tracking-tight text-white sm:text-4xl">购买平台商品，付款后等待后台处理</h1>
-            <p class="mt-3 max-w-xl text-sm font-medium leading-6 text-slate-200 sm:text-base">精选平台商品，支付成功后生成订单；管理员处理发货，推广奖励进入算力公司钱包。</p>
+            <p class="mt-3 max-w-xl text-sm font-medium leading-6 text-slate-200 sm:text-base">精选平台商品，支付成功后生成订单；管理员处理发货，推广返点进入你的推广钱包。</p>
           </div>
         </div>
       </section>
@@ -41,6 +41,12 @@
         <div>
           <h2 class="text-xl font-bold text-gray-950 dark:text-white">精选商品</h2>
           <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">与官网首页同一套商品。选择商品后直接付款，支付成功后会进入订单，等待管理员处理发货。</p>
+          <p
+            v-if="walletEligible"
+            class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-300"
+          >
+            返点余额 ¥{{ formatMoney(walletAvailableMinor) }} 可在下单时抵扣
+          </p>
         </div>
         <select v-if="paymentMethods.length > 0" v-model="paymentType" class="input-field min-w-40">
           <option v-for="method in paymentMethods" :key="method" :value="method">{{ paymentLabel(method) }}</option>
@@ -143,7 +149,12 @@
                 <div v-if="order.fulfillment_note" class="mt-1 text-xs text-amber-600 dark:text-amber-300">发货内容：{{ order.fulfillment_note }}</div>
               </div>
               <div class="flex items-center gap-3 sm:justify-end">
-                <div class="text-sm font-bold text-gray-950 dark:text-white">¥{{ formatMoney(order.snapshot_price_cny_minor) }}</div>
+                <div class="text-right">
+                  <div class="text-sm font-bold text-gray-950 dark:text-white">¥{{ formatMoney(order.snapshot_price_cny_minor) }}</div>
+                  <div v-if="order.wallet_applied_cny_minor > 0" class="text-xs text-orange-600 dark:text-orange-300">
+                    返点抵扣 ¥{{ formatMoney(order.wallet_applied_cny_minor) }}<template v-if="order.payable_cny_minor > 0"> · 实付 ¥{{ formatMoney(order.payable_cny_minor) }}</template>
+                  </div>
+                </div>
                 <button
                   v-if="needsDelivery(order) && order.status !== 'pending'"
                   type="button"
@@ -206,6 +217,77 @@
         </div>
       </BaseDialog>
 
+      <BaseDialog :show="checkoutDialog.open" title="确认下单" width="narrow" @close="closeCheckout">
+        <div v-if="checkoutDialog.open && checkoutProduct" class="space-y-4">
+          <div class="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50/70 p-3 dark:border-dark-700 dark:bg-dark-800/60">
+            <img
+              v-if="shopImage(checkoutProduct.image_url)"
+              :src="shopImage(checkoutProduct.image_url)"
+              :alt="checkoutProduct.name"
+              class="h-14 w-14 shrink-0 rounded-xl object-cover"
+            >
+            <div class="min-w-0 flex-1">
+              <div class="truncate font-semibold text-gray-950 dark:text-white">{{ checkoutProduct.name }}</div>
+              <div class="mt-0.5 text-sm font-bold text-gray-950 dark:text-white">¥{{ formatMoney(checkoutPriceMinor) }}</div>
+            </div>
+          </div>
+
+          <button
+            v-if="walletEligible"
+            type="button"
+            class="flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition"
+            :class="checkoutDialog.useWallet
+              ? 'border-orange-300 bg-orange-50 dark:border-orange-500/30 dark:bg-orange-500/10'
+              : 'border-gray-200 bg-white dark:border-dark-600 dark:bg-dark-800'"
+            @click="checkoutDialog.useWallet = !checkoutDialog.useWallet"
+          >
+            <span class="flex items-center gap-2.5">
+              <span
+                class="inline-flex h-5 w-5 items-center justify-center rounded-md border text-xs font-bold"
+                :class="checkoutDialog.useWallet ? 'border-orange-500 bg-orange-500 text-white' : 'border-gray-300 text-transparent dark:border-dark-500'"
+              >✓</span>
+              <span>
+                <span class="block text-sm font-semibold text-gray-950 dark:text-white">使用返点余额抵扣</span>
+                <span class="block text-xs text-gray-500 dark:text-gray-400">可用 ¥{{ formatMoney(walletAvailableMinor) }}</span>
+              </span>
+            </span>
+            <span class="shrink-0 text-sm font-semibold" :class="checkoutDialog.useWallet ? 'text-orange-600 dark:text-orange-300' : 'text-gray-400 dark:text-gray-500'">
+              <template v-if="checkoutDialog.useWallet">-¥{{ formatMoney(walletAppliedMinor) }}</template>
+              <template v-else>不使用</template>
+            </span>
+          </button>
+
+          <div class="space-y-2 rounded-2xl border border-gray-100 bg-white p-4 text-sm dark:border-dark-700 dark:bg-dark-900">
+            <div class="flex items-center justify-between text-gray-500 dark:text-gray-400">
+              <span>商品金额</span><span>¥{{ formatMoney(checkoutPriceMinor) }}</span>
+            </div>
+            <div v-if="walletAppliedMinor > 0" class="flex items-center justify-between text-orange-600 dark:text-orange-300">
+              <span>返点余额抵扣</span><span>-¥{{ formatMoney(walletAppliedMinor) }}</span>
+            </div>
+            <div class="flex items-center justify-between border-t border-dashed border-gray-200 pt-2 text-base font-bold text-gray-950 dark:border-dark-700 dark:text-white">
+              <span>需支付</span><span>¥{{ formatMoney(checkoutPayableMinor) }}</span>
+            </div>
+          </div>
+
+          <label v-if="!checkoutFullyPaid" class="block">
+            <span class="mb-1 block text-sm text-gray-600 dark:text-gray-300">支付方式</span>
+            <select v-model="checkoutDialog.method" class="input-field w-full">
+              <option v-for="method in checkoutMethods" :key="method" :value="method">{{ paymentLabel(method) }}</option>
+            </select>
+          </label>
+          <div v-else class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+            返点余额足够全额抵扣，下单后无需再付款。
+          </div>
+
+          <div class="flex justify-end gap-3">
+            <button type="button" class="btn-secondary rounded-xl px-4 py-2" @click="closeCheckout">取消</button>
+            <button type="button" class="btn-primary rounded-xl px-4 py-2" :disabled="creatingProductID !== null" @click="confirmCheckout">
+              {{ creatingProductID !== null ? '处理中...' : (checkoutFullyPaid ? '确认抵扣下单' : '去支付 ¥' + formatMoney(checkoutPayableMinor)) }}
+            </button>
+          </div>
+        </div>
+      </BaseDialog>
+
       <BaseDialog :show="payDialog.open" title="请完成支付" width="narrow" @close="closePayDialog">
         <PaymentStatusPanel
           v-if="payDialog.open"
@@ -225,9 +307,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { resolveShopAssetUrl, shopAPI, type ShopBanner, type ShopOrder, type ShopProduct } from '@/api/shop'
+import { resolveShopAssetUrl, shopAPI, type ShopBanner, type ShopOrder, type ShopProduct, type ShopWalletBalance } from '@/api/shop'
 import { type FulfillmentMode, publicShopAPI, type PublicCategory, type PublicProduct } from '@/api/publicShop'
 import { SHOP_CATEGORIES, type ShopCategory } from '@/constants/shop'
 import PlanCard from '@/components/home/PlanCard.vue'
@@ -267,6 +349,18 @@ const payDialog = reactive({
   paymentType: '',
   payUrl: '',
 })
+
+// 「我的返点余额」= 推广返点结算进的人民币钱包，可在商城下单时抵扣。
+// 与 API 美金额度（平台额度）是两个完全独立的账户，此处只用前者。
+const walletBalance = ref<ShopWalletBalance | null>(null)
+
+// 下单确认抽屉：展示可用余额 → 本单抵扣 → 剩余应付，让「组合支付」一眼看清。
+const checkoutDialog = reactive<{
+  open: boolean
+  product: ShopProduct | null
+  useWallet: boolean
+  method: string
+}>({ open: false, product: null, useWallet: false, method: '' })
 
 // 商品分组与官网首页保持一致：按品类（category）划分，品类数据源同为后台配置
 const catalogTab = ref<'all' | ShopCategory>('all')
@@ -395,13 +489,18 @@ function scrollToProduct(productID: number) {
   document.getElementById(`shop-product-${productID}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
-function amountFitsMethod(product: ShopProduct, method: string): boolean {
+/** 渠道可用性以「实际走渠道的金额」为准：抵扣后的应付金额才受单笔限额约束。 */
+function amountFitsMethodAmount(method: string, priceMinor: number): boolean {
   const limits = paymentMethodLimits.value[method]
   if (!limits || limits.available === false) return false
-  const amount = product.price_cny_minor / 100
+  const amount = priceMinor / 100
   if (limits.single_min > 0 && amount < limits.single_min) return false
   if (limits.single_max > 0 && amount > limits.single_max) return false
   return true
+}
+
+function amountFitsMethod(product: ShopProduct, method: string): boolean {
+  return amountFitsMethodAmount(method, product.price_cny_minor)
 }
 
 function availablePaymentType(product: ShopProduct): string {
@@ -410,6 +509,41 @@ function availablePaymentType(product: ShopProduct): string {
   }
   return paymentMethods.value.find(method => amountFitsMethod(product, method)) || ''
 }
+
+// ---- 下单确认（组合支付：先扣返点余额，差额走微信/支付宝）----
+
+const checkoutProduct = computed(() => checkoutDialog.product)
+const checkoutPriceMinor = computed(() => checkoutDialog.product?.price_cny_minor || 0)
+const walletAvailableMinor = computed(() => walletBalance.value?.available_cny_minor || 0)
+/** 有余额且推广计划开启时才展示抵扣入口，避免给用户「有返点却用不了」的错觉 */
+const walletEligible = computed(() => !!walletBalance.value?.enabled && walletAvailableMinor.value > 0)
+const walletAppliedMinor = computed(() => {
+  if (!checkoutDialog.useWallet || !walletEligible.value) return 0
+  return Math.min(walletAvailableMinor.value, checkoutPriceMinor.value)
+})
+const checkoutPayableMinor = computed(() => Math.max(checkoutPriceMinor.value - walletAppliedMinor.value, 0))
+const checkoutFullyPaid = computed(() => checkoutPayableMinor.value <= 0)
+/** 只保留对当前应付金额可用的渠道；全额抵扣时无需支付渠道 */
+const checkoutMethods = computed(() => {
+  if (checkoutFullyPaid.value) return []
+  return paymentMethods.value.filter(method => amountFitsMethodAmount(method, checkoutPayableMinor.value))
+})
+const checkoutEffectiveMethod = computed(() => {
+  if (checkoutFullyPaid.value) return ''
+  if (checkoutDialog.method && amountFitsMethodAmount(checkoutDialog.method, checkoutPayableMinor.value)) {
+    return checkoutDialog.method
+  }
+  return checkoutMethods.value[0] || ''
+})
+
+// 抵扣额度变化会让原选中的渠道不再适用（金额落到限额之外），这里自动纠正，
+// 保证「确认下单」时选的渠道一定可用。
+watch(checkoutPayableMinor, () => {
+  if (checkoutFullyPaid.value) return
+  if (!checkoutDialog.method || !amountFitsMethodAmount(checkoutDialog.method, checkoutPayableMinor.value)) {
+    checkoutDialog.method = checkoutMethods.value[0] || ''
+  }
+})
 
 function buildProductPromotionLink(product: ShopProduct): string {
   const code = inviteDetail.value?.aff_code?.trim()
@@ -464,6 +598,16 @@ async function loadOrders() {
   }
 }
 
+/** 拉取可用于抵扣的人民币返点余额；拉不到时置空（不展示抵扣入口，不阻塞下单）。 */
+async function loadWalletBalance() {
+  try {
+    const res = await shopAPI.walletBalance()
+    walletBalance.value = res.data || null
+  } catch {
+    walletBalance.value = null
+  }
+}
+
 async function loadData() {
   loading.value = true
   try {
@@ -480,7 +624,7 @@ async function loadData() {
     if (catalogTab.value !== 'all' && !catalogTabs.value.some(item => item.value === catalogTab.value)) {
       catalogTab.value = 'all'
     }
-    await Promise.all([loadCheckoutMethods(), loadOrders()])
+    await Promise.all([loadCheckoutMethods(), loadOrders(), loadWalletBalance()])
   } catch (error: any) {
     appStore.showToast('error', error?.message || '商城加载失败', 3000)
   } finally {
@@ -492,23 +636,41 @@ async function loadData() {
 /** PlanCard 的 select 事件回传 PublicProduct（首页/商城共用卡片的类型），
  *  而 buy() 需要 ShopProduct；运行时 product 本就来自商城列表，做一次收窄转换。 */
 function onPlanSelect(product: PublicProduct) {
-  buy(product as unknown as ShopProduct)
+  openCheckout(product as unknown as ShopProduct)
 }
 
-async function buy(product: ShopProduct) {
+/** 打开下单确认：先让用户看清「余额抵扣多少、还要付多少」，再决定支付方式。 */
+function openCheckout(product: ShopProduct) {
   // 防重入：下单是异步的，快速连点会并发创建多笔订单（creatingProductID 非空即视为进行中）
   if (creatingProductID.value !== null) return
-  const method = availablePaymentType(product)
-  if (!method) {
-    appStore.showToast('warning', '当前商品暂无可用支付方式，请联系管理员开启支付渠道', 3000)
+  checkoutDialog.product = product
+  // 有余额时默认勾选抵扣（防呆：多数用户就是想把返点花掉）
+  checkoutDialog.useWallet = walletEligible.value
+  checkoutDialog.method = availablePaymentType(product) || paymentMethods.value[0] || ''
+  checkoutDialog.open = true
+}
+
+function closeCheckout() {
+  checkoutDialog.open = false
+  checkoutDialog.product = null
+  checkoutDialog.useWallet = false
+  checkoutDialog.method = ''
+}
+
+async function confirmCheckout() {
+  const product = checkoutDialog.product
+  if (!product || creatingProductID.value !== null) return
+  const method = checkoutEffectiveMethod.value
+  if (!checkoutFullyPaid.value && !method) {
+    appStore.showToast('warning', '当前应付金额暂无可用支付方式，请调整支付渠道或联系管理员', 3000)
     return
   }
-  // 选了某个支付渠道但该渠道不适用于本商品金额时，之前是静默回退；这里显式提示，避免用户困惑
-  if (paymentType.value && method !== paymentType.value) {
-    appStore.showToast('warning', '所选支付方式不适用于该商品，已自动切换为可用方式', 3000)
+  // 选了某个支付渠道但该渠道不适用于应付金额时显式提示，避免用户困惑
+  if (!checkoutFullyPaid.value && paymentType.value && method !== paymentType.value) {
+    appStore.showToast('warning', '所选支付方式不适用于该金额，已自动切换为可用方式', 3000)
   }
   creatingProductID.value = product.id
-  const visibleMethod = normalizeVisibleMethod(method) || method
+  const visibleMethod = method ? (normalizeVisibleMethod(method) || method) : ''
   const forceQRCode = !!(alipayForceQRCode.value && visibleMethod === 'alipay')
   const orderType: OrderType = 'shop'
   try {
@@ -517,12 +679,21 @@ async function buy(product: ShopProduct) {
       payment_type: visibleMethod,
       return_url: `${window.location.origin}/payment/result`,
       is_mobile: forceQRCode ? false : isMobileDevice(),
+      use_wallet: checkoutDialog.useWallet,
     })
+    // 全额抵扣：没有外部支付环节，订单已进入交付，直接关抽屉刷新订单。
+    if (res.data?.fully_paid_by_wallet) {
+      closeCheckout()
+      appStore.showToast('success', '已用返点余额全额抵扣，订单已提交', 3000)
+      await Promise.all([loadOrders(), loadWalletBalance()])
+      return
+    }
     const payment = res.data?.payment
     if (!payment) {
       appStore.showToast('error', '下单未返回支付信息，请稍后重试', 3000)
       return
     }
+    closeCheckout()
     const stripeMethod = visibleMethod === 'stripe'
       ? ''
       : visibleMethod === 'wxpay' ? 'wechat_pay' : 'alipay'
@@ -626,15 +797,15 @@ function closePayDialog() {
   payDialog.expiresAt = ''
   payDialog.paymentType = ''
   payDialog.payUrl = ''
-  void loadOrders()
+  void Promise.all([loadOrders(), loadWalletBalance()])
 }
 
 function handlePaymentSuccess() {
-  void loadOrders()
+  void Promise.all([loadOrders(), loadWalletBalance()])
 }
 
 function handlePaymentSettled() {
-  void loadOrders()
+  void Promise.all([loadOrders(), loadWalletBalance()])
 }
 
 onMounted(() => {

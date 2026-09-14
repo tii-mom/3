@@ -787,11 +787,31 @@ const customMenuItemsForAdmin = computed(() => {
 
 // Admin navigation items
 const adminNavItems = computed((): NavItem[] => {
+  // 顺序 = 主控台的业务优先级：商城在最前，系统与安全在后。
+  // 调整顺序不会改动任何路由、权限或功能，只是把「以商城业务为主」落到导航上。
   const baseItems: NavItem[] = [
     { path: '/admin/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
     { path: '/admin/ops', label: t('nav.ops'), icon: ChartIcon, featureFlag: flagOpsMonitoring },
+    { path: '/admin/shop', label: t('nav.shopManagement'), icon: GiftIcon, hideInSimpleMode: true },
+    {
+      path: '/admin/orders',
+      label: t('nav.orderManagement'),
+      icon: OrderIcon,
+      hideInSimpleMode: true,
+      expandOnly: true,
+      children: [
+        { path: '/admin/orders/dashboard', label: t('nav.paymentDashboard'), icon: ChartIcon },
+        { path: '/admin/orders', label: t('nav.orderManagement'), icon: OrderIcon },
+      ],
+    },
+    { path: '/admin/orders/plans', label: t('nav.paymentPlans'), icon: CreditCardIcon, hideInSimpleMode: true },
+    { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
+    { path: '/admin/finance', label: t('nav.financeOperations'), icon: CreditCardIcon, hideInSimpleMode: true },
+    { path: '/admin/redeem', label: t('nav.redeemCodes'), icon: TicketIcon, hideInSimpleMode: true },
+    { path: '/admin/promo-codes', label: t('nav.promoCodes'), icon: GiftIcon, hideInSimpleMode: true },
     { path: '/admin/users', label: t('nav.users'), icon: UsersIcon, hideInSimpleMode: true },
     { path: '/admin/groups', label: t('nav.groups'), icon: FolderIcon, hideInSimpleMode: true },
+    { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon },
     {
       path: '/admin/channels',
       label: t('nav.channelManagement'),
@@ -803,9 +823,6 @@ const adminNavItems = computed((): NavItem[] => {
         { path: '/admin/channels/monitor', label: t('nav.channelMonitor'), icon: SignalIcon, featureFlag: flagChannelMonitor },
       ],
     },
-    { path: '/admin/orders/plans', label: t('nav.paymentPlans'), icon: CreditCardIcon, hideInSimpleMode: true },
-    { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
-    { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon },
     { path: '/admin/announcements', label: t('nav.announcements'), icon: BellIcon },
     { path: '/admin/proxies', label: t('nav.proxies'), icon: ServerIcon },
     {
@@ -820,24 +837,9 @@ const adminNavItems = computed((): NavItem[] => {
         { path: '/admin/prompt-audit', label: t('nav.promptAudit'), icon: ShieldIcon },
       ],
     },
-    { path: '/admin/redeem', label: t('nav.redeemCodes'), icon: TicketIcon, hideInSimpleMode: true },
-    { path: '/admin/promo-codes', label: t('nav.promoCodes'), icon: GiftIcon, hideInSimpleMode: true },
-    { path: '/admin/finance', label: t('nav.financeOperations'), icon: CreditCardIcon, hideInSimpleMode: true },
-    { path: '/admin/shop', label: t('nav.shopManagement'), icon: GiftIcon, hideInSimpleMode: true },
-    { path: '/admin/tools', label: t('nav.aiToolsManagement'), icon: GlobeIcon, hideInSimpleMode: true },
-    {
-      path: '/admin/orders',
-      label: t('nav.orderManagement'),
-      icon: OrderIcon,
-      hideInSimpleMode: true,
-      expandOnly: true,
-      children: [
-        { path: '/admin/orders/dashboard', label: t('nav.paymentDashboard'), icon: ChartIcon },
-        { path: '/admin/orders', label: t('nav.orderManagement'), icon: OrderIcon },
-      ],
-    },
     { path: '/admin/usage', label: t('nav.usage'), icon: ChartIcon },
-    { path: '/admin/audit-logs', label: t('nav.auditLogs'), icon: ShieldIcon, hideInSimpleMode: true }
+    { path: '/admin/audit-logs', label: t('nav.auditLogs'), icon: ShieldIcon, hideInSimpleMode: true },
+    { path: '/admin/tools', label: t('nav.aiToolsManagement'), icon: GlobeIcon, hideInSimpleMode: true }
   ]
 
   const visible = applyFeatureFlags(baseItems)
@@ -865,18 +867,20 @@ const adminNavItems = computed((): NavItem[] => {
 const ADMIN_GROUP_MAP: Record<string, string> = {
   '/admin/dashboard': '概览',
   '/admin/ops': '概览',
+  '/admin/shop': '商城',
+  '/admin/orders': '商城',
+  '/admin/orders/dashboard': '商城',
+  '/admin/orders/plans': '商城',
+  '/admin/subscriptions': '商城',
+  '/admin/finance': '推广与财务',
+  '/admin/redeem': '推广与财务',
+  '/admin/promo-codes': '推广与财务',
   '/admin/users': '用户与组织',
   '/admin/groups': '用户与组织',
   '/admin/accounts': '用户与组织',
   '/admin/channels': '渠道',
   '/admin/channels/pricing': '渠道',
   '/admin/channels/monitor': '渠道',
-  '/admin/shop': '商城与财务',
-  '/admin/orders/plans': '商城与财务',
-  '/admin/subscriptions': '商城与财务',
-  '/admin/finance': '商城与财务',
-  '/admin/redeem': '商城与财务',
-  '/admin/promo-codes': '商城与财务',
   '/admin/announcements': '运维与安全',
   '/admin/proxies': '运维与安全',
   '/admin/security-audit': '运维与安全',
@@ -884,12 +888,10 @@ const ADMIN_GROUP_MAP: Record<string, string> = {
   '/admin/prompt-audit': '运维与安全',
   '/admin/usage': '运维与安全',
   '/admin/audit-logs': '运维与安全',
-  '/admin/orders': '订单',
-  '/admin/orders/dashboard': '订单',
   '/admin/tools': '系统',
   '/admin/settings': '系统'
 }
-const ADMIN_GROUP_ORDER = ['概览', '用户与组织', '渠道', '商城与财务', '运维与安全', '订单', '系统']
+const ADMIN_GROUP_ORDER = ['概览', '商城', '推广与财务', '用户与组织', '渠道', '运维与安全', '系统']
 
 const adminNavGroups = computed(() => {
   const buckets = new Map<string, NavItem[]>()

@@ -9,7 +9,7 @@
       <div class="max-w-xl">
         <div class="flex items-center gap-2 text-primary-300">
           <Icon name="users" size="sm" :stroke-width="1.8" />
-          <span class="text-[11px] font-semibold tracking-[0.12em]">3API / 算力公司</span>
+          <span class="text-[11px] font-semibold tracking-[0.12em]">3API / 推广计划</span>
         </div>
         <h2 class="mt-3 text-xl font-semibold tracking-tight sm:text-2xl">{{ t('finance.distribution.shareCardTitle') }}</h2>
         <p class="mt-2 max-w-lg text-sm leading-6 text-gray-300">{{ t('finance.distribution.shareCardSubtitle') }}</p>
@@ -115,7 +115,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 function wrapCopy() {
   // The share image is intentionally Chinese-first so the invitation keeps a
   // consistent brand voice even when the surrounding console uses another locale.
-  return ['我开了一家神奇的', '算力公司，欢迎领导', '视察工作～']
+  return ['我在用 3API，扫码', '注册，我请你用', 'AI 会员～']
 }
 
 async function renderPoster() {
@@ -146,7 +146,7 @@ async function renderPoster() {
     ctx.fillText('3API', 102, 84)
     ctx.fillStyle = 'rgba(255,255,255,0.52)'
     ctx.font = '500 18px Arial, sans-serif'
-    ctx.fillText('算力公司 / 邀请', 102, 116)
+    ctx.fillText('推广计划 / 邀请', 102, 116)
 
     ctx.fillStyle = '#ffffff'
     ctx.font = '600 56px Arial, sans-serif'
@@ -200,7 +200,7 @@ function downloadPoster() {
   if (!posterDataUrl.value) return
   const link = document.createElement('a')
   link.href = posterDataUrl.value
-  link.download = '3api-compute-company-invite.png'
+  link.download = '3api-referral-invite.png'
   link.click()
 }
 

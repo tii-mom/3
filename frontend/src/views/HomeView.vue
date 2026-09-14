@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import FAQ_ITEMS from '@/content/home-faq.json'
 import {
   formatCNY,
@@ -32,8 +32,11 @@ const {
   startCheckout,
   goToOrderPage,
   closePayDialog,
-  methodsForAmount,
-  loadPaymentMethods
+  loadPaymentMethods,
+  paymentMethods,
+  walletEligible,
+  walletAvailableMinor,
+  loadWalletBalance
 } = useGuestCheckout()
 
 const products = ref<PublicProduct[]>([])
@@ -250,10 +253,8 @@ const QQ_AFTERSALES = '290115835'
 async function copyQQ(value: string, label: string) {
   await copyToClipboard(value, `${label}已复制：${value}`)
 }
-// 下单抽屉里的支付方式：后台配置 ∩ 当前商品金额在单笔限额内
-const sheetPaymentMethods = computed(() =>
-  selectedProduct.value ? methodsForAmount(selectedProduct.value.price_cny_minor) : []
-)
+// 下单抽屉里的支付方式：把后台配置的完整渠道集合交给抽屉，
+// 由抽屉按「抵扣后的应付金额」再过滤单笔限额（金额变了，可用渠道也会变）。
 
 const METRICS = [
   { value: '1-3', unit: '分钟', label: '平均到账时间' },
@@ -296,9 +297,16 @@ const COMPARISON: { name: string; for: string; rows: [string, string][] }[] = [
   }
 ]
 
+// 登录态可能晚于首次渲染才恢复：一旦变成已登录就补拉返点余额
+watch(isLoggedIn, (loggedIn) => {
+  if (loggedIn) void loadWalletBalance()
+})
+
 onMounted(async () => {
   // 支付渠道与控制台商城同源，后台开关与限额即时生效
   void loadPaymentMethods()
+  // 登录用户的返点余额：拿到才在下单抽屉里展示抵扣入口
+  void loadWalletBalance()
   try {
     const [productRes, bannerRes, categoryRes] = await Promise.all([
       publicShopAPI.listProducts(),
@@ -338,9 +346,9 @@ function openBannerProduct(productID: number) {
   openSheet(product)
 }
 
-async function handleSubmit(payload: { contact: string; paymentType: string }) {
+async function handleSubmit(payload: { contact: string; paymentType: string; useWallet: boolean }) {
   if (!selectedProduct.value) return
-  const ok = await startCheckout(selectedProduct.value, payload.contact, payload.paymentType)
+  const ok = await startCheckout(selectedProduct.value, payload.contact, payload.paymentType, payload.useWallet)
   if (ok) {
     sheetOpen.value = false
   }
@@ -746,9 +754,11 @@ function handlePaymentSuccess() {
     <OrderSheet
       :open="sheetOpen"
       :product="selectedProduct"
-      :payment-methods="sheetPaymentMethods"
+      :payment-methods="paymentMethods"
       :submitting="submitting"
       :support-qq="QQ_AFTERSALES"
+      :wallet-eligible="walletEligible"
+      :wallet-available-minor="walletAvailableMinor"
       @close="sheetOpen = false"
       @submit="handleSubmit"
     />

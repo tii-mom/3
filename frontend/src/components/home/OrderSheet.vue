@@ -8,11 +8,15 @@ import type { GuestPaymentOption } from '@/composables/useGuestCheckout'
 const props = defineProps<{
   open: boolean
   product: PublicProduct | null
-  /** 可用支付方式，来自后台配置并按商品金额过滤 */
+  /** 可用支付方式，来自后台配置（这里按「抵扣后的应付金额」再过滤一次） */
   paymentMethods?: GuestPaymentOption[]
   submitting?: boolean
   /** 售后 QQ 号，用于「暂无可用支付方式」时的联系入口 */
   supportQQ?: string
+  /** 推广计划已开启且当前登录用户有返点余额，用于展示「返点余额抵扣」入口 */
+  walletEligible?: boolean
+  /** 可用于抵扣的人民币返点余额（分） */
+  walletAvailableMinor?: number
 }>()
 
 const authStore = useAuthStore()
@@ -21,12 +25,25 @@ const isLoggedIn = computed(() => !!authStore.isAuthenticated)
 
 const emit = defineEmits<{
   close: []
-  submit: [payload: { contact: string; paymentType: string }]
+  submit: [payload: { contact: string; paymentType: string; useWallet: boolean }]
 }>()
 
 const contact = ref('')
 const paymentType = ref('')
 const touched = ref(false)
+const useWallet = ref(false)
+
+const priceMinor = computed(() => Number(props.product?.price_cny_minor || 0))
+const walletAvailable = computed(() => Number(props.walletAvailableMinor || 0))
+// 抵扣只在登录态可用：访客没有返点钱包；推广计划关闭时后端也不返回余额入口。
+const canUseWallet = computed(() => isLoggedIn.value && !!props.walletEligible && walletAvailable.value > 0)
+const walletAppliedMinor = computed(() => {
+  if (!useWallet.value || !canUseWallet.value) return 0
+  return Math.min(walletAvailable.value, priceMinor.value)
+})
+const payableMinor = computed(() => Math.max(priceMinor.value - walletAppliedMinor.value, 0))
+/** 全额抵扣：没有外部支付环节，也就无需选择支付方式 */
+const fullyPaidByWallet = computed(() => priceMinor.value > 0 && payableMinor.value <= 0)
 
 /** 主图 + 图廊；切换商品时回到第一张 */
 const images = computed(() =>
@@ -39,8 +56,19 @@ watch(() => props.product?.id, () => {
   activeImage.value = 0
 })
 
-const methods = computed(() => props.paymentMethods || [])
-const noMethodAvailable = computed(() => methods.value.length === 0)
+/** 渠道单笔限额以「实际走渠道的金额」为准：只有抵扣后的应付金额才受限额约束 */
+function amountFitsMethod(method: GuestPaymentOption, amountMinor: number): boolean {
+  const amount = amountMinor / 100
+  if (method.single_min > 0 && amount < method.single_min) return false
+  if (method.single_max > 0 && amount > method.single_max) return false
+  return true
+}
+
+const methods = computed(() => {
+  if (fullyPaidByWallet.value) return []
+  return (props.paymentMethods || []).filter((method) => amountFitsMethod(method, payableMinor.value))
+})
+const noMethodAvailable = computed(() => !fullyPaidByWallet.value && methods.value.length === 0)
 
 const requirement = computed(() => deliveryRequirement(props.product?.fulfillment_mode || 'manual'))
 
@@ -56,7 +84,7 @@ const contactError = computed(() => {
 })
 
 const canSubmit = computed(() =>
-  !noMethodAvailable.value &&
+  (fullyPaidByWallet.value || !noMethodAvailable.value) &&
   (isLoggedIn.value || (contact.value.trim() !== '' && !contactError.value)) &&
   !props.submitting
 )
@@ -71,24 +99,36 @@ const deliveryNotice = computed(() => {
   return '支付完成后，管理员会按订单信息人工处理发货。'
 })
 
+// 打开时默认勾选抵扣（防呆：多数用户的诉求就是「把返点花掉」），并重置联系方式与渠道
 watch(() => props.open, (open) => {
-  if (open) {
-    contact.value = ''
-    touched.value = false
-    paymentType.value = methods.value[0]?.value || ''
-  }
+  if (!open) return
+  contact.value = ''
+  touched.value = false
+  useWallet.value = canUseWallet.value
+  paymentType.value = methods.value[0]?.value || ''
 })
 
-watch(methods, (list) => {
-  if (!list.some((item) => item.value === paymentType.value)) {
-    paymentType.value = list[0]?.value || ''
+// 抵扣额度变化会让原选中的渠道不再适用（金额落到限额之外），这里自动纠正，
+// 保证「确认下单」时选中的渠道一定可用。
+watch([methods, payableMinor], () => {
+  if (fullyPaidByWallet.value) {
+    paymentType.value = ''
+    return
+  }
+  if (!methods.value.some((item) => item.value === paymentType.value)) {
+    paymentType.value = methods.value[0]?.value || ''
   }
 })
 
 function submit() {
   touched.value = true
   if (!canSubmit.value) return
-  emit('submit', { contact: contact.value.trim(), paymentType: paymentType.value })
+  emit('submit', {
+    contact: contact.value.trim(),
+    // 全额抵扣没有外部支付环节，不传渠道，避免后端把它当作「合并支付」
+    paymentType: fullyPaidByWallet.value ? '' : paymentType.value,
+    useWallet: fullyPaidByWallet.value ? true : (useWallet.value && canUseWallet.value)
+  })
 }
 </script>
 
@@ -128,8 +168,18 @@ function submit() {
         <p v-if="product.description" class="sheet__desc">{{ product.description }}</p>
 
         <div class="sheet__summary">
-          <span class="sheet__summary-label">应付金额</span>
-          <span class="sheet__summary-price">¥{{ formatCNY(product.price_cny_minor) }}</span>
+          <div v-if="walletAppliedMinor > 0" class="sheet__summary-breakdown">
+            <span class="sheet__summary-row">
+              <span>商品金额</span><span>¥{{ formatCNY(priceMinor) }}</span>
+            </span>
+            <span class="sheet__summary-row sheet__summary-row--credit">
+              <span>返点余额抵扣</span><span>-¥{{ formatCNY(walletAppliedMinor) }}</span>
+            </span>
+          </div>
+          <div class="sheet__summary-total">
+            <span class="sheet__summary-label">应付金额</span>
+            <span class="sheet__summary-price">¥{{ formatCNY(payableMinor) }}</span>
+          </div>
         </div>
 
         <div v-if="isLoggedIn" class="sheet__field">
@@ -154,7 +204,29 @@ function submit() {
           <p v-else class="sheet__hint">只用于核对订单与质保，与充值账号无关</p>
         </div>
 
-        <div class="sheet__field">
+        <div v-if="canUseWallet" class="sheet__field">
+          <button
+            type="button"
+            class="sheet__wallet"
+            :class="{ 'sheet__wallet--active': useWallet }"
+            :aria-pressed="useWallet"
+            @click="useWallet = !useWallet"
+          >
+            <span class="sheet__wallet-check" :class="{ 'sheet__wallet-check--on': useWallet }" aria-hidden="true">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M2.5 6.4l2.4 2.4 4.6-5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
+            <span class="sheet__wallet-text">
+              <span class="sheet__wallet-title">使用返点余额抵扣</span>
+              <span class="sheet__wallet-hint">可用 ¥{{ formatCNY(walletAvailable) }}</span>
+            </span>
+            <span v-if="useWallet" class="sheet__wallet-amount">-¥{{ formatCNY(walletAppliedMinor) }}</span>
+          </button>
+          <p v-if="fullyPaidByWallet" class="sheet__wallet-full">返点余额足够全额抵扣，下单后无需再付款。</p>
+        </div>
+
+        <div v-if="!fullyPaidByWallet" class="sheet__field">
           <span class="sheet__label">支付方式</span>
           <div v-if="noMethodAvailable" class="sheet__no-method">
             <p>
@@ -184,10 +256,12 @@ function submit() {
         </div>
 
         <button type="button" class="sheet__submit" :disabled="!canSubmit" @click="submit">
-          {{ submitting ? '正在创建订单…' : `去支付 ¥${formatCNY(product.price_cny_minor)}` }}
+          {{ submitting ? '正在创建订单…' : (fullyPaidByWallet ? '确认抵扣下单' : `去支付 ¥${formatCNY(payableMinor)}`) }}
         </button>
 
-        <p class="sheet__foot">支付后凭订单号 + 联系方式可在「查订单」页查看进度</p>
+        <p class="sheet__foot">
+          {{ fullyPaidByWallet ? '已用返点余额全额抵扣，下单后可在「控制台 · 我的商城订单」查看进度' : '支付后凭订单号 + 联系方式可在「查订单」页查看进度' }}
+        </p>
       </section>
     </div>
   </Transition>
@@ -316,12 +390,39 @@ function submit() {
 
 .sheet__summary {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 10px;
   padding: 15px 16px;
   border-radius: 11px;
   background: var(--sh-surface-2, #f6f6f7);
   border: 1px solid var(--sh-border, rgba(9, 9, 11, 0.08));
+}
+
+/* 抵扣发生时才展开明细：商品金额 → 返点抵扣 → 应付，让「组合支付」一眼看清 */
+.sheet__summary-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--sh-border-strong, rgba(9, 9, 11, 0.16));
+  font-size: 13px;
+  color: var(--sh-text-2, #56565f);
+  font-variant-numeric: tabular-nums;
+}
+
+.sheet__summary-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.sheet__summary-row--credit {
+  color: var(--sh-accent-text, #b34b1f);
+}
+
+.sheet__summary-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
 }
 
 .sheet__summary-label {

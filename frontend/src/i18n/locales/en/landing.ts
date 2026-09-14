@@ -61,13 +61,13 @@ export default {
       openaiMain: 'OpenAI Main Route',
       claudeBackup: 'Claude Backup Route',
       geminiDirect: 'Gemini Direct Route',
-      computeNetwork: 'Compute Company Network',
-      companyUnitsCount: '5 Company Units'
+      computeNetwork: 'Referral Program Network',
+      companyUnitsCount: 'One level only'
     },
     architecture: {
-      directPartner: 'Direct Partner',
-      computeCompany: 'Compute Company',
-      performanceBadge: 'Team Volume · Company Performance',
+      directPartner: 'Direct invite',
+      computeCompany: 'Referral Program',
+      performanceBadge: 'Friend recharge · Level-1 rebate',
       endUser: 'End User',
       t1: 'T1',
       t2: 'T2',
@@ -174,11 +174,11 @@ export default {
       review4Text: 'For multi-project developers, one-click distribution to CCS is the smoothest experience. Managing keys has never been this efficient, official channels are rock solid.'
     },
     business: {
-      title: 'Compute Company & Performance Network',
-      subtitle: 'Personal usage and compute partnerships run on the same high-availability routing, billing, and resource control plane.',
-      computeTitle: 'Compute can also form an operational network',
-      computeDesc: 'Grow through team volume and company earnings with clear frozen, available, and payout states.',
-      openCompute: 'Open Compute Company'
+      title: 'Referral Program & Rebate Network',
+      subtitle: 'API usage and referral rebates run on the same high-availability routing, billing, and resource control plane.',
+      computeTitle: 'Share once, one level only',
+      computeDesc: 'When a friend you invited directly recharges, you earn a rebate — with clear frozen, available, and payout states.',
+      openCompute: 'Open Referral Program'
     },
     // Pain points section
     painPoints: {

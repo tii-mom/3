@@ -23,50 +23,6 @@ func TestFinancialOutboxRetryDelayIsBounded(t *testing.T) {
 	require.Equal(t, 128*time.Minute, financialOutboxRetryDelay(99))
 }
 
-func TestTierForVolumeUsesCurrentOrderBoundary(t *testing.T) {
-	tiers := []DistributionTier{{Tier: 0, Threshold: 0}, {Tier: 1, Threshold: 100000}, {Tier: 2, Threshold: 1000000}, {Tier: 3, Threshold: 10000000}}
-	require.Equal(t, 0, tierForVolume(tiers, 0))
-	require.Equal(t, 0, tierForVolume(tiers, 99999))
-	require.Equal(t, 1, tierForVolume(tiers, 100000))
-	require.Equal(t, 1, tierForVolume(tiers, 999999))
-	require.Equal(t, 2, tierForVolume(tiers, 1000000))
-	require.Equal(t, 2, tierForVolume(tiers, 9999999))
-	require.Equal(t, 3, tierForVolume(tiers, 10000000))
-}
-
-func TestCommissionTierUsesPreRechargeVolumeAtPromotionBoundary(t *testing.T) {
-	tiers := []DistributionTier{
-		{Tier: 0, Threshold: 0},
-		{Tier: 1, Threshold: 100000},
-		{Tier: 2, Threshold: 1000000},
-		{Tier: 3, Threshold: 10000000},
-	}
-	// A recharge that moves a member from T1 to T2 must still use T1 for
-	// that order; T2 applies to subsequent orders.
-	require.Equal(t, 1, commissionTierForRecharge(tiers, 999999, nil))
-	require.Equal(t, 2, tierForVolume(tiers, 1000000))
-	override := 3
-	require.Equal(t, 3, commissionTierForRecharge(tiers, 0, &override))
-}
-
-func TestComputeCompanyTierRatesCoverAllFiveDepartments(t *testing.T) {
-	tiers := []DistributionTier{
-		{Tier: 0, Threshold: 0, RatesBPS: [5]int64{1000, 0, 0, 0, 0}},
-		{Tier: 1, Threshold: 100000, RatesBPS: [5]int64{1000, 400, 300, 200, 100}},
-		{Tier: 2, Threshold: 1000000, RatesBPS: [5]int64{1500, 600, 400, 300, 200}},
-		{Tier: 3, Threshold: 10000000, RatesBPS: [5]int64{2000, 800, 600, 400, 200}},
-	}
-	require.Equal(t, [5]int64{1000, 0, 0, 0, 0}, tiers[0].RatesBPS)
-	require.Equal(t, [5]int64{1000, 400, 300, 200, 100}, tiers[1].RatesBPS)
-	require.Equal(t, [5]int64{1500, 600, 400, 300, 200}, tiers[2].RatesBPS)
-	require.Equal(t, [5]int64{2000, 800, 600, 400, 200}, tiers[3].RatesBPS)
-	base := int64(100000)
-	require.Equal(t, []int64{10000, 4000, 3000, 2000, 1000}, commissionVector(base, tiers[1].RatesBPS))
-	require.Equal(t, []int64{15000, 6000, 4000, 3000, 2000}, commissionVector(base, tiers[2].RatesBPS))
-	require.Equal(t, []int64{20000, 8000, 6000, 4000, 2000}, commissionVector(base, tiers[3].RatesBPS))
-	require.Equal(t, []int64{10000, 0, 0, 0, 0}, commissionVector(base, tiers[0].RatesBPS))
-}
-
 func TestDistributionForecastRequiresRecentActivity(t *testing.T) {
 	series := make([]DistributionAnalyticsPoint, 30)
 	for index := range series {
@@ -82,15 +38,15 @@ func TestDistributionForecastProjectsPositiveTrend(t *testing.T) {
 	for index := range series {
 		series[index] = DistributionAnalyticsPoint{
 			Date:            time.Now().UTC().AddDate(0, 0, index-29).Format("2006-01-02"),
-			RechargeMinor:   int64(1000 + index*100),
+			SpendMinor:      int64(1000 + index*100),
 			CommissionMinor: int64(100 + index*10),
 		}
 	}
 	forecast := forecastHorizon(series, 7, 7)
 	require.True(t, forecast.Eligible)
-	require.Greater(t, forecast.EstimatedRechargeMinor, int64(0))
+	require.Greater(t, forecast.EstimatedSpendMinor, int64(0))
 	require.Greater(t, forecast.EstimatedCommissionMinor, int64(0))
-	require.Greater(t, forecast.RechargeGrowthPercent, float64(0))
+	require.Greater(t, forecast.SpendGrowthPercent, float64(0))
 	require.Greater(t, forecast.CommissionGrowthPercent, float64(0))
 }
 
@@ -100,6 +56,14 @@ func commissionVector(base int64, rates [5]int64) []int64 {
 		result[index] = calculateCommissionMinor(base, rate)
 	}
 	return result
+}
+
+// TestCommissionVectorUsesPerLevelRates 只验证「按费率算佣金」这条纯函数，
+// 与档位无关：推广计划已无档位，返佣比例来自商品上架时的设置。
+func TestCommissionVectorUsesPerLevelRates(t *testing.T) {
+	base := int64(100000)
+	require.Equal(t, []int64{5000, 0, 0, 0, 0}, commissionVector(base, [5]int64{500, 0, 0, 0, 0}))
+	require.Equal(t, []int64{8000, 800, 0, 0, 0}, commissionVector(base, [5]int64{800, 80, 0, 0, 0}))
 }
 
 func TestFirstRechargeBonusCapsRewardNotRecharge(t *testing.T) {
@@ -113,28 +77,39 @@ func TestWithdrawalFeeUsesMinorUnitsAndRoundsOnce(t *testing.T) {
 	require.Equal(t, int64(1), calculateWithdrawalFee(101, 50))
 }
 
+// TestDistributionPolicyValidation 覆盖推广计划「钱包 / 提现 / 首充奖励」参数的校验。
+// 推广计划已无档位：返佣比例不在这里配置，所以这里不再有任何 tiers 断言。
 func TestDistributionPolicyValidation(t *testing.T) {
 	input := DistributionPolicyInput{
 		CommissionFreezeHours: 168, WithdrawalMinMinor: 2000, WithdrawalDailyLimit: 1,
 		WithdrawalFeeBPS: 0, FirstRechargeBonusBPS: 1000, FirstRechargeBonusCap: "10000",
-		Tiers: []DistributionTier{
-			{Tier: 0, Threshold: 0, RatesBPS: [5]int64{1000, 0, 0, 0, 0}},
-			{Tier: 1, Threshold: 100000, RatesBPS: [5]int64{1000, 400, 300, 200, 100}},
-			{Tier: 2, Threshold: 1000000, RatesBPS: [5]int64{1500, 600, 400, 300, 200}},
-			{Tier: 3, Threshold: 10000000, RatesBPS: [5]int64{2000, 800, 600, 400, 200}},
-		},
 	}
 	capAmount, err := validateDistributionPolicy(input)
 	require.NoError(t, err)
 	require.True(t, capAmount.Equal(decimal.NewFromInt(10000)))
 
-	input.Tiers[2].Threshold = input.Tiers[1].Threshold
-	_, err = validateDistributionPolicy(input)
+	// 提现门槛必须为正。
+	invalid := input
+	invalid.WithdrawalMinMinor = 0
+	_, err = validateDistributionPolicy(invalid)
 	require.Error(t, err)
 
-	input.Tiers[2].Threshold = 1000000
-	input.Tiers[0].RatesBPS[1] = 1
-	_, err = validateDistributionPolicy(input)
+	// 提现手续费必须落在 [0, 10000) bps。
+	invalid = input
+	invalid.WithdrawalFeeBPS = 10000
+	_, err = validateDistributionPolicy(invalid)
+	require.Error(t, err)
+
+	// 首充奖励比例必须落在 [0, 10000] bps。
+	invalid = input
+	invalid.FirstRechargeBonusBPS = 10001
+	_, err = validateDistributionPolicy(invalid)
+	require.Error(t, err)
+
+	// 首充奖励上限必须是合法的非负金额。
+	invalid = input
+	invalid.FirstRechargeBonusCap = "not-a-number"
+	_, err = validateDistributionPolicy(invalid)
 	require.Error(t, err)
 }
 

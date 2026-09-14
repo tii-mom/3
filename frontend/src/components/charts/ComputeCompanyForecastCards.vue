@@ -8,7 +8,7 @@
       <template v-if="item.forecast?.eligible">
         <p class="mt-3 font-mono text-xl font-semibold tabular-nums text-gray-950 dark:text-white">{{ cny(item.forecast.estimated_commission_cny_minor) }}</p>
         <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">{{ t('finance.distribution.commission') }} · {{ t('finance.distribution.growth') }} <span :class="item.forecast.commission_growth_percent >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'">{{ signedPercent(item.forecast.commission_growth_percent) }}</span></p>
-        <p class="mt-3 text-xs text-gray-500 dark:text-dark-400">{{ t('finance.distribution.recharge') }} {{ cny(item.forecast.estimated_recharge_cny_minor) }}</p>
+        <p class="mt-3 text-xs text-gray-500 dark:text-dark-400">{{ t('finance.distribution.inviteSpend') }} {{ cny(item.forecast.estimated_spend_cny_minor) }}</p>
       </template>
       <p v-else class="mt-4 text-xs leading-5 text-gray-500 dark:text-dark-400">{{ reason(item.forecast?.reason) }}</p>
     </article>

@@ -203,8 +203,7 @@ func registerAdminDistributionRoutes(admin *gin.RouterGroup, h *handler.Handlers
 		distribution.POST("/recharge-events/:id/reverse", h.Admin.Distribution.ReverseRecharge)
 		distribution.GET("/relations", h.Admin.Distribution.ListRelations)
 		distribution.GET("/conversions", h.Admin.Distribution.ListConversions)
-		distribution.GET("/members", h.Admin.Distribution.ListTierAssignments)
-		distribution.PUT("/members/:user_id/tier", h.Admin.Distribution.SetTierOverride)
+		distribution.GET("/members", h.Admin.Distribution.ListMembers)
 		distribution.POST("/withdrawals/:id/transition", h.Admin.Distribution.TransitionWithdrawal)
 		distribution.POST("/withdrawals/:id/payout-details", h.Admin.Distribution.PayoutDetails)
 	}

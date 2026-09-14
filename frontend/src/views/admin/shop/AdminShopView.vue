@@ -5,7 +5,7 @@
       <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 class="text-xl font-bold text-gray-950 dark:text-white">商城管理</h1>
-          <p class="mt-1.5 text-sm text-gray-500 dark:text-gray-400">商品上架、品类配置、轮播展示与订单发货；用户付款后在订单里填写发货信息，推广佣金进入算力公司钱包。</p>
+          <p class="mt-1.5 text-sm text-gray-500 dark:text-gray-400">商品上架、品类配置、轮播展示与订单发货；用户付款后在订单里填写发货信息，推广返点进入推广钱包。</p>
         </div>
         <div class="flex flex-wrap gap-2">
           <button v-if="tab === 'products'" class="btn-primary rounded-lg px-4 py-2" @click="openProductDialog()">新增商品</button>
@@ -222,7 +222,12 @@
                 </div>
                 <div v-if="order.order_no" class="mt-0.5 text-xs text-gray-500">单号 {{ order.order_no }}</div>
               </td>
-              <td class="px-5 py-4 font-semibold">¥{{ money(order.snapshot_price_cny_minor) }}</td>
+              <td class="px-5 py-4">
+                <div class="font-semibold">¥{{ money(order.snapshot_price_cny_minor) }}</div>
+                <div v-if="order.wallet_applied_cny_minor > 0" class="mt-0.5 text-xs text-orange-600 dark:text-orange-300">
+                  返点抵扣 ¥{{ money(order.wallet_applied_cny_minor) }} · 实付 ¥{{ money(order.payable_cny_minor) }}
+                </div>
+              </td>
               <td class="px-5 py-4">
                 <div class="font-semibold text-gray-900 dark:text-white">{{ orderStatusLabel(order) }}</div>
                 <div v-if="order.fulfillment_note" class="mt-1 max-w-xs truncate text-xs text-amber-600 dark:text-amber-300">发货内容：{{ order.fulfillment_note }}</div>
@@ -256,6 +261,9 @@
             </div>
             <div class="shrink-0 text-right">
               <div class="text-sm font-semibold tabular-nums text-gray-950 dark:text-white">¥{{ money(order.snapshot_price_cny_minor) }}</div>
+              <div v-if="order.wallet_applied_cny_minor > 0" class="mt-0.5 text-xs text-orange-600 dark:text-orange-300">
+                抵扣 ¥{{ money(order.wallet_applied_cny_minor) }} · 实付 ¥{{ money(order.payable_cny_minor) }}
+              </div>
               <div class="mt-1 text-xs text-gray-500">{{ orderStatusLabel(order) }}</div>
             </div>
           </div>

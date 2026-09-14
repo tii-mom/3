@@ -257,8 +257,8 @@ FOR UPDATE`, productID).Scan(&name, &desc, &imageURL, &productType, &priceMinor,
 	err = tx.QueryRowContext(ctx, `
 INSERT INTO shop_orders (tenant_id, user_id, product_id, snapshot_name, snapshot_description, snapshot_image_url,
     snapshot_product_type, snapshot_price_cny_minor, snapshot_grant_usd_amount, snapshot_commission_bps,
-    order_no, guest_token, guest_contact, snapshot_fulfillment_mode)
-VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    order_no, guest_token, guest_contact, snapshot_fulfillment_mode, payable_cny_minor)
+VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $7)
 RETURNING id`, guestUserID, productID, name, desc, imageURL, productType, priceMinor, grantRaw, commissionBPS,
 		orderNo, guestToken, contact, fulfillmentMode).Scan(&shopOrderID)
 	if err != nil {

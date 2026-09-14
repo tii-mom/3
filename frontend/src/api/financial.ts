@@ -21,17 +21,19 @@ export interface VoucherAvailability {
   step_up_minimum_usd: string
   maximum_face_value_usd: string
 }
-export interface DistributionTier { tier: number; threshold_cny_minor: number; rates_bps: [number, number, number, number, number] }
-export interface DistributionLevelSummary { depth: number; member_count: number; recharge_cny_minor: number; commission_cny_minor: number; available_cny_minor: number; frozen_cny_minor: number }
-export interface DistributionDashboard { enabled: boolean; balance_recharge_multiplier: string; usd_to_cny_rate: string; commission_freeze_hours: number; withdrawal_min_cny_minor: number; withdrawal_daily_limit: number; team_volume_cny_minor: number; current_tier: number; auto_tier: number; tier_override?: number; next_threshold_cny_minor: number; level_counts: Record<number, number>; levels: DistributionLevelSummary[]; available_cny_minor: number; frozen_cny_minor: number; withdrawing_cny_minor: number; debt_cny_minor: number; lifetime_earned_cny_minor: number; tiers: DistributionTier[] }
-export interface TeamNode { user_id: number; parent_user_id: number; email_masked: string; username: string; direct_children: number; team_volume_cny_minor: number; current_tier: number; auto_tier: number; tier_override?: number; effective_tier: number }
-export interface Commission { id: number; source_order_id: number; source_user_id: number; depth: number; tier: number; rate_bps: number; base_cny_minor: number; amount_cny_minor: number; team_volume_cny_minor: number; status: string; frozen_until: string; created_at: string }
+// 推广计划没有档位：返佣比例来自每个商品上架时的设置（shop_products.commission_bps），
+// 下单时快照进订单。`team_volume_cny_minor` 保留为「直属邀请成员在商城的实付总额」。
+export interface DistributionDashboard { enabled: boolean; balance_recharge_multiplier: string; usd_to_cny_rate: string; commission_freeze_hours: number; withdrawal_min_cny_minor: number; withdrawal_daily_limit: number; invitee_count: number; team_volume_cny_minor: number; available_cny_minor: number; frozen_cny_minor: number; withdrawing_cny_minor: number; debt_cny_minor: number; lifetime_earned_cny_minor: number }
+export interface TeamNode { user_id: number; parent_user_id: number; email_masked: string; username: string; direct_children: number; team_volume_cny_minor: number }
+// source 区分佣金来源：'shop' = 商城订单返点（当前唯一在写入的），'distribution' = 历史充值返佣。
+// 两张表自增 id 会重号，列表 key 必须用 `${source}-${id}`。
+export interface Commission { id: number; source?: 'shop' | 'distribution'; source_order_id: number; source_user_id: number; depth: number; tier: number; rate_bps: number; base_cny_minor: number; amount_cny_minor: number; team_volume_cny_minor: number; status: string; frozen_until: string; created_at: string }
 export interface PayoutAccount { account_type: string; account_mask: string; real_name_mask: string }
 export interface Withdrawal { id: number; amount_cny_minor: number; fee_cny_minor: number; fee_rate_bps: number; config_version: number; status: string; reject_reason?: string; payment_reference?: string; submitted_at: string }
 export interface DistributionConversion { id: number; amount_cny_minor: number; usd_amount: string; cny_to_usd_rate?: string; rate_source?: string; usd_to_cny_rate: string; config_version: number; created_at: string }
-export interface DistributionAnalyticsPoint { date: string; recharge_cny_minor: number; commission_cny_minor: number }
-export interface DistributionAnalyticsSummary { recharge_cny_minor: number; commission_cny_minor: number; previous_recharge_cny_minor: number; previous_commission_cny_minor: number; recharge_growth_percent: number; commission_growth_percent: number }
-export interface DistributionForecastHorizon { eligible: boolean; reason?: 'insufficient_history' | 'insufficient_activity'; estimated_recharge_cny_minor: number; estimated_commission_cny_minor: number; recharge_growth_percent: number; commission_growth_percent: number }
+export interface DistributionAnalyticsPoint { date: string; spend_cny_minor: number; commission_cny_minor: number }
+export interface DistributionAnalyticsSummary { spend_cny_minor: number; commission_cny_minor: number; previous_spend_cny_minor: number; previous_commission_cny_minor: number; spend_growth_percent: number; commission_growth_percent: number }
+export interface DistributionForecastHorizon { eligible: boolean; reason?: 'insufficient_history' | 'insufficient_activity'; estimated_spend_cny_minor: number; estimated_commission_cny_minor: number; spend_growth_percent: number; commission_growth_percent: number }
 export interface DistributionAnalytics { as_of: string; range_days: number; series: DistributionAnalyticsPoint[]; summary: DistributionAnalyticsSummary; forecast: { method: string; seven_days: DistributionForecastHorizon; thirty_days: DistributionForecastHorizon } }
 
 export async function createVoucher(amount: string, totpCode: string, idempotencyKey: string): Promise<Voucher> {

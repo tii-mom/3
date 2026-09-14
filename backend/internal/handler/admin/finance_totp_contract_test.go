@@ -8,7 +8,6 @@ import (
 
 func TestFinanceAdminRequestsDoNotRequireTOTP(t *testing.T) {
 	requests := []any{
-		tierOverrideRequest{},
 		distributionReversalRequest{},
 		exchangeRateRequest{},
 		distributionConfigRequest{},

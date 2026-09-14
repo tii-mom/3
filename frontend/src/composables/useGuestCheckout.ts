@@ -9,7 +9,7 @@ import {
   type PublicPaymentMethod,
   type PublicProduct
 } from '@/api/publicShop'
-import { shopAPI } from '@/api/shop'
+import { shopAPI, type ShopWalletBalance } from '@/api/shop'
 import { decidePaymentLaunch, getVisibleMethods, normalizeVisibleMethod } from '@/components/payment/paymentFlow'
 import { getPaymentPopupFeatures } from '@/components/payment/providerConfig'
 import type { OrderType } from '@/types/payment'
@@ -87,6 +87,27 @@ export function useGuestCheckout() {
   const alipayForceQRCode = ref(false)
   const methodsLoaded = ref(false)
 
+  // 「我的返点余额」= 推广返点结算进的人民币钱包，可在下单时抵扣。
+  // 与只能调 API 的平台额度（美元）是两种钱，这里只碰人民币返点。
+  const walletBalance = ref<ShopWalletBalance | null>(null)
+  const walletAvailableMinor = computed(() => walletBalance.value?.available_cny_minor || 0)
+  // 有余额且推广计划开启时才展示抵扣入口，避免给用户「有返点却用不了」的错觉
+  const walletEligible = computed(() => !!walletBalance.value?.enabled && walletAvailableMinor.value > 0)
+
+  /** 拉取可用于抵扣的返点余额；失败时置空（不展示抵扣入口，也不阻塞下单）。 */
+  async function loadWalletBalance(): Promise<void> {
+    if (!isLoggedIn.value) {
+      walletBalance.value = null
+      return
+    }
+    try {
+      const response = await shopAPI.walletBalance()
+      walletBalance.value = response.data || null
+    } catch {
+      walletBalance.value = null
+    }
+  }
+
   /**
    * 首页可用支付方式 = 控制台同一份可见渠道集合（后台已开启的 alipay / wxpay / stripe / airwallex）。
    * 故意不再用前端硬编码白名单：否则后台只开了 stripe 时首页会显示「暂无可用支付方式」，
@@ -136,7 +157,7 @@ export function useGuestCheckout() {
     fulfillmentMode: FulfillmentMode
   } | null = null
 
-  async function startCheckout(product: PublicProduct, contact: string, paymentType: string): Promise<boolean> {
+  async function startCheckout(product: PublicProduct, contact: string, paymentType: string, useWallet = false): Promise<boolean> {
     if (submitting.value) return false
     const trimmedContact = String(contact || '').trim()
     // 登录用户无需联系方式：订单直接归属本人，可在控制台商城订单里查看
@@ -144,15 +165,30 @@ export function useGuestCheckout() {
       appStore.showToast('error', '请填写用于查单的手机号或邮箱', 3000)
       return false
     }
+    // 返点余额抵扣只在登录态可用：访客没有返点钱包。
+    // 「还需外部支付」的金额才是渠道单笔限额的判定基准。
+    const priceMinor = Number(product.price_cny_minor || 0)
+    const deductMinor = isLoggedIn.value && walletEligible.value
+      ? Math.min(Math.max(walletAvailableMinor.value, 0), priceMinor)
+      : 0
+    const requestWalletDeduction = isLoggedIn.value && useWallet && deductMinor > 0
+    const appliedMinor = requestWalletDeduction ? deductMinor : 0
+    const payableMinor = Math.max(priceMinor - appliedMinor, 0)
+    // 全额抵扣：没有外部支付环节，也就不需要支付方式。
+    const fullyPaidByWallet = priceMinor > 0 && payableMinor <= 0
     // 支付方式必须来自后台配置，且金额在其单笔限额内
-    const option = methodsForAmount(product.price_cny_minor).find((item) => item.value === paymentType)
-    if (!option) {
-      appStore.showToast('warning', '当前商品暂无可用支付方式，请联系客服处理', 3500)
-      return false
+    let visibleMethod = ''
+    let forceQRCode = false
+    if (!fullyPaidByWallet) {
+      const option = methodsForAmount(payableMinor).find((item) => item.value === paymentType)
+      if (!option) {
+        appStore.showToast('warning', '当前商品暂无可用支付方式，请联系客服处理', 3500)
+        return false
+      }
+      // 与控制台商城同一套归一化与二维码策略
+      visibleMethod = normalizeVisibleMethod(option.value) || option.value
+      forceQRCode = !!(alipayForceQRCode.value && visibleMethod === 'alipay')
     }
-    // 与控制台商城同一套归一化与二维码策略
-    const visibleMethod = normalizeVisibleMethod(option.value) || option.value
-    const forceQRCode = !!(alipayForceQRCode.value && visibleMethod === 'alipay')
     const orderType: OrderType = 'shop'
     submitting.value = true
     try {
@@ -162,8 +198,15 @@ export function useGuestCheckout() {
           product_id: product.id,
           payment_type: visibleMethod,
           return_url: buildReturnURL(),
-          is_mobile: forceQRCode ? false : isMobileDevice()
+          is_mobile: forceQRCode ? false : isMobileDevice(),
+          use_wallet: requestWalletDeduction
         })
+        // 全额抵扣时后端不返回 payment（没有外部支付环节），订单已进入交付，直接视为成功。
+        if (response.data.fully_paid_by_wallet || fullyPaidByWallet) {
+          appStore.showToast('success', '已用返点余额全额抵扣，订单已提交', 3000)
+          goToOrderPage()
+          return true
+        }
         payment = response.data.payment
         pendingContext = null
       } else {
@@ -310,6 +353,10 @@ export function useGuestCheckout() {
     paymentMethods: guestPaymentMethods,
     methodsLoaded,
     loadPaymentMethods,
-    methodsForAmount
+    methodsForAmount,
+    walletBalance,
+    walletAvailableMinor,
+    walletEligible,
+    loadWalletBalance
   }
 }

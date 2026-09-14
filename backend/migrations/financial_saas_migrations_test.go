@@ -14,6 +14,21 @@ func normalizedMigration(t *testing.T, name string) string {
 	return strings.Join(strings.Fields(string(content)), " ")
 }
 
+// normalizedMigrationCode 与 normalizedMigration 相同，但会先剥掉 -- 行注释，
+// 供「断言某段 SQL 不存在」的回归测试使用（避免注释里的示例文本把断言坐实）。
+func normalizedMigrationCode(t *testing.T, name string) string {
+	t.Helper()
+	content, err := FS.ReadFile(name)
+	require.NoError(t, err)
+	lines := strings.Split(string(content), "\n")
+	for index, line := range lines {
+		if comment := strings.Index(line, "--"); comment >= 0 {
+			lines[index] = line[:comment]
+		}
+	}
+	return strings.Join(strings.Fields(strings.Join(lines, " ")), " ")
+}
+
 func TestFinancialFoundationMigrationCreatesTenantScopeBeforeReferences(t *testing.T) {
 	sql := normalizedMigration(t, "176_credit_accounts_and_vouchers.sql")
 	tenantPos := strings.Index(sql, "CREATE TABLE IF NOT EXISTS saas_tenants")
@@ -106,6 +121,72 @@ func TestComputeCompanyT0MigrationUnifiesWalletPolicy(t *testing.T) {
 	require.Contains(t, sql, "stack_with_legacy = FALSE")
 	require.Contains(t, sql, "CREATE TABLE IF NOT EXISTS distribution_usd_conversions")
 	require.Contains(t, sql, "UNIQUE (program_id, idempotency_key)")
+}
+
+func TestPromotionSingleLevelMigrationBumpsConfigVersion(t *testing.T) {
+	// 只断言可执行 SQL：注释里会解释这处坑，若连注释一起匹配就会自伤。
+	sql := normalizedMigrationCode(t, "211_promotion_single_level.sql")
+	// 回归防线：配置版本号必须由 current_config_version + 1 推导。
+	// 硬编码成 2 会撞上 188 已占用的版本 2：INSERT 全被 ON CONFLICT 静默吸收、
+	// UPDATE 的 WHERE 也不命中，整份迁移空转且不报任何错。
+	require.Contains(t, sql, "next_version := previous_version + 1")
+	require.NotContains(t, sql, "config_version = 2")
+	require.NotContains(t, sql, "current_config_version < 2")
+	// 单层三档阶梯：T0~T2 只填第 1 层费率，第 2~5 层一律为 0。
+	require.Contains(t, sql, "(compute_program_id, next_version, 0, 0, 500, 0, 0, 0, 0)")
+	require.Contains(t, sql, "(compute_program_id, next_version, 1, 500000, 800, 0, 0, 0, 0)")
+	require.Contains(t, sql, "(compute_program_id, next_version, 2, 5000000, 1000, 0, 0, 0, 0)")
+	require.Contains(t, sql, "name = '推广计划'")
+	require.Contains(t, sql, "INSERT INTO distribution_policy_versions")
+	// 档位从 T0~T3 收成 T0~T2，手工指定档位必须同步作废并收紧约束。
+	require.Contains(t, sql, "CHECK (tier_override IS NULL OR tier_override BETWEEN 0 AND 2)")
+	// 直属业绩按 depth = 1 重算，且必须先重算业绩、再算档位（两条独立 UPDATE）。
+	require.Contains(t, sql, "e.status = 'APPLIED'")
+	require.Contains(t, sql, "r.depth = 1")
+	teamVolumePos := strings.Index(sql, "SET team_volume_cny_minor = COALESCE")
+	tierPos := strings.Index(sql, "SET current_tier = COALESCE")
+	require.GreaterOrEqual(t, teamVolumePos, 0)
+	require.Greater(t, tierPos, teamVolumePos)
+}
+
+func TestPromotionDropTiersMigrationOnlyZeroesState(t *testing.T) {
+	// 只断言可执行 SQL：注释里会解释决策，若连注释一起匹配就会自伤。
+	sql := normalizedMigrationCode(t, "212_promotion_drop_tiers.sql")
+	// 档位状态清零，且两条 UPDATE 都要带 WHERE 保证幂等。
+	require.Contains(t, sql, "SET tier_override = NULL")
+	require.Contains(t, sql, "SET current_tier = 0")
+	require.Contains(t, sql, "WHERE current_tier <> 0")
+	require.Contains(t, sql, "WHERE tier_override IS NOT NULL")
+	// 只打废弃注释，绝不做破坏性 DDL。
+	require.Contains(t, sql, "COMMENT ON TABLE distribution_tier_configs")
+	require.NotContains(t, sql, "DROP COLUMN")
+	require.NotContains(t, sql, "DROP TABLE")
+	// 不触碰用户账户余额：迁移里不应出现钱包表与额度表。
+	require.NotContains(t, sql, "user_credit_accounts")
+	require.NotContains(t, sql, "distribution_cash_wallets")
+}
+
+func TestShopWalletDeductionMigrationIsAdditiveAndGuarded(t *testing.T) {
+	// 只断言可执行 SQL：注释里会解释「返佣基数取实付」这处坑，连注释一起匹配会自伤。
+	sql := normalizedMigrationCode(t, "213_shop_wallet_deduction.sql")
+	// 只加两列，默认 0，保证存量订单语义不变。
+	require.Contains(t, sql, "ADD COLUMN IF NOT EXISTS wallet_applied_cny_minor BIGINT NOT NULL DEFAULT 0")
+	require.Contains(t, sql, "ADD COLUMN IF NOT EXISTS payable_cny_minor BIGINT NOT NULL DEFAULT 0")
+	// 存量回填必须带完整 WHERE，避免重复执行时把已抵扣订单的 payable 改回原价。
+	require.Contains(t, sql, "SET payable_cny_minor = snapshot_price_cny_minor")
+	require.Contains(t, sql, "WHERE wallet_applied_cny_minor = 0")
+	require.Contains(t, sql, "AND payable_cny_minor = 0")
+	require.Contains(t, sql, "AND snapshot_price_cny_minor > 0")
+	// 恒等式与取值上下界由 CHECK 约束兜底。
+	require.Contains(t, sql, "CHECK (wallet_applied_cny_minor >= 0 AND wallet_applied_cny_minor <= snapshot_price_cny_minor)")
+	require.Contains(t, sql, "CHECK (payable_cny_minor = snapshot_price_cny_minor - wallet_applied_cny_minor)")
+	// 幂等：两条约束都先 DROP IF EXISTS 再 ADD。
+	require.Contains(t, sql, "DROP CONSTRAINT IF EXISTS shop_orders_wallet_applied_range_check")
+	require.Contains(t, sql, "DROP CONSTRAINT IF EXISTS shop_orders_payable_identity_check")
+	// 纯增量：不做破坏性 DDL，也不碰额度表（人民币返点与 API 美金额度是两种钱）。
+	require.NotContains(t, sql, "DROP COLUMN")
+	require.NotContains(t, sql, "DROP TABLE")
+	require.NotContains(t, sql, "user_credit_accounts")
 }
 
 func TestDistributionConversionIdempotencyIsUserScoped(t *testing.T) {

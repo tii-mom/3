@@ -45,8 +45,8 @@ const chartData = computed(() => ({
   labels: props.series.map(point => point.date.slice(5)),
   datasets: [
     {
-      label: t('finance.distribution.recharge'),
-      data: props.series.map(point => point.recharge_cny_minor / 100),
+      label: t('finance.distribution.inviteSpend'),
+      data: props.series.map(point => point.spend_cny_minor / 100),
       borderColor: colors.value.recharge,
       backgroundColor: `${colors.value.recharge}18`,
       fill: true,

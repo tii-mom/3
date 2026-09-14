@@ -27,6 +27,19 @@ var (
 	ErrReversalInvalid         = infraerrors.BadRequest("DISTRIBUTION_REVERSAL_INVALID", "invalid distribution reversal request")
 )
 
+// promotionMaxDepth 是「推广计划」实际结算的层级深度。
+//
+// 历史沿革：该程序（code 仍为 compute_company）原本是 5 层多级分销，按团队业绩
+// 分 T0~T3 逐层拨出，合计 10%~40%；其后一度收敛为「单层 + 三档阶梯（5%/8%/10%）」。
+//
+// 现在起点更简：推广计划只有**一层**，且**不设任何档位**——返佣只有一个来源，
+// 就是被购买的商品在上架时设置的返佣比例（shop_products.commission_bps，
+// 下单时快照到 shop_orders.snapshot_commission_bps）。
+//
+// distribution_relations 表仍保留 0~5 层的完整数据（历史佣金与账本要能追溯），
+// 但业务结算一律只看 depth = 1。
+const promotionMaxDepth = 1
+
 type DistributionService struct {
 	db        *sql.DB
 	encryptor SecretEncryptor
@@ -37,49 +50,49 @@ type DistributionProcessResult struct {
 	StackWithLegacy bool
 }
 
+// DistributionDashboard 是推广员后台的概览数据。
+//
+// 返佣只有一个来源：商城商品订单（按商品上架时设置的返佣比例结算），
+// 因此这里没有档位、没有层级构成。金额一律是人民币（minor），
+// 与只能调 API 的美元额度（user_credit_accounts）是两种钱，不要混用。
 type DistributionDashboard struct {
-	Enabled                   bool                       `json:"enabled"`
-	BalanceRechargeMultiplier string                     `json:"balance_recharge_multiplier"`
-	USDToCNYRate              string                     `json:"usd_to_cny_rate"`
-	CommissionFreezeHours     int                        `json:"commission_freeze_hours"`
-	WithdrawalMinMinor        int64                      `json:"withdrawal_min_cny_minor"`
-	WithdrawalDailyLimit      int                        `json:"withdrawal_daily_limit"`
-	TeamVolumeMinor           int64                      `json:"team_volume_cny_minor"`
-	CurrentTier               int                        `json:"current_tier"`
-	AutoTier                  int                        `json:"auto_tier"`
-	TierOverride              *int                       `json:"tier_override,omitempty"`
-	NextThreshold             int64                      `json:"next_threshold_cny_minor"`
-	LevelCounts               map[int]int64              `json:"level_counts"`
-	Levels                    []DistributionLevelSummary `json:"levels"`
-	AvailableMinor            int64                      `json:"available_cny_minor"`
-	FrozenMinor               int64                      `json:"frozen_cny_minor"`
-	WithdrawingMinor          int64                      `json:"withdrawing_cny_minor"`
-	DebtMinor                 int64                      `json:"debt_cny_minor"`
-	LifetimeMinor             int64                      `json:"lifetime_earned_cny_minor"`
-	Tiers                     []DistributionTier         `json:"tiers"`
+	Enabled                   bool   `json:"enabled"`
+	BalanceRechargeMultiplier string `json:"balance_recharge_multiplier"`
+	USDToCNYRate              string `json:"usd_to_cny_rate"`
+	CommissionFreezeHours     int    `json:"commission_freeze_hours"`
+	WithdrawalMinMinor        int64  `json:"withdrawal_min_cny_minor"`
+	WithdrawalDailyLimit      int    `json:"withdrawal_daily_limit"`
+	// InviteeCount = 直接邀请人数；InviteeSpendMinor = 这些人在商城的实付总额。
+	InviteeCount      int64 `json:"invitee_count"`
+	InviteeSpendMinor int64 `json:"team_volume_cny_minor"`
+	AvailableMinor    int64 `json:"available_cny_minor"`
+	FrozenMinor       int64 `json:"frozen_cny_minor"`
+	WithdrawingMinor  int64 `json:"withdrawing_cny_minor"`
+	DebtMinor         int64 `json:"debt_cny_minor"`
+	LifetimeMinor     int64 `json:"lifetime_earned_cny_minor"`
 }
 
 type DistributionAnalyticsPoint struct {
 	Date            string `json:"date"`
-	RechargeMinor   int64  `json:"recharge_cny_minor"`
+	SpendMinor      int64  `json:"spend_cny_minor"`
 	CommissionMinor int64  `json:"commission_cny_minor"`
 }
 
 type DistributionAnalyticsSummary struct {
-	RechargeMinor           int64   `json:"recharge_cny_minor"`
+	SpendMinor              int64   `json:"spend_cny_minor"`
 	CommissionMinor         int64   `json:"commission_cny_minor"`
-	PreviousRechargeMinor   int64   `json:"previous_recharge_cny_minor"`
+	PreviousSpendMinor      int64   `json:"previous_spend_cny_minor"`
 	PreviousCommissionMinor int64   `json:"previous_commission_cny_minor"`
-	RechargeGrowthPercent   float64 `json:"recharge_growth_percent"`
+	SpendGrowthPercent      float64 `json:"spend_growth_percent"`
 	CommissionGrowthPercent float64 `json:"commission_growth_percent"`
 }
 
 type DistributionForecastHorizon struct {
 	Eligible                 bool    `json:"eligible"`
 	Reason                   string  `json:"reason,omitempty"`
-	EstimatedRechargeMinor   int64   `json:"estimated_recharge_cny_minor"`
+	EstimatedSpendMinor      int64   `json:"estimated_spend_cny_minor"`
 	EstimatedCommissionMinor int64   `json:"estimated_commission_cny_minor"`
-	RechargeGrowthPercent    float64 `json:"recharge_growth_percent"`
+	SpendGrowthPercent       float64 `json:"spend_growth_percent"`
 	CommissionGrowthPercent  float64 `json:"commission_growth_percent"`
 }
 
@@ -97,29 +110,13 @@ type DistributionAnalytics struct {
 	Forecast  DistributionForecast         `json:"forecast"`
 }
 
-type DistributionLevelSummary struct {
-	Depth           int   `json:"depth"`
-	MemberCount     int64 `json:"member_count"`
-	RechargeMinor   int64 `json:"recharge_cny_minor"`
-	CommissionMinor int64 `json:"commission_cny_minor"`
-	AvailableMinor  int64 `json:"available_cny_minor"`
-	FrozenMinor     int64 `json:"frozen_cny_minor"`
-}
-
-type DistributionTier struct {
-	Tier      int      `json:"tier"`
-	Threshold int64    `json:"threshold_cny_minor"`
-	RatesBPS  [5]int64 `json:"rates_bps"`
-}
-
 type DistributionPolicyInput struct {
-	CommissionFreezeHours int                `json:"commission_freeze_hours"`
-	WithdrawalMinMinor    int64              `json:"withdrawal_min_cny_minor"`
-	WithdrawalDailyLimit  int                `json:"withdrawal_daily_limit"`
-	WithdrawalFeeBPS      int                `json:"withdrawal_fee_bps"`
-	FirstRechargeBonusBPS int                `json:"first_recharge_bonus_bps"`
-	FirstRechargeBonusCap string             `json:"first_recharge_bonus_cap_usd"`
-	Tiers                 []DistributionTier `json:"tiers"`
+	CommissionFreezeHours int    `json:"commission_freeze_hours"`
+	WithdrawalMinMinor    int64  `json:"withdrawal_min_cny_minor"`
+	WithdrawalDailyLimit  int    `json:"withdrawal_daily_limit"`
+	WithdrawalFeeBPS      int    `json:"withdrawal_fee_bps"`
+	FirstRechargeBonusBPS int    `json:"first_recharge_bonus_bps"`
+	FirstRechargeBonusCap string `json:"first_recharge_bonus_cap_usd"`
 }
 
 type DistributionConversion struct {
@@ -134,20 +131,25 @@ type DistributionConversion struct {
 }
 
 type DistributionTreeNode struct {
-	UserID          int64  `json:"user_id"`
-	ParentUserID    int64  `json:"parent_user_id"`
-	EmailMasked     string `json:"email_masked"`
-	Username        string `json:"username"`
-	DirectChildren  int64  `json:"direct_children"`
-	TeamVolumeMinor int64  `json:"team_volume_cny_minor"`
-	CurrentTier     int    `json:"current_tier"`
-	AutoTier        int    `json:"auto_tier"`
-	TierOverride    *int   `json:"tier_override,omitempty"`
-	EffectiveTier   int    `json:"effective_tier"`
+	UserID         int64  `json:"user_id"`
+	ParentUserID   int64  `json:"parent_user_id"`
+	EmailMasked    string `json:"email_masked"`
+	Username       string `json:"username"`
+	DirectChildren int64  `json:"direct_children"`
+	// TeamVolumeMinor 是这名直属邀请成员在商城的实付总额（人民币 minor）。
+	// 返佣没有档位，这里只是「他贡献了多少业绩」的展示字段。
+	TeamVolumeMinor int64 `json:"team_volume_cny_minor"`
 }
 
+// DistributionCommission 是佣金明细的一行。
+//
+// 返点现在只有两个可能的来源，用 Source 区分（两表的自增 id 会重号，
+// 前端必须用 source + id 组合做 key）：
+//   - "shop"         商城订单佣金（shop_commission_records，当前唯一在写入的表）
+//   - "distribution" 历史充值返佣（distribution_commissions，已停止写入，仅留痕）
 type DistributionCommission struct {
 	ID              int64     `json:"id"`
+	Source          string    `json:"source"`
 	SourceOrderID   int64     `json:"source_order_id"`
 	SourceUserID    int64     `json:"source_user_id"`
 	Depth           int       `json:"depth"`
@@ -166,14 +168,17 @@ type AdminDistributionCommission struct {
 	BeneficiaryUserID int64 `json:"beneficiary_user_id"`
 }
 
-type DistributionTierAssignment struct {
-	UserID          int64  `json:"user_id"`
-	Email           string `json:"email"`
-	Username        string `json:"username"`
-	TeamVolumeMinor int64  `json:"team_volume_cny_minor"`
-	AutoTier        int    `json:"auto_tier"`
-	TierOverride    *int   `json:"tier_override,omitempty"`
-	EffectiveTier   int    `json:"effective_tier"`
+// AdminDistributionMember 是后台「推广成员」列表的一行：只有真正做过推广
+// （直接邀请过至少 1 人）的用户才会出现。没有档位，只有人数、业绩与钱包余额。
+type AdminDistributionMember struct {
+	UserID            int64  `json:"user_id"`
+	Email             string `json:"email"`
+	Username          string `json:"username"`
+	InviteeCount      int64  `json:"invitee_count"`
+	InviteeSpendMinor int64  `json:"team_volume_cny_minor"`
+	AvailableMinor    int64  `json:"available_cny_minor"`
+	FrozenMinor       int64  `json:"frozen_cny_minor"`
+	LifetimeMinor     int64  `json:"lifetime_earned_cny_minor"`
 }
 
 type DistributionRechargeEvent struct {
@@ -277,14 +282,6 @@ func (s *DistributionService) ProgramConfig(ctx context.Context) (map[string]any
 	if err != nil {
 		return nil, err
 	}
-	var programID int64
-	if err := s.db.QueryRowContext(ctx, `SELECT id FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company'`).Scan(&programID); err != nil {
-		return nil, err
-	}
-	tiers, err := loadDistributionTiersDB(ctx, s.db, programID, version)
-	if err != nil {
-		return nil, err
-	}
 	multiplier, err := s.balanceRechargeMultiplier(ctx)
 	if err != nil {
 		return nil, err
@@ -293,7 +290,7 @@ func (s *DistributionService) ProgramConfig(ctx context.Context) (map[string]any
 		"enabled": enabled, "stack_with_legacy": false, "commission_freeze_hours": freezeHours,
 		"withdrawal_min_cny_minor": minimum, "withdrawal_daily_limit": dailyLimit,
 		"withdrawal_fee_bps": feeBPS, "first_recharge_bonus_bps": bonusBPS,
-		"first_recharge_bonus_cap_usd": bonusCap, "current_config_version": version, "tiers": tiers,
+		"first_recharge_bonus_cap_usd": bonusCap, "current_config_version": version,
 		"balance_recharge_multiplier": multiplier.String(),
 		// Kept for clients that still read the legacy field. New conversions use
 		// the explicit CNY-to-USD multiplier above.
@@ -359,29 +356,11 @@ func (s *DistributionService) CreatePolicyVersion(ctx context.Context, operatorI
 		return 0, err
 	}
 	version := currentVersion + 1
-	for _, tier := range input.Tiers {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO distribution_tier_configs (program_id, config_version, tier, threshold_cny_minor, level1_bps, level2_bps, level3_bps, level4_bps, level5_bps) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`, programID, version, tier.Tier, tier.Threshold, tier.RatesBPS[0], tier.RatesBPS[1], tier.RatesBPS[2], tier.RatesBPS[3], tier.RatesBPS[4]); err != nil {
-			return 0, err
-		}
-	}
+	// 政策版本只承载提现规则与冻结期：返佣比例归商品，不再有档位配置。
 	if _, err := tx.ExecContext(ctx, `INSERT INTO distribution_policy_versions (program_id, config_version, commission_freeze_hours, withdrawal_min_cny_minor, withdrawal_daily_limit, withdrawal_fee_bps, first_recharge_bonus_bps, first_recharge_bonus_cap_usd, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`, programID, version, input.CommissionFreezeHours, input.WithdrawalMinMinor, input.WithdrawalDailyLimit, input.WithdrawalFeeBPS, input.FirstRechargeBonusBPS, bonusCap.String(), operatorID); err != nil {
 		return 0, err
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE distribution_programs SET commission_freeze_hours = $2, withdrawal_min_cny_minor = $3, withdrawal_daily_limit = $4, withdrawal_fee_bps = $5, first_recharge_bonus_bps = $6, first_recharge_bonus_cap_usd = $7, current_config_version = $8, updated_at = NOW() WHERE id = $1`, programID, input.CommissionFreezeHours, input.WithdrawalMinMinor, input.WithdrawalDailyLimit, input.WithdrawalFeeBPS, input.FirstRechargeBonusBPS, bonusCap.String(), version); err != nil {
-		return 0, err
-	}
-	if _, err := tx.ExecContext(ctx, `
-UPDATE distribution_members m
-SET current_tier = COALESCE((
-    SELECT t.tier
-    FROM distribution_tier_configs t
-    WHERE t.program_id = m.program_id
-      AND t.config_version = $2
-      AND t.threshold_cny_minor <= m.team_volume_cny_minor
-    ORDER BY t.threshold_cny_minor DESC
-    LIMIT 1
-), 0), updated_at = NOW()
-WHERE m.program_id = $1`, programID, version); err != nil {
 		return 0, err
 	}
 	if err := insertFinancialOutboxEvent(ctx, tx, "distribution_policy", strconv.Itoa(version), "distribution.policy_version_created", fmt.Sprintf("distribution-policy:%d", version), map[string]any{"operator_user_id": operatorID, "config_version": version}); err != nil {
@@ -429,9 +408,9 @@ func (s *DistributionService) ProcessRecharge(ctx context.Context, orderID, user
 	}
 	var programID int64
 	var enabled, stack bool
-	var freezeHours, configVersion, bonusBPS int
+	var configVersion, bonusBPS int
 	var bonusCapRaw string
-	err = tx.QueryRowContext(ctx, `SELECT id, enabled, stack_with_legacy, commission_freeze_hours, current_config_version, first_recharge_bonus_bps, first_recharge_bonus_cap_usd::text FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company' FOR SHARE`).Scan(&programID, &enabled, &stack, &freezeHours, &configVersion, &bonusBPS, &bonusCapRaw)
+	err = tx.QueryRowContext(ctx, `SELECT id, enabled, stack_with_legacy, current_config_version, first_recharge_bonus_bps, first_recharge_bonus_cap_usd::text FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company' FOR SHARE`).Scan(&programID, &enabled, &stack, &configVersion, &bonusBPS, &bonusCapRaw)
 	if errors.Is(err, sql.ErrNoRows) || !enabled {
 		return DistributionProcessResult{Enabled: false, StackWithLegacy: false}, nil
 	}
@@ -482,110 +461,15 @@ ON CONFLICT (program_id, source_order_id) DO NOTHING
 		}
 	}
 
-	tiers, err := loadDistributionTiers(ctx, tx, programID, configVersion)
-	if err != nil {
-		return result, err
-	}
-	rows, err := tx.QueryContext(ctx, `
-UPDATE distribution_members
-SET team_volume_cny_minor = team_volume_cny_minor + $2, updated_at = NOW()
-WHERE program_id = $1 AND user_id IN (
-    SELECT ancestor_user_id FROM distribution_relations WHERE program_id = $1 AND descendant_user_id = $3 AND depth BETWEEN 0 AND 5
-)
-	RETURNING user_id, team_volume_cny_minor, team_volume_cny_minor - $2 AS previous_team_volume_cny_minor, tier_override`, programID, baseMinor, userID)
-	if err != nil {
-		return result, err
-	}
-	volumes := make(map[int64]int64)
-	previousVolumes := make(map[int64]int64)
-	overrides := make(map[int64]int)
-	for rows.Next() {
-		var memberID, volume, previousVolume int64
-		var override sql.NullInt64
-		if err := rows.Scan(&memberID, &volume, &previousVolume, &override); err != nil {
-			_ = rows.Close()
-			return result, err
-		}
-		volumes[memberID] = volume
-		previousVolumes[memberID] = previousVolume
-		if override.Valid {
-			overrides[memberID] = int(override.Int64)
-		}
-	}
-	if err := rows.Close(); err != nil {
-		return result, err
-	}
-	for memberID, volume := range volumes {
-		tier := tierForVolume(tiers, volume)
-		if _, err := tx.ExecContext(ctx, `UPDATE distribution_members SET current_tier = $3::smallint, activated_at = COALESCE(activated_at, NOW()) WHERE program_id = $1 AND user_id = $2`, programID, memberID, tier); err != nil {
-			return result, err
-		}
-	}
-
-	ancestorRows, err := tx.QueryContext(ctx, `
-SELECT r.ancestor_user_id, r.depth
-FROM distribution_relations r
-WHERE r.program_id = $1 AND r.descendant_user_id = $2 AND r.depth BETWEEN 1 AND 5
-ORDER BY r.depth`, programID, userID)
-	if err != nil {
-		return result, err
-	}
-	type ancestor struct {
-		userID int64
-		depth  int
-	}
-	ancestors := make([]ancestor, 0, 5)
-	for ancestorRows.Next() {
-		var item ancestor
-		if err := ancestorRows.Scan(&item.userID, &item.depth); err != nil {
-			_ = ancestorRows.Close()
-			return result, err
-		}
-		ancestors = append(ancestors, item)
-	}
-	_ = ancestorRows.Close()
-	tierByID := make(map[int]DistributionTier, len(tiers))
-	for _, tier := range tiers {
-		tierByID[tier.Tier] = tier
-	}
-	for _, ancestor := range ancestors {
-		// Promotions affect subsequent recharges only. The current order uses
-		// the beneficiary's pre-recharge volume; the post-recharge volume above
-		// remains the new automatic tier for later orders.
-		volume := previousVolumes[ancestor.userID]
-		var overrideTier *int
-		if override, ok := overrides[ancestor.userID]; ok {
-			overrideTier = &override
-		}
-		tier := commissionTierForRecharge(tiers, volume, overrideTier)
-		tierConfig, ok := tierByID[tier]
-		if !ok || ancestor.depth < 1 || ancestor.depth > len(tierConfig.RatesBPS) {
-			continue
-		}
-		rateBPS := tierConfig.RatesBPS[ancestor.depth-1]
-		if rateBPS <= 0 {
-			continue
-		}
-		amountMinor := calculateCommissionMinor(baseMinor, rateBPS)
-		if amountMinor <= 0 {
-			continue
-		}
-		var commissionID int64
-		err := tx.QueryRowContext(ctx, `
-INSERT INTO distribution_commissions (program_id, tenant_id, source_order_id, source_user_id, beneficiary_user_id, depth, tier, rate_bps, base_cny_minor, amount_cny_minor, team_volume_cny_minor, config_version, frozen_until)
-VALUES ($1, 1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW() + make_interval(hours => $12))
-ON CONFLICT (program_id, source_order_id, beneficiary_user_id, depth) DO NOTHING
-RETURNING id`, programID, orderID, userID, ancestor.userID, ancestor.depth, tier, rateBPS, baseMinor, amountMinor, volume, configVersion, freezeHours).Scan(&commissionID)
-		if errors.Is(err, sql.ErrNoRows) {
-			continue
-		}
-		if err != nil {
-			return result, err
-		}
-		if err := creditDistributionWalletTx(ctx, tx, programID, ancestor.userID, amountMinor, "commission_frozen", "distribution_commission", commissionID); err != nil {
-			return result, err
-		}
-	}
+	// 余额充值不再产生推广佣金。
+	//
+	// 返佣只有一个来源：被购买商品上架时设置的返佣比例，由商城服务
+	// （shop_service.issueCommissionTx）在订单支付成功时按商品快照结算。
+	// 这里只保留充值事件本身：它承担首充奖励的幂等判断、冲正审计与后台查询，
+	// 不再展开邀请关系、不再累计团队业绩、不再写档位、不再发放任何佣金。
+	//
+	// 历史数据不受影响：distribution_commissions 与 distribution_recharge_events
+	// 里已有的记录照旧可查、可冲正。
 	if _, err := tx.ExecContext(ctx, `INSERT INTO financial_outbox_events (tenant_id, aggregate_type, aggregate_id, event_type, payload, idempotency_key) VALUES (1, 'distribution_recharge', $1, 'distribution.recharge_processed', jsonb_build_object('order_id', $2::bigint, 'user_id', $3::bigint), $4) ON CONFLICT DO NOTHING`, strconv.FormatInt(eventID, 10), orderID, userID, fmt.Sprintf("distribution-recharge:%d", orderID)); err != nil {
 		return result, err
 	}
@@ -606,15 +490,12 @@ func (s *DistributionService) ReverseRecharge(ctx context.Context, eventID, oper
 
 	var programID, orderID, userID, baseMinor int64
 	var creditedRaw, bonusRaw, status string
-	var currentConfigVersion int
 	err = tx.QueryRowContext(ctx, `
 SELECT e.program_id, e.source_order_id, e.user_id, e.base_cny_minor,
-       e.credited_usd::text, e.first_recharge_bonus_usd::text, e.status,
-       p.current_config_version
+       e.credited_usd::text, e.first_recharge_bonus_usd::text, e.status
 FROM distribution_recharge_events e
-JOIN distribution_programs p ON p.id = e.program_id
 WHERE e.id = $1
-FOR UPDATE OF e`, eventID).Scan(&programID, &orderID, &userID, &baseMinor, &creditedRaw, &bonusRaw, &status, &currentConfigVersion)
+FOR UPDATE OF e`, eventID).Scan(&programID, &orderID, &userID, &baseMinor, &creditedRaw, &bonusRaw, &status)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, infraerrors.NotFound("DISTRIBUTION_RECHARGE_NOT_FOUND", "distribution recharge event not found")
 	}
@@ -686,39 +567,8 @@ ORDER BY user_id`, userID, orderID, programID)
 		return nil, err
 	}
 
-	tiers, err := loadDistributionTiers(ctx, tx, programID, currentConfigVersion)
-	if err != nil {
-		return nil, err
-	}
-	volumeRows, err := tx.QueryContext(ctx, `
-UPDATE distribution_members
-SET team_volume_cny_minor = GREATEST(team_volume_cny_minor - $2, 0), updated_at = NOW()
-WHERE program_id = $1 AND user_id IN (
-    SELECT ancestor_user_id FROM distribution_relations
-    WHERE program_id = $1 AND descendant_user_id = $3 AND depth BETWEEN 0 AND 5
-)
-RETURNING user_id, team_volume_cny_minor`, programID, baseMinor, userID)
-	if err != nil {
-		return nil, err
-	}
-	volumes := make(map[int64]int64)
-	for volumeRows.Next() {
-		var memberID, volume int64
-		if err := volumeRows.Scan(&memberID, &volume); err != nil {
-			_ = volumeRows.Close()
-			return nil, err
-		}
-		volumes[memberID] = volume
-	}
-	if err := volumeRows.Close(); err != nil {
-		return nil, err
-	}
-	for memberID, volume := range volumes {
-		if _, err := tx.ExecContext(ctx, `UPDATE distribution_members SET current_tier = $3::smallint, updated_at = NOW() WHERE program_id = $1 AND user_id = $2`, programID, memberID, tierForVolume(tiers, volume)); err != nil {
-			return nil, err
-		}
-	}
-
+	// 余额充值不再产生推广佣金，也不再累计「团队业绩 / 档位」，
+	// 所以冲正只需要退回额度 + 首充奖励，以及回收历史（充值返佣时期）可能存在的佣金。
 	type commissionReversalItem struct {
 		id, beneficiaryUserID, amountMinor int64
 		status                             string
@@ -779,103 +629,26 @@ RETURNING id`, programID, eventID, orderID, userID, reversalType, baseMinor, cre
 }
 
 func (s *DistributionService) Dashboard(ctx context.Context, userID int64) (*DistributionDashboard, error) {
-	dashboard := &DistributionDashboard{
-		LevelCounts: map[int]int64{},
-		Levels:      make([]DistributionLevelSummary, 5),
-		Tiers:       []DistributionTier{},
-	}
-	for depth := 1; depth <= 5; depth++ {
-		dashboard.Levels[depth-1].Depth = depth
-	}
+	dashboard := &DistributionDashboard{}
 	var programID int64
 	err := s.db.QueryRowContext(ctx, `SELECT id, enabled, commission_freeze_hours, withdrawal_min_cny_minor, withdrawal_daily_limit FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company'`).Scan(&programID, &dashboard.Enabled, &dashboard.CommissionFreezeHours, &dashboard.WithdrawalMinMinor, &dashboard.WithdrawalDailyLimit)
 	if err != nil {
 		return nil, err
 	}
-	var override sql.NullInt64
-	if err := s.db.QueryRowContext(ctx, `SELECT team_volume_cny_minor, current_tier, tier_override FROM distribution_members WHERE program_id = $1 AND user_id = $2`, programID, userID).Scan(&dashboard.TeamVolumeMinor, &dashboard.AutoTier, &override); err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, err
-	}
-	if override.Valid {
-		tier := int(override.Int64)
-		dashboard.TierOverride = &tier
-		dashboard.CurrentTier = tier
-	} else {
-		dashboard.CurrentTier = dashboard.AutoTier
-	}
-	rows, err := s.db.QueryContext(ctx, `SELECT depth, COUNT(*) FROM distribution_relations WHERE program_id = $1 AND ancestor_user_id = $2 AND depth BETWEEN 1 AND 5 GROUP BY depth`, programID, userID)
-	if err != nil {
-		return nil, err
-	}
-	for rows.Next() {
-		var depth int
-		var count int64
-		if err := rows.Scan(&depth, &count); err != nil {
-			_ = rows.Close()
-			return nil, err
-		}
-		dashboard.LevelCounts[depth] = count
-	}
-	_ = rows.Close()
-	rechargeRows, err := s.db.QueryContext(ctx, `
-SELECT r.depth, COUNT(DISTINCT r.descendant_user_id), COALESCE(SUM(e.base_cny_minor), 0)
-FROM distribution_relations r
-LEFT JOIN distribution_recharge_events e
-  ON e.program_id = r.program_id
- AND e.user_id = r.descendant_user_id
- AND e.status = 'APPLIED'
-WHERE r.program_id = $1 AND r.ancestor_user_id = $2 AND r.depth BETWEEN 1 AND 5
-GROUP BY r.depth`, programID, userID)
-	if err != nil {
-		return nil, err
-	}
-	for rechargeRows.Next() {
-		var depth int
-		var memberCount, rechargeMinor int64
-		if err := rechargeRows.Scan(&depth, &memberCount, &rechargeMinor); err != nil {
-			_ = rechargeRows.Close()
-			return nil, err
-		}
-		if depth >= 1 && depth <= 5 {
-			dashboard.Levels[depth-1].MemberCount = memberCount
-			dashboard.Levels[depth-1].RechargeMinor = rechargeMinor
-		}
-	}
-	if err := rechargeRows.Close(); err != nil {
-		return nil, err
-	}
-	commissionRows, err := s.db.QueryContext(ctx, `
-SELECT depth,
-       COALESCE(SUM(CASE WHEN status <> 'REVERSED' THEN amount_cny_minor ELSE 0 END), 0),
-       COALESCE(SUM(CASE WHEN status = 'AVAILABLE' THEN amount_cny_minor ELSE 0 END), 0),
-       COALESCE(SUM(CASE WHEN status = 'FROZEN' THEN amount_cny_minor ELSE 0 END), 0)
-FROM distribution_commissions
-WHERE program_id = $1 AND beneficiary_user_id = $2 AND depth BETWEEN 1 AND 5
-GROUP BY depth`, programID, userID)
-	if err != nil {
-		return nil, err
-	}
-	for commissionRows.Next() {
-		var depth int
-		var commissionMinor, availableMinor, frozenMinor int64
-		if err := commissionRows.Scan(&depth, &commissionMinor, &availableMinor, &frozenMinor); err != nil {
-			_ = commissionRows.Close()
-			return nil, err
-		}
-		if depth >= 1 && depth <= 5 {
-			dashboard.Levels[depth-1].CommissionMinor = commissionMinor
-			dashboard.Levels[depth-1].AvailableMinor = availableMinor
-			dashboard.Levels[depth-1].FrozenMinor = frozenMinor
-		}
-	}
-	if err := commissionRows.Close(); err != nil {
+	// 邀请业绩与返佣全部来自商城订单：返佣比例是商品上架时设置的，
+	// 所以这里没有任何「档位 / 团队业绩 / 层级构成」的概念，
+	// 也不再读 distribution_members（那张表只服务已下线的充值返佣）。
+	if err := s.db.QueryRowContext(ctx, `
+SELECT (SELECT COUNT(*) FROM user_affiliates WHERE inviter_id = $1),
+       COALESCE((
+           SELECT SUM(o.payable_cny_minor)
+           FROM shop_orders o
+           JOIN user_affiliates ua ON ua.user_id = o.user_id AND ua.inviter_id = $1
+           WHERE o.tenant_id = 1 AND o.status IN ('paid', 'fulfilled')
+       ), 0)`, userID).Scan(&dashboard.InviteeCount, &dashboard.InviteeSpendMinor); err != nil {
 		return nil, err
 	}
 	if err := s.db.QueryRowContext(ctx, `SELECT available_cny_minor, frozen_cny_minor, withdrawing_cny_minor, debt_cny_minor, lifetime_earned_cny_minor FROM distribution_cash_wallets WHERE program_id = $1 AND user_id = $2`, programID, userID).Scan(&dashboard.AvailableMinor, &dashboard.FrozenMinor, &dashboard.WithdrawingMinor, &dashboard.DebtMinor, &dashboard.LifetimeMinor); err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, err
-	}
-	tierRows, err := s.db.QueryContext(ctx, `SELECT tier, threshold_cny_minor, level1_bps, level2_bps, level3_bps, level4_bps, level5_bps FROM distribution_tier_configs WHERE program_id = $1 AND config_version = (SELECT current_config_version FROM distribution_programs WHERE id = $1) ORDER BY tier`, programID)
-	if err != nil {
 		return nil, err
 	}
 	multiplier, err := s.balanceRechargeMultiplier(ctx)
@@ -884,65 +657,47 @@ GROUP BY depth`, programID, userID)
 	}
 	dashboard.BalanceRechargeMultiplier = multiplier.String()
 	dashboard.USDToCNYRate = decimal.NewFromInt(1).Div(multiplier).String()
-	for tierRows.Next() {
-		var tier DistributionTier
-		if err := tierRows.Scan(&tier.Tier, &tier.Threshold, &tier.RatesBPS[0], &tier.RatesBPS[1], &tier.RatesBPS[2], &tier.RatesBPS[3], &tier.RatesBPS[4]); err != nil {
-			_ = tierRows.Close()
-			return nil, err
-		}
-		dashboard.Tiers = append(dashboard.Tiers, tier)
-		if tier.Threshold > dashboard.TeamVolumeMinor && dashboard.NextThreshold == 0 {
-			dashboard.NextThreshold = tier.Threshold
-		}
-	}
-	return dashboard, tierRows.Close()
+	return dashboard, nil
 }
 
 func (s *DistributionService) Analytics(ctx context.Context, userID int64, days int) (*DistributionAnalytics, error) {
 	if days != 7 && days != 30 && days != 90 {
 		days = 30
 	}
-	var programID int64
-	if err := s.db.QueryRowContext(ctx, `SELECT id FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company'`).Scan(&programID); err != nil {
-		return nil, err
-	}
-
 	end := time.Now().UTC().Truncate(24 * time.Hour).Add(24 * time.Hour)
 	start := end.Add(-time.Duration(days*2) * 24 * time.Hour)
+	// 趋势同样只看商城：spend = 你直接邀请的人在商城的实付额（payable，抵扣部分不计），
+	// commission = 这些订单按商品返佣比例结给你的佣金。不涉任何档位与充值返佣。
 	rows, err := s.db.QueryContext(ctx, `
 WITH day_grid AS (
     SELECT generate_series($2::timestamptz, $3::timestamptz - INTERVAL '1 day', INTERVAL '1 day')::date AS day
-), recharge_totals AS (
-    SELECT (e.created_at AT TIME ZONE 'UTC')::date AS day,
-           COALESCE(SUM(e.base_cny_minor), 0)::bigint AS recharge_cny_minor
-    FROM distribution_recharge_events e
-    JOIN distribution_relations r
-      ON r.program_id = e.program_id
-     AND r.descendant_user_id = e.user_id
-     AND r.ancestor_user_id = $4
-     AND r.depth BETWEEN 1 AND 5
-    WHERE e.program_id = $1
-      AND e.status = 'APPLIED'
-      AND e.created_at >= $2
-      AND e.created_at < $3
+), spend_totals AS (
+    SELECT (o.paid_at AT TIME ZONE 'UTC')::date AS day,
+           COALESCE(SUM(o.payable_cny_minor), 0)::bigint AS spend_cny_minor
+    FROM shop_orders o
+    JOIN user_affiliates ua ON ua.user_id = o.user_id AND ua.inviter_id = $1
+    WHERE o.tenant_id = 1
+      AND o.status IN ('paid', 'fulfilled')
+      AND o.paid_at >= $2
+      AND o.paid_at < $3
     GROUP BY 1
 ), commission_totals AS (
     SELECT (c.created_at AT TIME ZONE 'UTC')::date AS day,
            COALESCE(SUM(CASE WHEN c.status <> 'REVERSED' THEN c.amount_cny_minor ELSE 0 END), 0)::bigint AS commission_cny_minor
-    FROM distribution_commissions c
-    WHERE c.program_id = $1
-      AND c.beneficiary_user_id = $4
+    FROM shop_commission_records c
+    WHERE c.tenant_id = 1
+      AND c.beneficiary_user_id = $1
       AND c.created_at >= $2
       AND c.created_at < $3
     GROUP BY 1
 )
 SELECT TO_CHAR(g.day, 'YYYY-MM-DD'),
-       COALESCE(r.recharge_cny_minor, 0),
+       COALESCE(s.spend_cny_minor, 0),
        COALESCE(c.commission_cny_minor, 0)
 FROM day_grid g
-LEFT JOIN recharge_totals r ON r.day = g.day
+LEFT JOIN spend_totals s ON s.day = g.day
 LEFT JOIN commission_totals c ON c.day = g.day
-ORDER BY g.day`, programID, start, end, userID)
+ORDER BY g.day`, userID, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -950,7 +705,7 @@ ORDER BY g.day`, programID, start, end, userID)
 	allSeries := make([]DistributionAnalyticsPoint, 0, days*2)
 	for rows.Next() {
 		var point DistributionAnalyticsPoint
-		if err := rows.Scan(&point.Date, &point.RechargeMinor, &point.CommissionMinor); err != nil {
+		if err := rows.Scan(&point.Date, &point.SpendMinor, &point.CommissionMinor); err != nil {
 			return nil, err
 		}
 		allSeries = append(allSeries, point)
@@ -965,14 +720,14 @@ ORDER BY g.day`, programID, start, end, userID)
 	previous := allSeries[:len(allSeries)-days]
 	summary := DistributionAnalyticsSummary{}
 	for _, point := range current {
-		summary.RechargeMinor += point.RechargeMinor
+		summary.SpendMinor += point.SpendMinor
 		summary.CommissionMinor += point.CommissionMinor
 	}
 	for _, point := range previous {
-		summary.PreviousRechargeMinor += point.RechargeMinor
+		summary.PreviousSpendMinor += point.SpendMinor
 		summary.PreviousCommissionMinor += point.CommissionMinor
 	}
-	summary.RechargeGrowthPercent = growthPercent(summary.RechargeMinor, summary.PreviousRechargeMinor)
+	summary.SpendGrowthPercent = growthPercent(summary.SpendMinor, summary.PreviousSpendMinor)
 	summary.CommissionGrowthPercent = growthPercent(summary.CommissionMinor, summary.PreviousCommissionMinor)
 	return &DistributionAnalytics{
 		AsOf:      time.Now().UTC(),
@@ -1000,7 +755,7 @@ func growthPercent(current, previous int64) float64 {
 func forecastHorizon(series []DistributionAnalyticsPoint, horizon, minimumActiveDays int) DistributionForecastHorizon {
 	activeDays := 0
 	for _, point := range series {
-		if point.RechargeMinor > 0 || point.CommissionMinor > 0 {
+		if point.SpendMinor > 0 || point.CommissionMinor > 0 {
 			activeDays++
 		}
 	}
@@ -1017,13 +772,13 @@ func forecastHorizon(series []DistributionAnalyticsPoint, horizon, minimumActive
 	if recentWindow > len(series) {
 		recentWindow = len(series)
 	}
-	recharge, rechargeGrowth := projectMetric(series, recentWindow, horizon, func(point DistributionAnalyticsPoint) int64 { return point.RechargeMinor })
+	recharge, rechargeGrowth := projectMetric(series, recentWindow, horizon, func(point DistributionAnalyticsPoint) int64 { return point.SpendMinor })
 	commission, commissionGrowth := projectMetric(series, recentWindow, horizon, func(point DistributionAnalyticsPoint) int64 { return point.CommissionMinor })
 	return DistributionForecastHorizon{
 		Eligible:                 true,
-		EstimatedRechargeMinor:   recharge,
+		EstimatedSpendMinor:      recharge,
 		EstimatedCommissionMinor: commission,
-		RechargeGrowthPercent:    rechargeGrowth,
+		SpendGrowthPercent:       rechargeGrowth,
 		CommissionGrowthPercent:  commissionGrowth,
 	}
 }
@@ -1070,32 +825,29 @@ func (s *DistributionService) Tree(ctx context.Context, ownerUserID, parentUserI
 	if pageSize < 1 || pageSize > 100 {
 		pageSize = 20
 	}
-	var programID int64
-	if err := s.db.QueryRowContext(ctx, `SELECT id FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company'`).Scan(&programID); err != nil {
-		return nil, 0, err
-	}
 	if parentUserID != ownerUserID {
-		var allowed bool
-		if err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM distribution_relations WHERE program_id = $1 AND ancestor_user_id = $2 AND descendant_user_id = $3 AND depth BETWEEN 1 AND 5)`, programID, ownerUserID, parentUserID).Scan(&allowed); err != nil || !allowed {
-			if err != nil {
-				return nil, 0, err
-			}
-			return nil, 0, infraerrors.Forbidden("DISTRIBUTION_TREE_FORBIDDEN", "tree node is outside your team")
-		}
+		// 推广计划已收敛为单层：只展示「我直接邀请的人」，不再支持下钻更深的层级。
+		// 下钻会暴露第二代伙伴，与单层叙事不符，也会诱发多层分销的预期。
+		return nil, 0, infraerrors.Forbidden("DISTRIBUTION_TREE_FORBIDDEN", "team drilling is disabled for the single-level promotion program")
 	}
 	pattern := "%" + strings.TrimSpace(search) + "%"
 	var total int64
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM user_affiliates ua JOIN users u ON u.id = ua.user_id WHERE ua.inviter_id = $1 AND ($2 = '%%' OR u.email ILIKE $2 OR u.username ILIKE $2)`, parentUserID, pattern).Scan(&total); err != nil {
 		return nil, 0, err
 	}
+	// 业绩（team_volume）直接取这名成员在商城的实付额；不再读 distribution_members，
+	// 因为那张表只承载已下线的「充值返佣 + 档位」语义。
 	rows, err := s.db.QueryContext(ctx, `
 SELECT u.id, $1::bigint, u.email, u.username,
        (SELECT COUNT(*) FROM user_affiliates c WHERE c.inviter_id = u.id),
-       COALESCE(dm.team_volume_cny_minor, 0), COALESCE(dm.current_tier, 0), dm.tier_override
+       COALESCE((
+           SELECT SUM(o.payable_cny_minor)
+           FROM shop_orders o
+           WHERE o.tenant_id = 1 AND o.user_id = u.id AND o.status IN ('paid', 'fulfilled')
+       ), 0)
 FROM user_affiliates ua JOIN users u ON u.id = ua.user_id
-LEFT JOIN distribution_members dm ON dm.program_id = $2 AND dm.user_id = u.id
-WHERE ua.inviter_id = $1 AND ($3 = '%%' OR u.email ILIKE $3 OR u.username ILIKE $3)
-ORDER BY u.id LIMIT $4 OFFSET $5`, parentUserID, programID, pattern, pageSize, (page-1)*pageSize)
+WHERE ua.inviter_id = $1 AND ($2 = '%%' OR u.email ILIKE $2 OR u.username ILIKE $2)
+ORDER BY u.id LIMIT $3 OFFSET $4`, parentUserID, pattern, pageSize, (page-1)*pageSize)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1104,18 +856,9 @@ ORDER BY u.id LIMIT $4 OFFSET $5`, parentUserID, programID, pattern, pageSize, (
 	for rows.Next() {
 		var node DistributionTreeNode
 		var email string
-		var override sql.NullInt64
-		if err := rows.Scan(&node.UserID, &node.ParentUserID, &email, &node.Username, &node.DirectChildren, &node.TeamVolumeMinor, &node.AutoTier, &override); err != nil {
+		if err := rows.Scan(&node.UserID, &node.ParentUserID, &email, &node.Username, &node.DirectChildren, &node.TeamVolumeMinor); err != nil {
 			return nil, 0, err
 		}
-		if override.Valid {
-			tier := int(override.Int64)
-			node.TierOverride = &tier
-			node.EffectiveTier = tier
-		} else {
-			node.EffectiveTier = node.AutoTier
-		}
-		node.CurrentTier = node.EffectiveTier
 		node.EmailMasked = maskDistributionEmail(email)
 		items = append(items, node)
 	}
@@ -1134,10 +877,33 @@ func (s *DistributionService) Ledger(ctx context.Context, userID int64, page, pa
 		return nil, 0, err
 	}
 	var total int64
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM distribution_commissions WHERE program_id = $1 AND beneficiary_user_id = $2`, programID, userID).Scan(&total); err != nil {
+	// 明细要同时覆盖「商城订单佣金」和「历史充值返佣」两张表：
+	// 前者是当前唯一在写入的佣金来源，后者只留痕但历史用户的钱在里面。
+	if err := s.db.QueryRowContext(ctx, `
+SELECT (SELECT COUNT(*) FROM distribution_commissions WHERE program_id = $1 AND beneficiary_user_id = $2)
+     + (SELECT COUNT(*) FROM shop_commission_records WHERE tenant_id = 1 AND beneficiary_user_id = $2)`, programID, userID).Scan(&total); err != nil {
 		return nil, 0, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id, source_order_id, source_user_id, depth, tier, rate_bps, base_cny_minor, amount_cny_minor, team_volume_cny_minor, status, frozen_until, created_at FROM distribution_commissions WHERE program_id = $1 AND beneficiary_user_id = $2 ORDER BY created_at DESC, id DESC LIMIT $3 OFFSET $4`, programID, userID, pageSize, (page-1)*pageSize)
+	rows, err := s.db.QueryContext(ctx, `
+WITH merged AS (
+    SELECT 'distribution'::text AS source, id, source_order_id, source_user_id, depth, tier, rate_bps,
+           base_cny_minor, amount_cny_minor, team_volume_cny_minor, status, frozen_until, created_at
+    FROM distribution_commissions
+    WHERE program_id = $1 AND beneficiary_user_id = $2
+    UNION ALL
+    -- 商城佣金：商品上架时定死的单层返佣比例。
+    -- depth 恒为 1（只结算直接邀请人）、tier 恒为 0（已无档位体系）；
+    -- team_volume 列对单层模型没有意义，与 base 取同值仅为保持列形状一致。
+    SELECT 'shop'::text AS source, id, shop_order_id, buyer_user_id, 1, 0, commission_bps,
+           base_cny_minor, amount_cny_minor, base_cny_minor, status, frozen_until, created_at
+    FROM shop_commission_records
+    WHERE tenant_id = 1 AND beneficiary_user_id = $2
+)
+SELECT source, id, source_order_id, source_user_id, depth, tier, rate_bps,
+       base_cny_minor, amount_cny_minor, team_volume_cny_minor, status, frozen_until, created_at
+FROM merged
+ORDER BY created_at DESC, source DESC, id DESC
+LIMIT $3 OFFSET $4`, programID, userID, pageSize, (page-1)*pageSize)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1145,7 +911,7 @@ func (s *DistributionService) Ledger(ctx context.Context, userID int64, page, pa
 	items := make([]DistributionCommission, 0, pageSize)
 	for rows.Next() {
 		var item DistributionCommission
-		if err := rows.Scan(&item.ID, &item.SourceOrderID, &item.SourceUserID, &item.Depth, &item.Tier, &item.RateBPS, &item.BaseMinor, &item.AmountMinor, &item.TeamVolumeMinor, &item.Status, &item.FrozenUntil, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.Source, &item.ID, &item.SourceOrderID, &item.SourceUserID, &item.Depth, &item.Tier, &item.RateBPS, &item.BaseMinor, &item.AmountMinor, &item.TeamVolumeMinor, &item.Status, &item.FrozenUntil, &item.CreatedAt); err != nil {
 			return nil, 0, err
 		}
 		items = append(items, item)
@@ -1463,14 +1229,30 @@ func (s *DistributionService) AdminListWithdrawals(ctx context.Context, status s
 func (s *DistributionService) AdminListCommissions(ctx context.Context, page, pageSize int) ([]AdminDistributionCommission, int64, error) {
 	page, pageSize = normalizeFinancialPage(page, pageSize)
 	var total int64
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM distribution_commissions`).Scan(&total); err != nil {
+	// 与用户端明细同一口径：商城佣金 + 历史充值返佣都要能看到，
+	// 否则后台在「充值返佣已下线」之后会是一条空表。
+	if err := s.db.QueryRowContext(ctx, `
+SELECT (SELECT COUNT(*) FROM distribution_commissions)
+     + (SELECT COUNT(*) FROM shop_commission_records)`).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx, `
-SELECT id, source_order_id, source_user_id, beneficiary_user_id, depth, tier, rate_bps,
+WITH merged AS (
+    SELECT 'distribution'::text AS source, id, source_order_id, source_user_id, beneficiary_user_id,
+           depth, tier, rate_bps, base_cny_minor, amount_cny_minor, team_volume_cny_minor,
+           status, frozen_until, created_at
+    FROM distribution_commissions
+    UNION ALL
+    SELECT 'shop'::text AS source, id, shop_order_id, buyer_user_id, beneficiary_user_id,
+           1, 0, commission_bps, base_cny_minor, amount_cny_minor, base_cny_minor,
+           status, frozen_until, created_at
+    FROM shop_commission_records
+    WHERE tenant_id = 1
+)
+SELECT source, id, source_order_id, source_user_id, beneficiary_user_id, depth, tier, rate_bps,
        base_cny_minor, amount_cny_minor, team_volume_cny_minor, status, frozen_until, created_at
-FROM distribution_commissions
-ORDER BY created_at DESC, id DESC
+FROM merged
+ORDER BY created_at DESC, source DESC, id DESC
 LIMIT $1 OFFSET $2`, pageSize, (page-1)*pageSize)
 	if err != nil {
 		return nil, 0, err
@@ -1479,7 +1261,7 @@ LIMIT $1 OFFSET $2`, pageSize, (page-1)*pageSize)
 	items := make([]AdminDistributionCommission, 0, pageSize)
 	for rows.Next() {
 		var item AdminDistributionCommission
-		if err := rows.Scan(&item.ID, &item.SourceOrderID, &item.SourceUserID, &item.BeneficiaryUserID, &item.Depth, &item.Tier, &item.RateBPS, &item.BaseMinor, &item.AmountMinor, &item.TeamVolumeMinor, &item.Status, &item.FrozenUntil, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.Source, &item.ID, &item.SourceOrderID, &item.SourceUserID, &item.BeneficiaryUserID, &item.Depth, &item.Tier, &item.RateBPS, &item.BaseMinor, &item.AmountMinor, &item.TeamVolumeMinor, &item.Status, &item.FrozenUntil, &item.CreatedAt); err != nil {
 			return nil, 0, err
 		}
 		items = append(items, item)
@@ -1573,123 +1355,55 @@ LIMIT $1 OFFSET $2`, pageSize, (page-1)*pageSize)
 	return items, total, rows.Err()
 }
 
-func (s *DistributionService) AdminListTierAssignments(ctx context.Context, search string, page, pageSize int) ([]DistributionTierAssignment, int64, error) {
+// AdminListMembers 列出「正在做推广的人」（至少直接邀请过 1 人）及其业绩与收益。
+//
+// 推广计划没有档位、也没有人工调档，所以这里不再有任何 tier 字段；
+// 业绩与佣金分别来自商城订单（按商品返佣比例结算）与佣金钱包。
+// 业绩口径同样是订单实付额（payable），抵扣部分不计。
+func (s *DistributionService) AdminListMembers(ctx context.Context, search string, page, pageSize int) ([]AdminDistributionMember, int64, error) {
 	page, pageSize = normalizeFinancialPage(page, pageSize)
 	search = strings.TrimSpace(search)
-	var programID int64
-	if err := s.db.QueryRowContext(ctx, `SELECT id FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company'`).Scan(&programID); err != nil {
-		return nil, 0, err
-	}
 	var total int64
 	if err := s.db.QueryRowContext(ctx, `
 SELECT COUNT(*)
 FROM users u
 WHERE u.deleted_at IS NULL AND u.status = 'active'
+  AND EXISTS (SELECT 1 FROM user_affiliates ua WHERE ua.inviter_id = u.id)
   AND ($1 = '' OR u.email ILIKE '%' || $1 || '%' OR COALESCE(u.username, '') ILIKE '%' || $1 || '%')`, search).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx, `
 SELECT u.id, u.email, COALESCE(u.username, ''),
-       COALESCE(dm.team_volume_cny_minor, 0), COALESCE(dm.current_tier, 0), dm.tier_override
+       (SELECT COUNT(*) FROM user_affiliates ua WHERE ua.inviter_id = u.id),
+       COALESCE((
+           SELECT SUM(o.payable_cny_minor)
+           FROM shop_orders o
+           JOIN user_affiliates ua ON ua.user_id = o.user_id AND ua.inviter_id = u.id
+           WHERE o.tenant_id = 1 AND o.status IN ('paid', 'fulfilled')
+       ), 0),
+       COALESCE(cw.available_cny_minor, 0),
+       COALESCE(cw.frozen_cny_minor, 0),
+       COALESCE(cw.lifetime_earned_cny_minor, 0)
 FROM users u
-LEFT JOIN distribution_members dm ON dm.program_id = $1 AND dm.user_id = u.id
+LEFT JOIN distribution_cash_wallets cw ON cw.tenant_id = 1 AND cw.user_id = u.id
 WHERE u.deleted_at IS NULL AND u.status = 'active'
-  AND ($2 = '' OR u.email ILIKE '%' || $2 || '%' OR COALESCE(u.username, '') ILIKE '%' || $2 || '%')
+  AND EXISTS (SELECT 1 FROM user_affiliates ua WHERE ua.inviter_id = u.id)
+  AND ($1 = '' OR u.email ILIKE '%' || $1 || '%' OR COALESCE(u.username, '') ILIKE '%' || $1 || '%')
 ORDER BY u.id DESC
-LIMIT $3 OFFSET $4`, programID, search, pageSize, (page-1)*pageSize)
+LIMIT $2 OFFSET $3`, search, pageSize, (page-1)*pageSize)
 	if err != nil {
 		return nil, 0, err
 	}
 	defer func() { _ = rows.Close() }()
-	items := make([]DistributionTierAssignment, 0, pageSize)
+	items := make([]AdminDistributionMember, 0, pageSize)
 	for rows.Next() {
-		var item DistributionTierAssignment
-		var override sql.NullInt64
-		if err := rows.Scan(&item.UserID, &item.Email, &item.Username, &item.TeamVolumeMinor, &item.AutoTier, &override); err != nil {
+		var item AdminDistributionMember
+		if err := rows.Scan(&item.UserID, &item.Email, &item.Username, &item.InviteeCount, &item.InviteeSpendMinor, &item.AvailableMinor, &item.FrozenMinor, &item.LifetimeMinor); err != nil {
 			return nil, 0, err
-		}
-		if override.Valid {
-			tier := int(override.Int64)
-			item.TierOverride = &tier
-			item.EffectiveTier = tier
-		} else {
-			item.EffectiveTier = item.AutoTier
 		}
 		items = append(items, item)
 	}
 	return items, total, rows.Err()
-}
-
-func (s *DistributionService) AdminSetTierOverride(ctx context.Context, operatorID, userID int64, tierOverride *int, reason string) (*DistributionTierAssignment, error) {
-	if operatorID <= 0 || userID <= 0 {
-		return nil, infraerrors.BadRequest("DISTRIBUTION_TIER_ASSIGNMENT_INVALID", "invalid user id")
-	}
-	if tierOverride != nil && (*tierOverride < 0 || *tierOverride > 3) {
-		return nil, infraerrors.BadRequest("DISTRIBUTION_TIER_ASSIGNMENT_INVALID", "tier override must be between 0 and 3")
-	}
-	reason = strings.TrimSpace(reason)
-	if len(reason) > 500 {
-		return nil, infraerrors.BadRequest("DISTRIBUTION_TIER_ASSIGNMENT_INVALID", "tier override reason is too long")
-	}
-	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = tx.Rollback() }()
-	var programID int64
-	if err := tx.QueryRowContext(ctx, `SELECT id FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company' FOR UPDATE`).Scan(&programID); err != nil {
-		return nil, err
-	}
-	var exists bool
-	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL)`, userID).Scan(&exists); err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, infraerrors.NotFound("USER_NOT_FOUND", "user not found")
-	}
-	if err := ensureDistributionMemberTx(ctx, tx, programID, userID); err != nil {
-		return nil, err
-	}
-	if _, err := tx.ExecContext(ctx, `
-UPDATE distribution_members
-SET tier_override = $3::smallint,
-    tier_override_by = CASE WHEN $3::smallint IS NULL THEN NULL ELSE $4::bigint END,
-    tier_override_at = CASE WHEN $3::smallint IS NULL THEN NULL ELSE NOW() END,
-    tier_override_reason = CASE WHEN $3::smallint IS NULL THEN NULL ELSE NULLIF($5, '') END,
-    updated_at = NOW()
-WHERE program_id = $1 AND user_id = $2`, programID, userID, tierOverride, operatorID, reason); err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	return s.loadDistributionTierAssignment(ctx, programID, userID)
-}
-
-func (s *DistributionService) loadDistributionTierAssignment(ctx context.Context, programID, userID int64) (*DistributionTierAssignment, error) {
-	var item DistributionTierAssignment
-	var override sql.NullInt64
-	err := s.db.QueryRowContext(ctx, `
-SELECT u.id, u.email, COALESCE(u.username, ''),
-       COALESCE(dm.team_volume_cny_minor, 0), COALESCE(dm.current_tier, 0), dm.tier_override
-FROM users u
-LEFT JOIN distribution_members dm ON dm.program_id = $1 AND dm.user_id = u.id
-WHERE u.id = $2 AND u.deleted_at IS NULL`, programID, userID).Scan(
-		&item.UserID, &item.Email, &item.Username, &item.TeamVolumeMinor, &item.AutoTier, &override)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, infraerrors.NotFound("USER_NOT_FOUND", "user not found")
-	}
-	if err != nil {
-		return nil, err
-	}
-	if override.Valid {
-		tier := int(override.Int64)
-		item.TierOverride = &tier
-		item.EffectiveTier = tier
-	} else {
-		item.EffectiveTier = item.AutoTier
-	}
-	return &item, nil
 }
 
 func normalizeFinancialPage(page, pageSize int) (int, int) {
@@ -1954,69 +1668,16 @@ func calculateCommissionMinor(baseMinor int64, rateBPS int64) int64 {
 	return decimal.NewFromInt(baseMinor).Mul(decimal.NewFromInt(rateBPS)).Div(decimal.NewFromInt(10000)).Round(0).IntPart()
 }
 
+// validateDistributionPolicy 校验推广计划的「钱包与提现」参数。
+//
+// 推广计划已没有档位：返佣比例不在这里配置，而是每个商品上架时各自设定。
+// 所以这个校验里不再有任何 tiers 相关断言。
 func validateDistributionPolicy(input DistributionPolicyInput) (decimal.Decimal, error) {
 	bonusCap, err := decimal.NewFromString(strings.TrimSpace(input.FirstRechargeBonusCap))
-	if err != nil || bonusCap.IsNegative() || bonusCap.Exponent() < -8 || input.CommissionFreezeHours < 0 || input.WithdrawalMinMinor <= 0 || input.WithdrawalDailyLimit <= 0 || input.WithdrawalFeeBPS < 0 || input.WithdrawalFeeBPS >= 10000 || input.FirstRechargeBonusBPS < 0 || input.FirstRechargeBonusBPS > 10000 || len(input.Tiers) != 4 {
+	if err != nil || bonusCap.IsNegative() || bonusCap.Exponent() < -8 || input.CommissionFreezeHours < 0 || input.WithdrawalMinMinor <= 0 || input.WithdrawalDailyLimit <= 0 || input.WithdrawalFeeBPS < 0 || input.WithdrawalFeeBPS >= 10000 || input.FirstRechargeBonusBPS < 0 || input.FirstRechargeBonusBPS > 10000 {
 		return decimal.Zero, infraerrors.BadRequest("DISTRIBUTION_POLICY_INVALID", "invalid distribution policy")
 	}
-	previousThreshold := int64(0)
-	for index, tier := range input.Tiers {
-		if tier.Tier != index || (index == 0 && tier.Threshold != 0) || (index > 0 && tier.Threshold <= previousThreshold) {
-			return decimal.Zero, infraerrors.BadRequest("DISTRIBUTION_POLICY_INVALID", "distribution tiers must be ordered and increasing")
-		}
-		if index == 0 && tier.RatesBPS != [5]int64{1000, 0, 0, 0, 0} {
-			return decimal.Zero, infraerrors.BadRequest("DISTRIBUTION_POLICY_INVALID", "T0 must pay only the core compute department at 10%")
-		}
-		for _, rate := range tier.RatesBPS {
-			if rate < 0 || rate > 10000 {
-				return decimal.Zero, infraerrors.BadRequest("DISTRIBUTION_POLICY_INVALID", "distribution rate is outside the valid range")
-			}
-		}
-		previousThreshold = tier.Threshold
-	}
 	return bonusCap, nil
-}
-
-func loadDistributionTiers(ctx context.Context, tx *sql.Tx, programID int64, version int) ([]DistributionTier, error) {
-	return loadDistributionTiersDB(ctx, tx, programID, version)
-}
-
-type distributionTierQueryer interface {
-	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
-}
-
-func loadDistributionTiersDB(ctx context.Context, db distributionTierQueryer, programID int64, version int) ([]DistributionTier, error) {
-	rows, err := db.QueryContext(ctx, `SELECT tier, threshold_cny_minor, level1_bps, level2_bps, level3_bps, level4_bps, level5_bps FROM distribution_tier_configs WHERE program_id = $1 AND config_version = $2 ORDER BY tier`, programID, version)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-	tiers := make([]DistributionTier, 0, 4)
-	for rows.Next() {
-		var tier DistributionTier
-		if err := rows.Scan(&tier.Tier, &tier.Threshold, &tier.RatesBPS[0], &tier.RatesBPS[1], &tier.RatesBPS[2], &tier.RatesBPS[3], &tier.RatesBPS[4]); err != nil {
-			return nil, err
-		}
-		tiers = append(tiers, tier)
-	}
-	return tiers, rows.Err()
-}
-
-func tierForVolume(tiers []DistributionTier, volume int64) int {
-	tier := 0
-	for _, candidate := range tiers {
-		if volume >= candidate.Threshold {
-			tier = candidate.Tier
-		}
-	}
-	return tier
-}
-
-func commissionTierForRecharge(tiers []DistributionTier, previousVolume int64, override *int) int {
-	if override != nil {
-		return *override
-	}
-	return tierForVolume(tiers, previousVolume)
 }
 
 func ensureDistributionMemberTx(ctx context.Context, tx *sql.Tx, programID, userID int64) error {

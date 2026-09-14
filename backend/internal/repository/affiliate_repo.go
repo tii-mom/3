@@ -146,11 +146,12 @@ WITH programs AS (
     FROM programs p CROSS JOIN (VALUES ($1::bigint), ($2::bigint)) AS u(id)
     ON CONFLICT DO NOTHING
 )
+-- 推广计划为单层：只登记「直接邀请人 → 被邀请人」这一条 depth=1 的关系。
+-- 历史上这里会沿邀请链向上展开到第 5 层，自迁移 211 起不再产生更深层关系；
+-- 存量 depth 2~5 的关系保留在表里供历史佣金追溯，但不再参与任何结算。
 INSERT INTO distribution_relations (program_id, tenant_id, ancestor_user_id, descendant_user_id, depth)
-SELECT p.id, p.tenant_id, r.ancestor_user_id, $1, r.depth + 1
+SELECT p.id, p.tenant_id, $2, $1, 1
 FROM programs p
-JOIN distribution_relations r ON r.program_id = p.id AND r.descendant_user_id = $2
-WHERE r.depth < 5 AND r.ancestor_user_id <> $1
 ON CONFLICT DO NOTHING`, userID, inviterID)
 	if err != nil {
 		return fmt.Errorf("bind distribution relation: %w", err)

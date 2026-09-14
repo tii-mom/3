@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"regexp"
 	"strconv"
@@ -149,18 +150,23 @@ type ShopBanner struct {
 }
 
 type ShopOrder struct {
-	ID                      int64   `json:"id"`
-	UserID                  int64   `json:"user_id"`
-	ProductID               int64   `json:"product_id"`
-	PaymentOrderID          *int64  `json:"payment_order_id,omitempty"`
-	Status                  string  `json:"status"`
-	FulfillmentStatus       string  `json:"fulfillment_status"`
-	CommissionStatus        string  `json:"commission_status"`
-	SnapshotName            string  `json:"snapshot_name"`
-	SnapshotDescription     string  `json:"snapshot_description"`
-	SnapshotImageURL        string  `json:"snapshot_image_url"`
-	SnapshotProductType     string  `json:"snapshot_product_type"`
-	SnapshotPriceCNYMinor   int64   `json:"snapshot_price_cny_minor"`
+	ID                    int64  `json:"id"`
+	UserID                int64  `json:"user_id"`
+	ProductID             int64  `json:"product_id"`
+	PaymentOrderID        *int64 `json:"payment_order_id,omitempty"`
+	Status                string `json:"status"`
+	FulfillmentStatus     string `json:"fulfillment_status"`
+	CommissionStatus      string `json:"commission_status"`
+	SnapshotName          string `json:"snapshot_name"`
+	SnapshotDescription   string `json:"snapshot_description"`
+	SnapshotImageURL      string `json:"snapshot_image_url"`
+	SnapshotProductType   string `json:"snapshot_product_type"`
+	SnapshotPriceCNYMinor int64  `json:"snapshot_price_cny_minor"`
+	// WalletAppliedCNYMinor = 本单用人民币返点余额抵扣的金额；
+	// PayableCNYMinor = 还需外部支付（微信/支付宝）的金额。
+	// 恒等式：PayableCNYMinor = SnapshotPriceCNYMinor - WalletAppliedCNYMinor。
+	WalletAppliedCNYMinor   int64   `json:"wallet_applied_cny_minor"`
+	PayableCNYMinor         int64   `json:"payable_cny_minor"`
 	SnapshotGrantUSD        string  `json:"snapshot_grant_usd_amount"`
 	SnapshotCommissionBPS   int     `json:"snapshot_commission_bps"`
 	FulfillmentNote         string  `json:"fulfillment_note"`
@@ -180,6 +186,19 @@ type ShopOrder struct {
 type CreateShopOrderResult struct {
 	ShopOrderID int64                `json:"shop_order_id"`
 	Payment     *CreateOrderResponse `json:"payment"`
+	// WalletAppliedCNYMinor 本单抵扣的返点余额；PayableCNYMinor 还需外部支付的金额。
+	WalletAppliedCNYMinor int64 `json:"wallet_applied_cny_minor"`
+	PayableCNYMinor       int64 `json:"payable_cny_minor"`
+	// FullyPaidByWallet 为 true 时没有外部支付环节：订单已经直接进入交付，
+	// 前端不要再去拉起支付渠道，直接跳订单页。
+	FullyPaidByWallet bool `json:"fully_paid_by_wallet"`
+}
+
+// ShopWalletBalance 是「我的返点余额」快照，用于下单页展示可用抵扣。
+type ShopWalletBalance struct {
+	Enabled           bool  `json:"enabled"`
+	AvailableCNYMinor int64 `json:"available_cny_minor"`
+	FrozenCNYMinor    int64 `json:"frozen_cny_minor"`
 }
 
 type UpsertShopProductInput struct {
@@ -429,17 +448,41 @@ func (s *ShopService) DeleteBanner(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (s *ShopService) CreateOrderAndPayment(ctx context.Context, userID int64, productID int64, paymentType, returnURL, clientIP, srcHost, srcURL, locale string, isMobile, isWeChatBrowser bool, openID string) (*CreateShopOrderResult, error) {
-	if s.paymentService == nil {
-		return nil, infraerrors.Forbidden("PAYMENT_UNAVAILABLE", "payment system is unavailable")
-	}
-	shopOrderID, amount, err := s.createPendingShopOrder(ctx, userID, productID)
+func (s *ShopService) CreateOrderAndPayment(ctx context.Context, userID int64, productID int64, paymentType, returnURL, clientIP, srcHost, srcURL, locale string, isMobile, isWeChatBrowser bool, openID string, useWallet bool) (*CreateShopOrderResult, error) {
+	shopOrderID, payableMinor, appliedMinor, err := s.createPendingShopOrder(ctx, userID, productID, useWallet)
 	if err != nil {
 		return nil, err
 	}
+	// 全额抵扣：没有外部支付环节，直接完成交付（下单 → 发货走同一条幂等链路）。
+	if payableMinor <= 0 {
+		if err := s.FulfillWalletPaidOrder(ctx, shopOrderID); err != nil {
+			// 交付失败（如库存被并发抢空）时把订单作废并退回抵扣的余额，
+			// 不能出现「余额已扣、货没发」的悬空订单。
+			s.abortPendingShopOrder(ctx, shopOrderID, "failed")
+			return nil, err
+		}
+		return &CreateShopOrderResult{
+			ShopOrderID:           shopOrderID,
+			WalletAppliedCNYMinor: appliedMinor,
+			PayableCNYMinor:       0,
+			FullyPaidByWallet:     true,
+		}, nil
+	}
+	if s.paymentService == nil {
+		// 支付系统不可用：订单不可能再被支付。必须在这里就作废订单并退回已抵扣的
+		// 返点余额，否则会留下一张永远 pending、余额却被扣掉的悬空订单
+		// （没有外部支付单，也就没有任何超时事件会来关它）。
+		s.abortPendingShopOrder(ctx, shopOrderID, "failed")
+		return nil, infraerrors.Forbidden("PAYMENT_UNAVAILABLE", "payment system is unavailable")
+	}
+	// 有外部应付金额时才要求支付方式；全额抵扣的订单没有支付环节。
+	if strings.TrimSpace(paymentType) == "" {
+		s.abortPendingShopOrder(ctx, shopOrderID, "failed")
+		return nil, infraerrors.BadRequest("PAYMENT_TYPE_REQUIRED", "payment type is required")
+	}
 	paymentResp, err := s.paymentService.CreateOrder(ctx, CreateOrderRequest{
 		UserID:          userID,
-		Amount:          amount,
+		Amount:          float64(payableMinor) / 100,
 		PaymentType:     paymentType,
 		OpenID:          openID,
 		ClientIP:        clientIP,
@@ -454,16 +497,27 @@ func (s *ShopService) CreateOrderAndPayment(ctx context.Context, userID int64, p
 		Locale:          locale,
 	})
 	if err != nil {
-		_, _ = s.db.ExecContext(ctx, `UPDATE shop_orders SET status = 'failed', updated_at = NOW() WHERE id = $1 AND status = 'pending'`, shopOrderID)
+		// 支付单创建失败：订单作废，同时把已经抵扣的返点余额退回。
+		s.abortPendingShopOrder(ctx, shopOrderID, "failed")
 		return nil, err
 	}
-	return &CreateShopOrderResult{ShopOrderID: shopOrderID, Payment: paymentResp}, nil
+	return &CreateShopOrderResult{
+		ShopOrderID:           shopOrderID,
+		Payment:               paymentResp,
+		WalletAppliedCNYMinor: appliedMinor,
+		PayableCNYMinor:       payableMinor,
+	}, nil
 }
 
-func (s *ShopService) createPendingShopOrder(ctx context.Context, userID, productID int64) (int64, float64, error) {
+// createPendingShopOrder 创建待支付订单，并按需用返点余额抵扣。
+//
+// 返回 (shopOrderID, payableMinor, appliedMinor)：
+//   - appliedMinor 是实际抵扣金额（余额不足时按可用余额抵扣，可能为 0）；
+//   - payableMinor 是还需外部支付的金额，为 0 表示全额抵扣。
+func (s *ShopService) createPendingShopOrder(ctx context.Context, userID, productID int64, useWallet bool) (int64, int64, int64, error) {
 	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	defer func() { _ = tx.Rollback() }()
 	var name, desc, imageURL, productType, grantRaw, status string
@@ -477,33 +531,185 @@ FROM shop_products
 WHERE tenant_id = 1 AND id = $1 AND deleted_at IS NULL
 FOR UPDATE`, productID).Scan(&name, &desc, &imageURL, &productType, &priceMinor, &originalMinor, &grantRaw, &stock, &commissionBPS, &status)
 	if errors.Is(err, sql.ErrNoRows) || status != "published" {
-		return 0, 0, infraerrors.NotFound("SHOP_PRODUCT_NOT_AVAILABLE", "product is not available")
+		return 0, 0, 0, infraerrors.NotFound("SHOP_PRODUCT_NOT_AVAILABLE", "product is not available")
 	}
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	if stock.Valid && stock.Int64 <= 0 {
-		return 0, 0, infraerrors.Conflict("SHOP_PRODUCT_SOLD_OUT", "product is sold out")
+		return 0, 0, 0, infraerrors.Conflict("SHOP_PRODUCT_SOLD_OUT", "product is sold out")
 	}
 	var shopOrderID int64
 	err = tx.QueryRowContext(ctx, `
 INSERT INTO shop_orders (tenant_id, user_id, product_id, snapshot_name, snapshot_description, snapshot_image_url,
-    snapshot_product_type, snapshot_price_cny_minor, snapshot_grant_usd_amount, snapshot_commission_bps)
-VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9)
+    snapshot_product_type, snapshot_price_cny_minor, snapshot_grant_usd_amount, snapshot_commission_bps, payable_cny_minor)
+VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $7)
 RETURNING id`, userID, productID, name, desc, imageURL, productType, priceMinor, grantRaw, commissionBPS).Scan(&shopOrderID)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
+	}
+	// 先落单再抵扣：抵扣流水需要带上订单号作为幂等键。
+	var appliedMinor int64
+	if useWallet {
+		programID, err := enabledShopWalletProgramIDTx(ctx, tx)
+		if err != nil {
+			return 0, 0, 0, err
+		}
+		appliedMinor, err = debitWalletForShopOrderTx(ctx, tx, programID, userID, shopOrderID, priceMinor)
+		if err != nil {
+			return 0, 0, 0, err
+		}
+		if appliedMinor > 0 {
+			if _, err := tx.ExecContext(ctx, `UPDATE shop_orders SET wallet_applied_cny_minor = $2, payable_cny_minor = snapshot_price_cny_minor - $2, updated_at = NOW() WHERE id = $1`, shopOrderID, appliedMinor); err != nil {
+				return 0, 0, 0, err
+			}
+		}
 	}
 	if err := tx.Commit(); err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
-	return shopOrderID, float64(priceMinor) / 100, nil
+	return shopOrderID, priceMinor - appliedMinor, appliedMinor, nil
+}
+
+// shopWalletQueryer 让「查推广计划」既能跑在 *sql.Tx 上也能跑在 *sql.DB 上。
+type shopWalletQueryer interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+// enabledShopWalletProgramIDTx 返回推广计划 program id；计划缺失或未启用时返回 0。
+func enabledShopWalletProgramIDTx(ctx context.Context, q shopWalletQueryer) (int64, error) {
+	var programID int64
+	err := q.QueryRowContext(ctx, `SELECT id FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company' AND enabled = TRUE`).Scan(&programID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	return programID, nil
+}
+
+// debitWalletForShopOrderTx 用人民币返点余额抵扣订单，返回实际抵扣金额。
+//
+// 余额不足时按可用余额抵扣（前端也会传 min(可用, 应付)，这里再兜一层，
+// 因为锁行的顺序决定了必须以锁定后读到的余额为准）。
+func debitWalletForShopOrderTx(ctx context.Context, tx *sql.Tx, programID, userID, orderID, wantMinor int64) (int64, error) {
+	if programID <= 0 || wantMinor <= 0 {
+		return 0, nil
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO distribution_cash_wallets (program_id, tenant_id, user_id) VALUES ($1, 1, $2) ON CONFLICT DO NOTHING`, programID, userID); err != nil {
+		return 0, err
+	}
+	var available int64
+	if err := tx.QueryRowContext(ctx, `SELECT available_cny_minor FROM distribution_cash_wallets WHERE program_id = $1 AND user_id = $2 FOR UPDATE`, programID, userID).Scan(&available); err != nil {
+		return 0, err
+	}
+	applied := minInt64(available, wantMinor)
+	if applied <= 0 {
+		return 0, nil
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE distribution_cash_wallets SET available_cny_minor = available_cny_minor - $3, updated_at = NOW() WHERE program_id = $1 AND user_id = $2`, programID, userID, applied); err != nil {
+		return 0, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+INSERT INTO distribution_wallet_ledger (program_id, tenant_id, user_id, action, amount_cny_minor, source_type, source_id, available_after, frozen_after, withdrawing_after, debt_after, idempotency_key, metadata)
+SELECT $1, 1, $2, 'shop_wallet_deduction', $3, 'shop_order', $4, available_cny_minor, frozen_cny_minor, withdrawing_cny_minor, debt_cny_minor, $5, jsonb_build_object('label', '商城下单抵扣')
+FROM distribution_cash_wallets WHERE program_id = $1 AND user_id = $2
+ON CONFLICT DO NOTHING`, programID, userID, -applied, strconv.FormatInt(orderID, 10), fmt.Sprintf("shop:order:%d:wallet-deduction", orderID)); err != nil {
+		return 0, err
+	}
+	return applied, nil
+}
+
+// refundShopOrderWalletTx 订单作废/退款时，把已抵扣的返点余额退回可用余额。
+func refundShopOrderWalletTx(ctx context.Context, tx *sql.Tx, orderID int64) error {
+	var userID, applied int64
+	if err := tx.QueryRowContext(ctx, `SELECT user_id, wallet_applied_cny_minor FROM shop_orders WHERE tenant_id = 1 AND id = $1 FOR UPDATE`, orderID).Scan(&userID, &applied); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+	if applied <= 0 {
+		return nil
+	}
+	programID, err := enabledShopWalletProgramIDTx(ctx, tx)
+	if err != nil {
+		return err
+	}
+	if programID <= 0 {
+		return nil
+	}
+	// 幂等：同一张订单只退一次。
+	var exists bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM distribution_wallet_ledger WHERE program_id = $1 AND idempotency_key = $2)`, programID, fmt.Sprintf("shop:order:%d:wallet-refund", orderID)).Scan(&exists); err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO distribution_cash_wallets (program_id, tenant_id, user_id) VALUES ($1, 1, $2) ON CONFLICT DO NOTHING`, programID, userID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE distribution_cash_wallets SET available_cny_minor = available_cny_minor + $3, updated_at = NOW() WHERE program_id = $1 AND user_id = $2`, programID, userID, applied); err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `
+INSERT INTO distribution_wallet_ledger (program_id, tenant_id, user_id, action, amount_cny_minor, source_type, source_id, available_after, frozen_after, withdrawing_after, debt_after, idempotency_key, metadata)
+SELECT $1, 1, $2, 'shop_wallet_deduction_refund', $3, 'shop_order', $4, available_cny_minor, frozen_cny_minor, withdrawing_cny_minor, debt_cny_minor, $5, jsonb_build_object('label', '订单关闭退回抵扣')
+FROM distribution_cash_wallets WHERE program_id = $1 AND user_id = $2
+ON CONFLICT DO NOTHING`, programID, userID, applied, strconv.FormatInt(orderID, 10), fmt.Sprintf("shop:order:%d:wallet-refund", orderID))
+	return err
+}
+
+// abortPendingShopOrder 把订单置为终止态并退回抵扣余额，供下单链路失败时调用。
+func (s *ShopService) abortPendingShopOrder(ctx context.Context, shopOrderID int64, status string) {
+	if status != "cancelled" && status != "failed" {
+		status = "failed"
+	}
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		slog.Error("abort shop order: begin tx failed", "shop_order_id", shopOrderID, "error", err)
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `UPDATE shop_orders SET status = $2, fulfillment_status = 'failed', updated_at = NOW() WHERE tenant_id = 1 AND id = $1 AND status = 'pending'`, shopOrderID, status); err != nil {
+		slog.Error("abort shop order: update failed", "shop_order_id", shopOrderID, "error", err)
+		return
+	}
+	if err := refundShopOrderWalletTx(ctx, tx, shopOrderID); err != nil {
+		slog.Error("abort shop order: wallet refund failed", "shop_order_id", shopOrderID, "error", err)
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		slog.Error("abort shop order: commit failed", "shop_order_id", shopOrderID, "error", err)
+	}
+}
+
+// WalletBalance 返回当前用户可用于商城抵扣的返点余额。
+func (s *ShopService) WalletBalance(ctx context.Context, userID int64) (*ShopWalletBalance, error) {
+	programID, err := enabledShopWalletProgramIDTx(ctx, s.db)
+	if err != nil {
+		return nil, err
+	}
+	if programID <= 0 {
+		return &ShopWalletBalance{}, nil
+	}
+	var available, frozen int64
+	err = s.db.QueryRowContext(ctx, `SELECT available_cny_minor, frozen_cny_minor FROM distribution_cash_wallets WHERE program_id = $1 AND user_id = $2`, programID, userID).Scan(&available, &frozen)
+	if errors.Is(err, sql.ErrNoRows) {
+		return &ShopWalletBalance{Enabled: true}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &ShopWalletBalance{Enabled: true, AvailableCNYMinor: available, FrozenCNYMinor: frozen}, nil
 }
 
 func (s *ShopService) ValidatePendingOrderForPayment(ctx context.Context, shopOrderID, userID int64) (float64, error) {
-	var priceMinor int64
+	var priceMinor, payableMinor int64
 	var status string
-	err := s.db.QueryRowContext(ctx, `SELECT snapshot_price_cny_minor, status FROM shop_orders WHERE tenant_id = 1 AND id = $1 AND user_id = $2`, shopOrderID, userID).Scan(&priceMinor, &status)
+	err := s.db.QueryRowContext(ctx, `SELECT snapshot_price_cny_minor, payable_cny_minor, status FROM shop_orders WHERE tenant_id = 1 AND id = $1 AND user_id = $2`, shopOrderID, userID).Scan(&priceMinor, &payableMinor, &status)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, infraerrors.NotFound("SHOP_ORDER_NOT_FOUND", "shop order not found")
 	}
@@ -513,7 +719,14 @@ func (s *ShopService) ValidatePendingOrderForPayment(ctx context.Context, shopOr
 	if status != "pending" {
 		return 0, infraerrors.Conflict("SHOP_ORDER_NOT_PENDING", "shop order is not pending")
 	}
-	return float64(priceMinor) / 100, nil
+	// 抵扣过的订单只对外收「还需支付」的部分；待支付金额必须为正。
+	if payableMinor <= 0 {
+		if priceMinor <= 0 {
+			return 0, infraerrors.BadRequest("SHOP_ORDER_PAYABLE_INVALID", "shop order payable amount is invalid")
+		}
+		payableMinor = priceMinor
+	}
+	return float64(payableMinor) / 100, nil
 }
 
 func (s *ShopService) AttachPaymentOrder(ctx context.Context, shopOrderID, userID, paymentOrderID int64) error {
@@ -527,18 +740,33 @@ func (s *ShopService) AttachPaymentOrder(ctx context.Context, shopOrderID, userI
 	return nil
 }
 
+// MarkPaymentOrderClosed 把未支付的商城订单置为终止态，并退回已抵扣的返点余额。
 func (s *ShopService) MarkPaymentOrderClosed(ctx context.Context, paymentOrderID int64, status string) error {
 	status = strings.TrimSpace(status)
 	if status != "cancelled" && status != "failed" {
 		return infraerrors.BadRequest("SHOP_ORDER_STATUS_INVALID", "shop order status is invalid")
 	}
-	_, err := s.db.ExecContext(ctx, `
-UPDATE shop_orders
-SET status = $2, fulfillment_status = 'failed', updated_at = NOW()
-WHERE tenant_id = 1
-  AND payment_order_id = $1
-  AND status = 'pending'`, paymentOrderID, status)
-	return err
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var shopOrderID int64
+	err = tx.QueryRowContext(ctx, `SELECT id FROM shop_orders WHERE tenant_id = 1 AND payment_order_id = $1 AND status = 'pending' FOR UPDATE`, paymentOrderID).Scan(&shopOrderID)
+	if errors.Is(err, sql.ErrNoRows) {
+		// 订单已不是待支付状态：无需处理（可能已支付或已被关闭）。
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE shop_orders SET status = $2, fulfillment_status = 'failed', updated_at = NOW() WHERE id = $1`, shopOrderID, status); err != nil {
+		return err
+	}
+	if err := refundShopOrderWalletTx(ctx, tx, shopOrderID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *ShopService) AdminFulfillOrder(ctx context.Context, orderID int64, note string) error {
@@ -599,32 +827,58 @@ WHERE id = $1`, orderID, note, now); err != nil {
 }
 
 func (s *ShopService) FulfillPaidPaymentOrder(ctx context.Context, paymentOrderID int64) error {
+	return s.fulfillShopOrder(ctx, paymentOrderID, 0)
+}
+
+// FulfillWalletPaidOrder 处理「全额返点余额抵扣」的订单：没有外部支付单，
+// 但交付链路必须与正常支付完全一致（发货、佣金、库存扣减、幂等）。
+func (s *ShopService) FulfillWalletPaidOrder(ctx context.Context, shopOrderID int64) error {
+	return s.fulfillShopOrder(ctx, 0, shopOrderID)
+}
+
+// fulfillShopOrder 按 paymentOrderID 或 shopOrderID 二选一定位订单并完成交付。
+// paymentOrderID <= 0 表示该订单没有外部支付单（全额余额抵扣）。
+func (s *ShopService) fulfillShopOrder(ctx context.Context, paymentOrderID, shopOrderID int64) error {
 	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
 	var order ShopOrder
+	var resolvedPaymentOrderID sql.NullInt64
 	var paidAt sql.NullTime
+	selector := `payment_order_id = $1`
+	arg := paymentOrderID
+	if paymentOrderID <= 0 {
+		selector = `id = $1`
+		arg = shopOrderID
+	}
 	err = tx.QueryRowContext(ctx, `
-SELECT id, user_id, product_id, status, fulfillment_status, commission_status, snapshot_name, snapshot_description,
-       snapshot_image_url, snapshot_product_type, snapshot_price_cny_minor, snapshot_grant_usd_amount::text,
+SELECT id, user_id, product_id, payment_order_id, status, fulfillment_status, commission_status, snapshot_name, snapshot_description,
+       snapshot_image_url, snapshot_product_type, snapshot_price_cny_minor, wallet_applied_cny_minor, payable_cny_minor,
+       snapshot_grant_usd_amount::text,
        snapshot_commission_bps, fulfillment_note, paid_at
 FROM shop_orders
-WHERE tenant_id = 1 AND payment_order_id = $1
-FOR UPDATE`, paymentOrderID).Scan(&order.ID, &order.UserID, &order.ProductID, &order.Status, &order.FulfillmentStatus, &order.CommissionStatus,
+WHERE tenant_id = 1 AND `+selector+`
+FOR UPDATE`, arg).Scan(&order.ID, &order.UserID, &order.ProductID, &resolvedPaymentOrderID, &order.Status, &order.FulfillmentStatus, &order.CommissionStatus,
 		&order.SnapshotName, &order.SnapshotDescription, &order.SnapshotImageURL, &order.SnapshotProductType,
-		&order.SnapshotPriceCNYMinor, &order.SnapshotGrantUSD, &order.SnapshotCommissionBPS, &order.FulfillmentNote, &paidAt)
+		&order.SnapshotPriceCNYMinor, &order.WalletAppliedCNYMinor, &order.PayableCNYMinor, &order.SnapshotGrantUSD,
+		&order.SnapshotCommissionBPS, &order.FulfillmentNote, &paidAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return infraerrors.NotFound("SHOP_ORDER_NOT_FOUND", "shop order not found")
 	}
 	if err != nil {
 		return err
 	}
+	if resolvedPaymentOrderID.Valid && resolvedPaymentOrderID.Int64 > 0 {
+		paymentOrderID = resolvedPaymentOrderID.Int64
+	} else {
+		// 无外部支付单：全额抵扣订单，任何 payment_orders 回写都要跳过。
+		paymentOrderID = 0
+	}
 	if order.SnapshotProductType == ShopProductTypeVirtual {
 		if order.Status == "fulfilled" || (order.Status == "paid" && order.FulfillmentStatus == "pending") {
-			_, err = tx.ExecContext(ctx, `UPDATE payment_orders SET status = $2, completed_at = COALESCE(completed_at, NOW()), updated_at = NOW() WHERE id = $1 AND status <> $2`, paymentOrderID, OrderStatusCompleted)
-			if err != nil {
+			if err := s.completeLinkedPaymentOrder(ctx, tx, paymentOrderID); err != nil {
 				return err
 			}
 			return tx.Commit()
@@ -634,8 +888,7 @@ FOR UPDATE`, paymentOrderID).Scan(&order.ID, &order.UserID, &order.ProductID, &o
 		}
 	}
 	if order.FulfillmentStatus == "fulfilled" {
-		_, err = tx.ExecContext(ctx, `UPDATE payment_orders SET status = $2, completed_at = COALESCE(completed_at, NOW()), updated_at = NOW() WHERE id = $1 AND status <> $2`, paymentOrderID, OrderStatusCompleted)
-		if err != nil {
+		if err := s.completeLinkedPaymentOrder(ctx, tx, paymentOrderID); err != nil {
 			return err
 		}
 		return tx.Commit()
@@ -673,14 +926,32 @@ FOR UPDATE`, paymentOrderID).Scan(&order.ID, &order.UserID, &order.ProductID, &o
 			return err
 		}
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE payment_orders SET status = $2, completed_at = COALESCE(completed_at, NOW()), updated_at = NOW() WHERE id = $1`, paymentOrderID, OrderStatusCompleted); err != nil {
+	if err := s.completeLinkedPaymentOrder(ctx, tx, paymentOrderID); err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
+// completeLinkedPaymentOrder 把关联支付单回写为已完成。
+// paymentOrderID <= 0 表示订单没有外部支付单（全额返点余额抵扣），直接跳过，
+// 避免误写 payment_orders。本函数只负责写入，不再内部 Commit：
+// 提交交给调用方统一处理，否则会出现「已提交事务再 Commit」的 sql.ErrTxDone。
+func (s *ShopService) completeLinkedPaymentOrder(ctx context.Context, tx *sql.Tx, paymentOrderID int64) error {
+	if paymentOrderID <= 0 {
+		return nil
+	}
+	_, err := tx.ExecContext(ctx, `UPDATE payment_orders SET status = $2, completed_at = COALESCE(completed_at, NOW()), updated_at = NOW() WHERE id = $1 AND status <> $2`, paymentOrderID, OrderStatusCompleted)
+	return err
+}
+
 func (s *ShopService) issueCommissionTx(ctx context.Context, tx *sql.Tx, order ShopOrder) error {
-	if order.SnapshotCommissionBPS <= 0 || order.SnapshotPriceCNYMinor <= 0 {
+	// 返佣基数只取「外部实付金额」：用返点余额抵扣掉的那部分钱本身就是平台
+	// 已经付出过的返点，再计一次会形成「返点 → 抵扣下单 → 再返点」的无锚增发。
+	baseMinor := order.PayableCNYMinor
+	if baseMinor <= 0 {
+		baseMinor = order.SnapshotPriceCNYMinor - order.WalletAppliedCNYMinor
+	}
+	if order.SnapshotCommissionBPS <= 0 || baseMinor <= 0 {
 		_, err := tx.ExecContext(ctx, `UPDATE shop_orders SET commission_status = 'none', updated_at = NOW() WHERE id = $1`, order.ID)
 		return err
 	}
@@ -702,7 +973,7 @@ func (s *ShopService) issueCommissionTx(ctx context.Context, tx *sql.Tx, order S
 	if err != nil {
 		return err
 	}
-	amountMinor := int64(math.Floor(float64(order.SnapshotPriceCNYMinor*int64(order.SnapshotCommissionBPS))/10000 + 0.5))
+	amountMinor := int64(math.Floor(float64(baseMinor*int64(order.SnapshotCommissionBPS))/10000 + 0.5))
 	if amountMinor <= 0 {
 		_, err := tx.ExecContext(ctx, `UPDATE shop_orders SET commission_status = 'none', updated_at = NOW() WHERE id = $1`, order.ID)
 		return err
@@ -714,7 +985,7 @@ INSERT INTO shop_commission_records (tenant_id, shop_order_id, product_id, buyer
     base_cny_minor, commission_bps, amount_cny_minor, frozen_until, idempotency_key)
 VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (shop_order_id) DO NOTHING
-RETURNING id`, order.ID, order.ProductID, order.UserID, inviterID.Int64, order.SnapshotPriceCNYMinor, order.SnapshotCommissionBPS, amountMinor, frozenUntil, fmt.Sprintf("shop:commission:%d", order.ID)).Scan(&commissionID)
+RETURNING id`, order.ID, order.ProductID, order.UserID, inviterID.Int64, baseMinor, order.SnapshotCommissionBPS, amountMinor, frozenUntil, fmt.Sprintf("shop:commission:%d", order.ID)).Scan(&commissionID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
@@ -760,7 +1031,8 @@ func (s *ShopService) listOrders(ctx context.Context, userID int64, page, pageSi
 	rows, err := s.db.QueryContext(ctx, `
 SELECT o.id, o.user_id, o.product_id, o.payment_order_id, o.status, o.fulfillment_status, o.commission_status,
        o.snapshot_name, o.snapshot_description, o.snapshot_image_url, o.snapshot_product_type,
-       o.snapshot_price_cny_minor, o.snapshot_grant_usd_amount::text, o.snapshot_commission_bps,
+       o.snapshot_price_cny_minor, o.wallet_applied_cny_minor, o.payable_cny_minor,
+       o.snapshot_grant_usd_amount::text, o.snapshot_commission_bps,
        o.fulfillment_note, COALESCE(u.email, ''), COALESCE(o.order_no, ''), COALESCE(o.guest_token, ''),
        COALESCE(o.guest_contact, ''), COALESCE(o.snapshot_fulfillment_mode, 'manual'), COALESCE(o.delivery_hint, ''),
        o.delivery_submitted_at, COALESCE(o.rental_duration, ''), o.created_at, o.paid_at, o.fulfilled_at
@@ -933,7 +1205,8 @@ func scanShopOrder(rows productScanner) (ShopOrder, error) {
 	var paidAt, fulfilledAt, deliverySubmittedAt sql.NullTime
 	err := rows.Scan(&item.ID, &item.UserID, &item.ProductID, &paymentOrderID, &item.Status, &item.FulfillmentStatus,
 		&item.CommissionStatus, &item.SnapshotName, &item.SnapshotDescription, &item.SnapshotImageURL,
-		&item.SnapshotProductType, &item.SnapshotPriceCNYMinor, &item.SnapshotGrantUSD,
+		&item.SnapshotProductType, &item.SnapshotPriceCNYMinor, &item.WalletAppliedCNYMinor, &item.PayableCNYMinor,
+		&item.SnapshotGrantUSD,
 		&item.SnapshotCommissionBPS, &item.FulfillmentNote, &item.UserEmail, &item.OrderNo, &item.GuestToken,
 		&item.GuestContact, &item.SnapshotFulfillmentMode, &item.DeliveryHint, &deliverySubmittedAt,
 		&item.RentalDuration, &created, &paidAt, &fulfilledAt)

@@ -20,12 +20,20 @@ import (
 const scenarioWorkers = 12
 
 func runFinancialScenarios(ctx context.Context, db *sql.DB) (_ map[string]string, err error) {
+	// 只统计「可登录账号」：迁移 206 会种一个 guest@internal.3api.invalid
+	// 系统游客账号（password_hash 为 nologin: 前缀，永不可登录），
+	// 若把系统账号也算进去，任何跑过迁移的库都会被判定为非空。
 	var existingUsers int64
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users`).Scan(&existingUsers); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users WHERE password_hash NOT LIKE 'nologin:%'`).Scan(&existingUsers); err != nil {
 		return nil, err
 	}
 	if existingUsers != 0 {
-		return nil, fmt.Errorf("refusing destructive scenarios: expected an empty users table, found %d rows", existingUsers)
+		return nil, fmt.Errorf("refusing destructive scenarios: expected an empty users table (ignoring nologin system accounts), found %d login-capable rows", existingUsers)
+	}
+	// 迁移会种下系统账号（如 206 的游客账号），它们没有信用桶；而开启推广计划
+	// 会校验「每个用户都有信用桶」。这里先补齐，否则场景永远跑不起来。
+	if err := ensureCreditAccountsForAllUsers(ctx, db); err != nil {
+		return nil, err
 	}
 
 	settings := databaseSettings{db: db}
@@ -42,20 +50,15 @@ func runFinancialScenarios(ctx context.Context, db *sql.DB) (_ map[string]string
 	if err != nil {
 		return nil, err
 	}
-	if err := seedDistributionChain(ctx, db, users[:6]); err != nil {
+	// 整条邀请链都要建（含 users[6]）：商城佣金场景的买家是 users[6]，
+	// 他必须有邀请人才会结算佣金。少建一个，佣金就静默变成 'none'。
+	if err := seedDistributionChain(ctx, db, users); err != nil {
 		return nil, err
 	}
 	if err := distribution.UpdateFinancialRuntimeConfig(ctx, true); err != nil {
 		return nil, err
 	}
 	if err := distribution.UpdateProgramConfig(ctx, true, false); err != nil {
-		return nil, err
-	}
-	var programID int64
-	if err := db.QueryRowContext(ctx, `SELECT id FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company'`).Scan(&programID); err != nil {
-		return nil, err
-	}
-	if _, err := db.ExecContext(ctx, `UPDATE distribution_members SET team_volume_cny_minor = 100000, current_tier = 1 WHERE program_id = $1 AND user_id = ANY($2::bigint[])`, programID, pq.Array(users[:6])); err != nil {
 		return nil, err
 	}
 
@@ -69,7 +72,8 @@ func runFinancialScenarios(ctx context.Context, db *sql.DB) (_ map[string]string
 	if err := assertDistributionScenario(ctx, db, orderID, users[:6]); err != nil {
 		return nil, err
 	}
-	tierScheduleResult, err := runTierScheduleScenario(ctx, db, distribution, users[:6])
+	// 商城才是现在唯一会「产生佣金」的地方：余额充值不再发佣金。
+	shopResult, err := runShopMoneyScenario(ctx, db, users)
 	if err != nil {
 		return nil, err
 	}
@@ -95,13 +99,49 @@ func runFinancialScenarios(ctx context.Context, db *sql.DB) (_ map[string]string
 	}
 
 	return map[string]string{
-		"distribution_concurrency":   fmt.Sprintf("%d duplicate deliveries -> 1 event, 5 commissions, CNY 200.00 total", scenarioWorkers),
-		"distribution_tier_schedule": tierScheduleResult,
-		"distribution_withdrawal":    withdrawalResult,
-		"first_recharge_bonus":       "USD 10,000 principal -> USD 1,000 non-transferable bonus",
-		"voucher_lifecycle":          voucherResult,
-		"wholesale_billing":          wholesaleResult,
+		"distribution_concurrency": fmt.Sprintf("%d duplicate deliveries -> 1 recharge event, 0 commissions (recharge no longer pays commission)", scenarioWorkers),
+		"distribution_shop_money":  shopResult,
+		"distribution_withdrawal":  withdrawalResult,
+		"first_recharge_bonus":     "USD 10,000 principal -> USD 1,000 non-transferable bonus",
+		"voucher_lifecycle":        voucherResult,
+		"wholesale_billing":        wholesaleResult,
 	}, nil
+}
+
+// ensureCreditAccountsForAllUsers 给所有还没有信用桶的用户补桶。
+// 迁移种下的系统账号（206 的游客账号等）默认没有信用桶，
+// 而「开启推广计划」会要求全库用户都有桶，不补齐场景就无法推进。
+func ensureCreditAccountsForAllUsers(ctx context.Context, db *sql.DB) error {
+	rows, err := db.QueryContext(ctx, `
+SELECT u.id
+FROM users u
+LEFT JOIN user_credit_accounts a ON a.user_id = u.id
+WHERE a.user_id IS NULL
+ORDER BY u.id`)
+	if err != nil {
+		return fmt.Errorf("find users without credit accounts: %w", err)
+	}
+	var pending []int64
+	for rows.Next() {
+		var userID int64
+		if err := rows.Scan(&userID); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		pending = append(pending, userID)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, userID := range pending {
+		if err := creditledger.EnsureAccount(ctx, db, userID); err != nil {
+			return fmt.Errorf("initialize credit account for user %d: %w", userID, err)
+		}
+	}
+	return nil
 }
 
 func seedScenarioUsers(ctx context.Context, db *sql.DB) ([]int64, error) {
@@ -207,7 +247,7 @@ func runConcurrentRecharge(ctx context.Context, distribution *service.Distributi
 }
 
 func assertDistributionScenario(ctx context.Context, db *sql.DB, orderID int64, users []int64) error {
-	var events, commissions int64
+	var events int64
 	var bonus string
 	if err := db.QueryRowContext(ctx, `SELECT COUNT(*), COALESCE(MAX(first_recharge_bonus_usd), 0)::text FROM distribution_recharge_events WHERE source_order_id = $1`, orderID).Scan(&events, &bonus); err != nil {
 		return err
@@ -215,32 +255,21 @@ func assertDistributionScenario(ctx context.Context, db *sql.DB, orderID int64, 
 	if events != 1 || bonus != "1000.00000000" {
 		return fmt.Errorf("unexpected recharge event result: events=%d bonus=%s", events, bonus)
 	}
-	var amount int64
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*), COALESCE(SUM(amount_cny_minor), 0) FROM distribution_commissions WHERE source_order_id = $1`, orderID).Scan(&commissions, &amount); err != nil {
+	// 余额充值不再产生推广佣金（返佣只跟着商品的 commission_bps 走）。
+	// 重复投递 12 次的旧断言是「1 事件 + 5 层佣金」，现在必须是「1 事件 + 0 佣金」。
+	var rechargeCommissions int64
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM distribution_commissions WHERE source_order_id = $1`, orderID).Scan(&rechargeCommissions); err != nil {
 		return err
 	}
-	if commissions != 5 || amount != 20000 {
-		return fmt.Errorf("unexpected commissions: count=%d amount_minor=%d", commissions, amount)
+	if rechargeCommissions != 0 {
+		return fmt.Errorf("recharge must not settle commission, found %d rows", rechargeCommissions)
 	}
-	var matching int64
-	if err := db.QueryRowContext(ctx, `
-SELECT COUNT(*) FROM distribution_commissions
-WHERE source_order_id = $1
-  AND (depth, rate_bps, amount_cny_minor) IN ((1,1000,10000),(2,400,4000),(3,300,3000),(4,200,2000),(5,100,1000))`, orderID).Scan(&matching); err != nil {
+	var shopCommissions int64
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM shop_commission_records`).Scan(&shopCommissions); err != nil {
 		return err
 	}
-	if matching != 5 {
-		return fmt.Errorf("commission depth/rate schedule mismatch: matched=%d", matching)
-	}
-	var relationCount, tierOneMembers int64
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM distribution_relations WHERE descendant_user_id = $1 AND depth BETWEEN 0 AND 5`, users[5]).Scan(&relationCount); err != nil {
-		return err
-	}
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM distribution_members WHERE user_id = ANY($1::bigint[]) AND team_volume_cny_minor = 200000 AND current_tier = 1`, pq.Array(users)).Scan(&tierOneMembers); err != nil {
-		return err
-	}
-	if relationCount != 6 || tierOneMembers != 6 {
-		return fmt.Errorf("distribution relation/team mismatch: relations=%d tier1_members=%d", relationCount, tierOneMembers)
+	if shopCommissions != 0 {
+		return fmt.Errorf("recharge fixtures must not touch shop commissions, found %d rows", shopCommissions)
 	}
 	var transferable, nonTransferable, balance string
 	if err := db.QueryRowContext(ctx, `SELECT a.transferable_credit::text, a.non_transferable_credit::text, u.balance::text FROM user_credit_accounts a JOIN users u ON u.id = a.user_id WHERE a.user_id = $1`, users[5]).Scan(&transferable, &nonTransferable, &balance); err != nil {
@@ -252,85 +281,161 @@ WHERE source_order_id = $1
 	return nil
 }
 
-func runTierScheduleScenario(ctx context.Context, db *sql.DB, distribution *service.DistributionService, users []int64) (string, error) {
-	if len(users) < 6 {
-		return "", errors.New("tier schedule scenario requires a six-user chain")
+// runShopMoneyScenario 覆盖当前唯一会「产生佣金」与「花掉返点」的地方 —— 商城订单，
+// 全部走真实的 service 代码路径（不自己拼佣金 SQL）：
+//
+//	A. 外部全额支付：恰好 1 笔商城佣金，基数 = 实付额，费率 = 商品 commission_bps；
+//	B. 返点余额全额抵扣：不再产生佣金（否则「返点 → 抵扣下单 → 再返点」会无锚增发），
+//	   且买家返点余额被真实扣减；
+//	C. 余额不足以全额抵扣：抵扣被回滚、订单作废、余额退回，且不留佣金。
+//
+// 这里不覆盖「部分抵扣 + 外部补付」的支付单链路：那一段需要真实支付渠道，
+// 由生产环境的支付回调链路负责；本场景只锁死「钱与佣金」的守恒关系。
+func runShopMoneyScenario(ctx context.Context, db *sql.DB, users []int64) (string, error) {
+	if len(users) < 7 {
+		return "", errors.New("shop money scenario requires seven users")
 	}
+	shop := service.NewShopService(db)
+
 	var programID int64
 	if err := db.QueryRowContext(ctx, `SELECT id FROM distribution_programs WHERE tenant_id = 1 AND code = 'compute_company'`).Scan(&programID); err != nil {
 		return "", err
 	}
-	// Set the pre-order volume of each ancestor to a different tier. The next
-	// recharge crosses some thresholds, proving that rates use the prior tier.
-	if _, err := db.ExecContext(ctx, `
-UPDATE distribution_members
-SET team_volume_cny_minor = CASE user_id
-    WHEN $2 THEN 100000
-    WHEN $3 THEN 1000000
-    WHEN $4 THEN 10000000
-    WHEN $5 THEN 0
-    WHEN $6 THEN 100000
-    ELSE team_volume_cny_minor
-END,
-current_tier = CASE user_id
-    WHEN $2 THEN 1
-    WHEN $3 THEN 2
-    WHEN $4 THEN 3
-    WHEN $5 THEN 0
-    WHEN $6 THEN 1
-    ELSE current_tier
-END
-WHERE program_id = $1 AND user_id = ANY($7::bigint[])`, programID, users[0], users[1], users[2], users[3], users[4], pq.Array(users)); err != nil {
-		return "", err
+	const (
+		priceMinor = 10000 // ¥100.00
+		commission = 800   // 8%
+		wantAmount = 800   // ¥8.00
+	)
+	seedWallet := func(userID, available int64) error {
+		_, err := db.ExecContext(ctx, `
+INSERT INTO distribution_cash_wallets (program_id, tenant_id, user_id, available_cny_minor)
+VALUES ($1, 1, $2, $3)
+ON CONFLICT (program_id, user_id) DO UPDATE
+SET available_cny_minor = EXCLUDED.available_cny_minor, updated_at = NOW()`, programID, userID, available)
+		return err
 	}
-	var orderID int64
+	walletAvailable := func(userID int64) (int64, error) {
+		var available int64
+		err := db.QueryRowContext(ctx, `SELECT available_cny_minor FROM distribution_cash_wallets WHERE program_id = $1 AND user_id = $2`, programID, userID).Scan(&available)
+		return available, err
+	}
+
+	var productID int64
 	if err := db.QueryRowContext(ctx, `
-INSERT INTO payment_orders (
-    user_id, user_email, amount, pay_amount, fee_rate, recharge_code,
-    payment_type, payment_trade_no, order_type, status, out_trade_no,
-    expires_at, paid_at, completed_at
-) VALUES ($1, 'financial-gate@example.invalid', 10000, 1000, 0, 'FGATE-TIERS',
-          'gate', 'financial-gate-tier-trade', 'balance', 'COMPLETED', 'financial-gate-tier-order',
-          NOW() + INTERVAL '1 hour', NOW(), NOW())
-RETURNING id`, users[5]).Scan(&orderID); err != nil {
+INSERT INTO shop_products (tenant_id, name, description, product_type, price_cny_minor, commission_bps, status)
+VALUES (1, 'financial-gate-sku', 'gate fixture', 'virtual', $1, $2, 'published')
+RETURNING id`, priceMinor, commission).Scan(&productID); err != nil {
+		return "", fmt.Errorf("insert shop product: %w", err)
+	}
+
+	// A. 外部全额支付：buyer = users[6]，邀请人 = users[5]，佣金归 users[5]。
+	buyerA, beneficiary := users[6], users[5]
+	var orderA int64
+	if err := db.QueryRowContext(ctx, `
+INSERT INTO shop_orders (tenant_id, user_id, product_id, snapshot_name, snapshot_description, snapshot_image_url,
+    snapshot_product_type, snapshot_price_cny_minor, snapshot_grant_usd_amount, snapshot_commission_bps, payable_cny_minor)
+VALUES (1, $1, $2, 'financial-gate-sku', '', '', 'virtual', $3, 0, $4, $3)
+RETURNING id`, buyerA, productID, priceMinor, commission).Scan(&orderA); err != nil {
+		return "", fmt.Errorf("insert externally paid shop order: %w", err)
+	}
+	if err := shop.FulfillWalletPaidOrder(ctx, orderA); err != nil {
+		return "", fmt.Errorf("fulfil externally paid shop order: %w", err)
+	}
+	var base, bps, amount int64
+	var commissionStatus, beneficiaryID string
+	if err := db.QueryRowContext(ctx, `
+SELECT base_cny_minor, commission_bps, amount_cny_minor, status, beneficiary_user_id::text
+FROM shop_commission_records WHERE shop_order_id = $1`, orderA).Scan(&base, &bps, &amount, &commissionStatus, &beneficiaryID); err != nil {
+		return "", fmt.Errorf("read shop commission: %w", err)
+	}
+	if base != priceMinor || bps != commission || amount != wantAmount || commissionStatus != "FROZEN" {
+		return "", fmt.Errorf("shop commission mismatch: base=%d bps=%d amount=%d status=%s", base, bps, amount, commissionStatus)
+	}
+	var wantBeneficiary string
+	if err := db.QueryRowContext(ctx, `SELECT $1::text`, beneficiary).Scan(&wantBeneficiary); err != nil {
 		return "", err
 	}
-	if _, err := distribution.ProcessRecharge(ctx, orderID, users[5], decimal.NewFromInt(1000), decimal.Zero, decimal.NewFromInt(10000)); err != nil {
+	if beneficiaryID != wantBeneficiary {
+		return "", fmt.Errorf("shop commission beneficiary=%s want=%s", beneficiaryID, wantBeneficiary)
+	}
+	var orderAStatus, orderACommission string
+	if err := db.QueryRowContext(ctx, `SELECT status, commission_status FROM shop_orders WHERE id = $1`, orderA).Scan(&orderAStatus, &orderACommission); err != nil {
 		return "", err
 	}
-	rows, err := db.QueryContext(ctx, `SELECT depth, rate_bps, amount_cny_minor FROM distribution_commissions WHERE source_order_id = $1 ORDER BY depth`, orderID)
+	if orderAStatus != "paid" || orderACommission != "frozen" {
+		return "", fmt.Errorf("externally paid order state mismatch: status=%s commission=%s", orderAStatus, orderACommission)
+	}
+
+	// B. 返点余额全额抵扣：buyer = users[4]（邀请人 users[3]），余额充足。
+	buyerB := users[4]
+	if err := seedWallet(buyerB, priceMinor+5000); err != nil {
+		return "", err
+	}
+	resultB, err := shop.CreateOrderAndPayment(ctx, buyerB, productID, "", "", "", "", "", "", false, false, "", true)
+	if err != nil {
+		return "", fmt.Errorf("full wallet deduction order: %w", err)
+	}
+	if !resultB.FullyPaidByWallet || resultB.PayableCNYMinor != 0 || resultB.WalletAppliedCNYMinor != priceMinor {
+		return "", fmt.Errorf("full deduction result mismatch: fully=%t payable=%d applied=%d", resultB.FullyPaidByWallet, resultB.PayableCNYMinor, resultB.WalletAppliedCNYMinor)
+	}
+	availableB, err := walletAvailable(buyerB)
 	if err != nil {
 		return "", err
 	}
-	defer func() { _ = rows.Close() }()
-	type commission struct{ rate, amount int64 }
-	got := make(map[int]commission)
-	for rows.Next() {
-		var depth int
-		var item commission
-		if err := rows.Scan(&depth, &item.rate, &item.amount); err != nil {
-			return "", err
-		}
-		got[depth] = item
+	if availableB != 5000 {
+		return "", fmt.Errorf("full deduction did not debit wallet: available=%d want=5000", availableB)
 	}
-	if err := rows.Err(); err != nil {
+	var orderBStatus, orderBCommission string
+	if err := db.QueryRowContext(ctx, `SELECT status, commission_status FROM shop_orders WHERE id = $1`, resultB.ShopOrderID).Scan(&orderBStatus, &orderBCommission); err != nil {
 		return "", err
 	}
-	expected := map[int]commission{
-		1: {rate: 1000, amount: 10000},
-		3: {rate: 600, amount: 6000},
-		4: {rate: 300, amount: 3000},
-		5: {rate: 100, amount: 1000},
+	// 虚拟商品的订单在「已付款、待人工交付」时停在 paid/pending（与外部支付一致），
+	// 关键断言是它没有结算佣金。
+	if orderBStatus != "paid" || orderBCommission != "none" {
+		return "", fmt.Errorf("fully deducted order state mismatch: status=%s commission=%s", orderBStatus, orderBCommission)
 	}
-	if len(got) != len(expected) {
-		return "", fmt.Errorf("tier schedule commission count=%d, want %d", len(got), len(expected))
+
+	// C. 余额不足：全额抵扣失败 → 抵扣回滚、订单作废、余额退回，且不留佣金。
+	buyerC := users[2]
+	if err := seedWallet(buyerC, 3000); err != nil {
+		return "", err
 	}
-	for depth, want := range expected {
-		if got[depth] != want {
-			return "", fmt.Errorf("tier schedule depth %d got=%+v want=%+v", depth, got[depth], want)
-		}
+	if _, err := shop.CreateOrderAndPayment(ctx, buyerC, productID, "alipay", "", "", "", "", "", false, false, "", true); err == nil {
+		return "", errors.New("insufficient balance must not create an externally payable order without a payment provider")
 	}
-	return "T1/T2/T3 five-layer rates settled with T0 zero-rate depth omitted", nil
+	availableC, err := walletAvailable(buyerC)
+	if err != nil {
+		return "", err
+	}
+	if availableC != 3000 {
+		return "", fmt.Errorf("aborted order did not refund wallet: available=%d want=3000", availableC)
+	}
+	var orderC int64
+	var orderCStatus string
+	if err := db.QueryRowContext(ctx, `SELECT id, status FROM shop_orders WHERE user_id = $1 ORDER BY id DESC LIMIT 1`, buyerC).Scan(&orderC, &orderCStatus); err != nil {
+		return "", err
+	}
+	if orderCStatus != "failed" {
+		return "", fmt.Errorf("aborted shop order status=%s want=failed", orderCStatus)
+	}
+	var refunds int64
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM distribution_wallet_ledger WHERE idempotency_key = $1`, fmt.Sprintf("shop:order:%d:wallet-refund", orderC)).Scan(&refunds); err != nil {
+		return "", err
+	}
+	if refunds != 1 {
+		return "", fmt.Errorf("aborted order wallet refunds=%d want=1", refunds)
+	}
+
+	// 全程只应存在 A 留下的那一笔佣金。
+	var totalCommissions int64
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM shop_commission_records`).Scan(&totalCommissions); err != nil {
+		return "", err
+	}
+	if totalCommissions != 1 {
+		return "", fmt.Errorf("shop commissions total=%d want=1 (deducted portion must not pay commission)", totalCommissions)
+	}
+
+	return "CNY 100 order -> 1 commission of CNY 8.00 on paid base; full wallet deduction pays 0 commission; aborted deduction refunded", nil
 }
 
 func runWithdrawalScenario(ctx context.Context, db *sql.DB, paidUserID, rejectedUserID int64) (string, error) {
@@ -626,8 +731,8 @@ RETURNING id`, buyerID, fmt.Sprintf("stress-trade-%d-%d", runID, i), fmt.Sprintf
 	if err := db.QueryRowContext(ctx, `SELECT COUNT(*), COALESCE(SUM(amount_cny_minor), 0) FROM distribution_commissions WHERE source_order_id = ANY($1::bigint[])`, pq.Array(orderIDs)).Scan(&commissionCount, &commissionMinor); err != nil {
 		return "", err
 	}
-	if eventCount != int64(orderCount) || commissionCount != int64(orderCount*5) || commissionMinor != int64(orderCount*20) {
-		return "", fmt.Errorf("stress conservation mismatch: events=%d commissions=%d amount_minor=%d", eventCount, commissionCount, commissionMinor)
+	if eventCount != int64(orderCount) || commissionCount != 0 || commissionMinor != 0 {
+		return "", fmt.Errorf("stress conservation mismatch: want events=%d commissions=0, got events=%d commissions=%d amount_minor=%d", orderCount, eventCount, commissionCount, commissionMinor)
 	}
 	rate := float64(orderCount) / duration.Seconds()
 	return fmt.Sprintf("%d orders, %d workers, %d events, %d commissions, %s, %.1f orders/s", orderCount, concurrency, eventCount, commissionCount, duration.Round(time.Millisecond), rate), nil

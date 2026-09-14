@@ -36,11 +36,16 @@ func (h *ShopHandler) ListProducts(c *gin.Context) {
 }
 
 type createShopOrderRequest struct {
-	ProductID   int64  `json:"product_id" binding:"required"`
-	PaymentType string `json:"payment_type" binding:"required"`
+	ProductID int64 `json:"product_id" binding:"required"`
+	// PaymentType 在「全额返点余额抵扣」时可以为空（没有外部支付环节），
+	// 是否必填由 service 按应付金额判断，避免把无支付单的订单挡在绑定校验外。
+	PaymentType string `json:"payment_type"`
 	ReturnURL   string `json:"return_url"`
 	OpenID      string `json:"openid"`
 	IsMobile    *bool  `json:"is_mobile,omitempty"`
+	// UseWallet 为 true 时先扣人民币返点余额，差额再走微信/支付宝；
+	// 余额足够全额抵扣时不产生外部支付单（结果里 fully_paid_by_wallet = true）。
+	UseWallet bool `json:"use_wallet"`
 }
 
 func (h *ShopHandler) CreateOrder(c *gin.Context) {
@@ -70,12 +75,28 @@ func (h *ShopHandler) CreateOrder(c *gin.Context) {
 		mobile,
 		isWeChatBrowser(c),
 		strings.TrimSpace(req.OpenID),
+		req.UseWallet,
 	)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
 	response.Success(c, result)
+}
+
+// WalletBalance 返回当前用户可用于商城抵扣的人民币返点余额。
+// 与「API 美金额度」是两个完全独立的资金账户，前端下单页用它展示可抵扣上限。
+func (h *ShopHandler) WalletBalance(c *gin.Context) {
+	subject, ok := requireAuth(c)
+	if !ok {
+		return
+	}
+	balance, err := h.shopService.WalletBalance(c.Request.Context(), subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, balance)
 }
 
 func (h *ShopHandler) MyOrders(c *gin.Context) {

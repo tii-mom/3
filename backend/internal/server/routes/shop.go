@@ -19,6 +19,7 @@ func RegisterShopRoutes(
 	{
 		shop.GET("/banners", shopHandler.ListBanners)
 		shop.GET("/products", shopHandler.ListProducts)
+		shop.GET("/wallet-balance", shopHandler.WalletBalance)
 		shop.POST("/orders", shopHandler.CreateOrder)
 		shop.GET("/orders/my", shopHandler.MyOrders)
 		shop.POST("/orders/claim", shopHandler.ClaimOrder)

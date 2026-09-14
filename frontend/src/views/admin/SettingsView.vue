@@ -6019,7 +6019,7 @@
                     {{ t('nav.distribution') }}
                   </label>
                   <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                    {{ localText('开放用户端算力公司、收益和提现功能。', 'Allows users to access the Compute Company, earnings, and payout features.') }}
+                    {{ localText('开放用户端推广计划、返点和提现功能。', 'Allows users to access the referral program, rebates, and payout features.') }}
                   </p>
                 </div>
                 <Toggle

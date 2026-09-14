@@ -37,6 +37,12 @@ var requiredFinancialMigrations = []string{
 	"195_resolve_currently_balanced_reconciliation_issues.sql",
 	"196_resolve_post_rollout_balanced_reconciliation_issues.sql",
 	"197_resolve_balanced_reconciliation_issues.sql",
+	// 财务模型变更（推广计划单层化 + 返点余额可抵扣商城订单）：
+	// 不加进来，生产就能在「新模型未落库」的情况下通过财务门。
+	"205_balance_voucher_idempotency.sql",
+	"211_promotion_single_level.sql",
+	"212_promotion_drop_tiers.sql",
+	"213_shop_wallet_deduction.sql",
 }
 
 type gateReport struct {
@@ -89,6 +95,33 @@ WHERE NOT EXISTS (SELECT 1 FROM balance_voucher_ledger l WHERE l.voucher_id = v.
 		name: "negative_distribution_wallet",
 		query: `SELECT COUNT(*) FROM distribution_cash_wallets
 WHERE available_cny_minor < 0 OR frozen_cny_minor < 0 OR withdrawing_cny_minor < 0 OR debt_cny_minor < 0`,
+	},
+	{
+		// 恒等式由 CHECK 约束保证，这里再兜一层：约束被误删时门要立刻失败。
+		name: "shop_order_deduction_identity",
+		query: `SELECT COUNT(*) FROM shop_orders
+WHERE payable_cny_minor <> snapshot_price_cny_minor - wallet_applied_cny_minor`,
+	},
+	{
+		// 已终止的订单必须把抵扣的返点余额退回，否则用户的钱被平台吞掉。
+		// 只看 closed 状态：pending 订单还没有退款义务。
+		name: "unrefunded_shop_wallet_deduction",
+		query: `SELECT COUNT(*) FROM shop_orders o
+WHERE o.wallet_applied_cny_minor > 0
+  AND o.status IN ('cancelled', 'failed', 'refunded')
+  AND NOT EXISTS (
+      SELECT 1 FROM distribution_wallet_ledger l
+      WHERE l.idempotency_key = 'shop:order:' || o.id::text || ':wallet-refund'
+  )`,
+	},
+	{
+		// 佣金基数必须是「用户真实付出去的钱」。部分抵扣的订单基数要等于实付额，
+		// 不能按商品原价计佣，否则「返点 → 抵扣下单 → 再返点」会无锚增发。
+		// 只约束发生过抵扣的新模型订单，避免误伤历史充值返佣。
+		name: "partially_deducted_commission_base_mismatch",
+		query: `SELECT COUNT(*) FROM shop_commission_records c
+JOIN shop_orders o ON o.id = c.shop_order_id
+WHERE o.wallet_applied_cny_minor > 0 AND c.base_cny_minor <> o.payable_cny_minor`,
 	},
 	{
 		name: "reversed_recharge_without_single_reversal",

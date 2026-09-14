@@ -20,7 +20,12 @@ describe('Prompt Audit integration surface', () => {
 
   it('keeps the legacy content moderation route and adds both pages under an expand-only security group', () => {
     const sidebar = read('../../../components/layout/AppSidebar.vue')
-    const group = sidebar.slice(sidebar.indexOf("path: '/admin/security-audit'"), sidebar.indexOf("path: '/admin/redeem'"))
+    // 只取 security-audit 这一个菜单项的字面量（到它的收尾 `},` 为止）。
+    // 不要用「下一个菜单路径」当右边界——菜单顺序会随主控台业务优先级调整，
+    // 那样写会让测试因为纯排序改动而误报。
+    const start = sidebar.indexOf("path: '/admin/security-audit'")
+    expect(start).toBeGreaterThan(-1)
+    const group = sidebar.slice(start, sidebar.indexOf('\n    },', start))
     expect(group).toContain('expandOnly: true')
     expect(group).toContain("path: '/admin/risk-control'")
     expect(group).toContain("path: '/admin/prompt-audit'")

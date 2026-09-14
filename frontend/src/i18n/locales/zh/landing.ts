@@ -61,13 +61,13 @@ export default {
       openaiMain: 'OpenAI 主路由',
       claudeBackup: 'Claude 备用路由',
       geminiDirect: 'Gemini 直连路由',
-      computeNetwork: '算力公司网络',
-      companyUnitsCount: '5 个公司单元'
+      computeNetwork: '推广计划网络',
+      companyUnitsCount: '只有一级'
     },
     architecture: {
-      directPartner: '直属伙伴',
-      computeCompany: '算力公司',
-      performanceBadge: '团队业绩 · 公司收益',
+      directPartner: '直接邀请',
+      computeCompany: '推广计划',
+      performanceBadge: '好友充值 · 一级返点',
       endUser: '终端用户',
       t1: 'T1',
       t2: 'T2',
@@ -174,11 +174,11 @@ export default {
       review4Text: '对于多项目开发者来说，一键分发至 CCS 是最爽的体验。管理密钥从来没有这么高效过，官方通道非常稳定。'
     },
     business: {
-      title: '算力公司与收益网络',
-      subtitle: '个人调用和算力合作都由同一套高可用路由、计费与资源控制面支撑。',
-      computeTitle: '算力，也能成为业务网络',
-      computeDesc: '用团队业绩驱动公司收益，冻结、可用与提现流水清晰可追踪，合作关系可持续增长。',
-      openCompute: '进入算力公司'
+      title: '推广计划与返点网络',
+      subtitle: 'API 调用和推广返点跑在同一套高可用路由、计费与资源控制面上。',
+      computeTitle: '分享一次，只有一级',
+      computeDesc: '你直接邀请的好友充值，你就拿返点。冻结、可用与提现流水清晰可追踪。',
+      openCompute: '进入推广计划'
     },
     // 用户痛点区块
     painPoints: {

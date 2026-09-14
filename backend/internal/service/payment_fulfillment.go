@@ -341,7 +341,7 @@ func (s *PaymentService) doBalance(ctx context.Context, o *dbent.PaymentOrder, l
 
 	switch action {
 	case redeemActionSkipCompleted:
-		if _, err := s.applyDistributionForOrder(ctx, o); err != nil {
+		if _, err := s.applyRechargeBonus(ctx, o); err != nil {
 			return err
 		}
 		// Code already created and redeemed — just mark completed
@@ -365,13 +365,18 @@ func (s *PaymentService) doBalance(ctx context.Context, o *dbent.PaymentOrder, l
 	if _, err := s.redeemService.Redeem(creditCtx, o.UserID, o.RechargeCode); err != nil {
 		return fmt.Errorf("redeem balance: %w", err)
 	}
-	if _, err := s.applyDistributionForOrder(ctx, o); err != nil {
+	if _, err := s.applyRechargeBonus(ctx, o); err != nil {
 		return err
 	}
 	return s.markCompleted(ctx, o, lease, "RECHARGE_SUCCESS")
 }
 
-func (s *PaymentService) applyDistributionForOrder(ctx context.Context, order *dbent.PaymentOrder) (DistributionProcessResult, error) {
+// applyRechargeBonus 把「余额充值已完成」告知推广服务。
+//
+// 它**不再发放推广佣金**：返佣只有商城商品一个来源，由商城服务按商品上架时
+// 设置的返佣比例结算。这里留下的唯一业务是首充奖励（被邀请的用户首次充值
+// 额外赠送的额度）以及充水事件的落库。
+func (s *PaymentService) applyRechargeBonus(ctx context.Context, order *dbent.PaymentOrder) (DistributionProcessResult, error) {
 	if s.distributionService == nil || order == nil {
 		return DistributionProcessResult{}, nil
 	}
