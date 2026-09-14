@@ -93,3 +93,24 @@
     如需该修复，只能手工移植「瞬时故障守卫」（网络/429/5xx 不清 token，约 8 行）。
   - `c227863d5` 生图 SSRF → 依赖上游独有功能 `images_url_to_b64_json`，本地无此功能。
   - `4a1da2950` dompurify XSS → 本地已 3.4.12 > 漏洞区间 ≤3.3.3，无需。
+
+## 生产运维（VPS）——长期事实
+
+- **VPS**: `root@43.167.220.227`，本机 `~/.ssh/id_ed25519` 可**直接免密登录**（BatchMode 可用）。
+  部署目录 `/opt/sub2api-deploy`；容器 `sub2api` / `sub2api-postgres` / `sub2api-redis`；
+  另有其他项目的栈：`tai-backend` / `tai-bot`（`/opt/tai-protocol`）——**不要动它们的资源**。
+- 发布链路的权威流程见 skill `3api-deploy-release`。注意 `deploy.yml` 的 push 只在
+  `build-and-push` 产镜像；投产必须 `production-preflight.yml` → `deploy.yml` 两步、同一 digest。
+- ⚠️ **磁盘是常态化风险（50G 盘）**。三个累积源，全是"只增不减"：
+  1. **历史镜像**：每次部署 pull 新 digest 却不删旧的。因为按 digest 拉取，
+     它们**不算 dangling** → `docker image prune -f` 回收 0B，必须显式
+     `docker images ghcr.io/tii-mom/3 --format "{{.ID}}" | tail -n +4 | xargs docker rmi`
+     （保留最新 3 个）。2026-09-14 一次清掉 40 个镜像 ≈ 4GB。
+  2. **preflight 备份**：`/opt/sub2api-deploy/backups/preflight/`，脚本**无 retention**，
+     每次留一份 dump（约 63MB，7/19 起累积到 764MB）。
+  3. **Docker 构建缓存**：`docker builder prune -f` 可回收（2026-09-14 回收 1.655GB）。
+- **preflight 磁盘预检**：`deploy/production-preflight.sh:103`
+  `required = pg_database_size × 3 + 1GiB`。生产库约 1.05GB → 需要 **4.14GB** 可用。
+  低于此值会直接 `Refusing preflight: insufficient disk`。清完磁盘记得留足余量。
+- 🐞 **未修的隐患**：`/opt/sub2api-deploy` 下 Docker **本地卷 23.9GB（37 个，仅 1 个在用）**
+  标记 100% 可回收——未处理，可能属其他项目，需拍板后再动。
