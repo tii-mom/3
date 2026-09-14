@@ -82,3 +82,14 @@
 - **不可直接 merge 升级**：`git merge-tree` 试合并 = **498 文件冲突**；文件级重叠 1018/1347（76%）；
   上游改了 `ent/schema/{user,group,usage_log,subscription_plan,proxy}.go` 等自研依赖的核心表。
 - 升级只走**选择性 cherry-pick**（安全/支付/稳定性补丁），不做全量 merge；任何同步前必须先提交工作区。
+- **2026-09-14 首次选择性同步已执行**：摘取 9 项（支付 5 + 网关/Claude 4），
+  合并提交 `423ad70a8`，备份分支 `backup/pre-upstream-sync-20260914-092056`。
+  验证全绿（后端 build/vet/test；前端 195 文件 1317 用例；财务闸门 13 对账全 0 + 6 场景）。
+  ⚠️ `pages-deploy.yml` 会在 push main 且含 `frontend/**` 时**自动发布前端到生产**——
+  push 前必须确认。
+- **不要尝试摘取的补丁**（已验证不适用，勿重复踩）：
+  - `781a02aea` auth 会话保活 → 本地 `frontend/src/api/client.ts` 是自研会话实现
+    （`isRefreshing` 刷新锁 / `refreshBrowserSession`），与上游结构完全不同，无法 cherry-pick。
+    如需该修复，只能手工移植「瞬时故障守卫」（网络/429/5xx 不清 token，约 8 行）。
+  - `c227863d5` 生图 SSRF → 依赖上游独有功能 `images_url_to_b64_json`，本地无此功能。
+  - `4a1da2950` dompurify XSS → 本地已 3.4.12 > 漏洞区间 ≤3.3.3，无需。
